@@ -1,0 +1,211 @@
+import { getCtx, getTenantId } from "../../utils/route-helper.js";
+import type { FastifyInstance } from 'fastify';
+import { db } from '../../core/database.js';
+import { sendSuccess } from '../../utils/response.js';
+
+export async function registerCommonModule(app: FastifyInstance) {
+  // Dashboard stats
+  app.get('/api/v1/dashboard/stats', {
+    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const today = new Date().toISOString().split('T')[0];
+
+    const [
+      patientCount,
+      appointmentCount,
+      todayAppointments,
+      pendingInvoices,
+      revenueToday,
+      doctorCount,
+    ] = await Promise.all([
+      db('patients')
+        .where({ tenant_id: tenantId, status: 'active' })
+        .whereNull('deleted_at')
+        .count('id as count')
+        .first(),
+      db('appointments')
+        .where({ tenant_id: tenantId })
+        .whereNull('deleted_at')
+        .count('id as count')
+        .first(),
+      db('appointments')
+        .where({ tenant_id: tenantId, appointment_date: today })
+        .whereNull('deleted_at')
+        .count('id as count')
+        .first(),
+      db('invoices')
+        .where({ tenant_id: tenantId })
+        .whereIn('status', ['pending', 'partial', 'overdue'])
+        .whereNull('deleted_at')
+        .count('id as count')
+        .first(),
+      db('invoices')
+        .where({ tenant_id: tenantId })
+        .whereNull('deleted_at')
+        .where(db.raw("issued_at::date = ?", [today]))
+        .sum('paid as total')
+        .first(),
+      db('users')
+        .where({ tenant_id: tenantId, status: 'active' })
+        .whereIn('role_id', function () {
+          this.select('id').from('roles').where('slug', 'doctor');
+        })
+        .count('id as count')
+        .first(),
+    ]);
+
+    return sendSuccess(reply, {
+      totalPatients: Number(patientCount?.count || 0),
+      totalAppointments: Number(appointmentCount?.count || 0),
+      todayAppointments: Number(todayAppointments?.count || 0),
+      pendingBills: Number(pendingInvoices?.count || 0),
+      revenueToday: Number(revenueToday?.total || 0),
+      activeDoctors: Number(doctorCount?.count || 0),
+    });
+  });
+
+  // List doctors
+  app.get('/api/v1/doctors', {
+    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+
+    const doctors = await db('users')
+      .join('roles', 'users.role_id', 'roles.id')
+      .where('users.tenant_id', tenantId)
+      .where('users.status', 'active')
+      .where('roles.slug', 'doctor')
+      .orWhere(function () {
+        this.where('users.tenant_id', tenantId)
+          .where('users.status', 'active')
+          .whereRaw("users.roles::text LIKE '%doctor%'");
+      })
+      .select(
+        'users.id',
+        'users.first_name',
+        'users.last_name',
+        'users.email',
+        'users.phone',
+      )
+      .orderBy('users.first_name');
+
+    return sendSuccess(reply, doctors.map((d: any) => ({
+      id: d.id,
+      name: `${d.first_name} ${d.last_name}`,
+      email: d.email,
+      phone: d.phone,
+    })));
+  });
+
+  // List branches
+  app.get('/api/v1/branches', {
+    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+
+    const branches = await db('branches')
+      .where({ tenant_id: tenantId, status: 'active' })
+      .orderBy('name');
+
+    return sendSuccess(reply, branches.map((b: any) => ({
+      id: b.id,
+      name: b.name,
+      code: b.code,
+      address: b.address ? (typeof b.address === 'string' ? JSON.parse(b.address) : b.address) : null,
+      phone: b.phone,
+      email: b.email,
+      status: b.status,
+    })));
+  });
+
+  // Create branch
+  app.post('/api/v1/branches', {
+    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const body = request.body as any;
+
+    const [branch] = await db('branches').insert({
+      tenant_id: tenantId,
+      name: body.name,
+      code: body.code,
+      address: body.address ? JSON.stringify(body.address) : null,
+      phone: body.phone,
+      email: body.email || null,
+      status: 'active',
+    }).returning('*');
+
+    return sendSuccess(reply, {
+      id: branch.id,
+      name: branch.name,
+      code: branch.code,
+      status: branch.status,
+    }, 'Branch created', 201);
+  });
+
+  // Time slots (for scheduling)
+  app.get('/api/v1/doctors/:doctorId/slots', {
+    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+  }, async (request, reply) => {
+    const { doctorId } = request.params as any;
+    const { date } = request.query as any;
+    const tenantId = getTenantId(request);
+
+    if (!date) {
+      return sendSuccess(reply, []);
+    }
+
+    const existingAppointments = await db('appointments')
+      .where({
+        doctor_id: doctorId,
+        appointment_date: date,
+        tenant_id: tenantId,
+      })
+      .whereNotIn('status', ['cancelled', 'no_show'])
+      .select('start_time', 'end_time');
+
+    const bookedSlots = existingAppointments.map((a: any) => ({
+      start: a.start_time,
+      end: a.end_time,
+    }));
+
+    // Generate time slots (8:00 - 17:00, 15 min intervals)
+    const slots = [];
+    for (let hour = 8; hour < 17; hour++) {
+      for (let min = 0; min < 60; min += 15) {
+        const time = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+        const isBooked = bookedSlots.some(
+          (s: any) => time >= s.start && time < s.end,
+        );
+        slots.push({
+          time,
+          available: !isBooked,
+        });
+      }
+    }
+
+    return sendSuccess(reply, slots);
+  });
+
+  // Activity log (recent)
+  app.get('/api/v1/activity', {
+    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+
+    const activities = await db('audit_logs')
+      .where({ tenant_id: tenantId })
+      .orderBy('timestamp', 'desc')
+      .limit(20);
+
+    return sendSuccess(reply, activities.map((a: any) => ({
+      id: a.id,
+      action: a.action,
+      entity: a.entity,
+      entityId: a.entity_id,
+      userId: a.user_id,
+      timestamp: a.timestamp,
+    })));
+  });
+}

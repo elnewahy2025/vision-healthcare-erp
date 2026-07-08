@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.turbo/
+.env
+.env.local
+*.log
+.DS_Store
+coverage/
+*.tsbuildinfo
+deployment/nginx/ssl/*.pem
+deployment/nginx/ssl/*.key
+public/icon-*.png
+public/apple-touch-icon.png
