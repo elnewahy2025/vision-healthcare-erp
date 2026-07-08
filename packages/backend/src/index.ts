@@ -17,6 +17,16 @@ import { errorHandler } from './core/error-handler.js';
 import { db } from './core/database.js';
 import { redis } from './core/redis.js';
 
+import { registerLaboratoryModule } from './modules/laboratory/index.js';
+import { registerRadiologyModule } from './modules/radiology/index.js';
+import { registerPharmacyModule } from './modules/pharmacy/index.js';
+import { registerQueueModule } from './modules/queue/index.js';
+import { registerReferralModule } from './modules/referral/index.js';
+import { registerNotificationModule } from './modules/notification/index.js';
+import { registerNursingModule } from './modules/nursing/index.js';
+import { registerHomeVisitsModule } from './modules/home-visits/index.js';
+import { registerTelemedicineModule } from './modules/telemedicine/index.js';
+
 const env = getEnv();
 
 async function buildApp() {
@@ -75,6 +85,16 @@ async function buildApp() {
   await registerAppointmentModule(app);
   await registerEmmModule(app);
   await registerBillingModule(app);
+  await registerLaboratoryModule(app);
+  await registerRadiologyModule(app);
+  await registerPharmacyModule(app);
+  await registerQueueModule(app);
+  await registerReferralModule(app);
+  await registerNotificationModule(app);
+  await registerNursingModule(app);
+  await registerHomeVisitsModule(app);
+  await registerTelemedicineModule(app);
+
 
   return app;
 }

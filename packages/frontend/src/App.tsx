@@ -11,6 +11,15 @@ import PatientDetailPage from './pages/PatientDetailPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import EmrPage from './pages/EmrPage';
 import BillingPage from './pages/BillingPage';
+import LaboratoryPage from './pages/LaboratoryPage';
+import RadiologyPage from './pages/RadiologyPage';
+import PharmacyPage from './pages/PharmacyPage';
+import QueuePage from './pages/QueuePage';
+import ReferralsPage from './pages/ReferralsPage';
+import NotificationsPage from './pages/NotificationsPage';
+import NursingPage from './pages/NursingPage';
+import HomeVisitsPage from './pages/HomeVisitsPage';
+import TelemedicinePage from './pages/TelemedicinePage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -56,6 +65,15 @@ function AppContent() {
         <Route path="appointments" element={<AppointmentsPage />} />
         <Route path="emr" element={<EmrPage />} />
         <Route path="billing" element={<BillingPage />} />
+        <Route path="laboratory" element={<LaboratoryPage />} />
+        <Route path="radiology" element={<RadiologyPage />} />
+        <Route path="pharmacy" element={<PharmacyPage />} />
+        <Route path="queue" element={<QueuePage />} />
+        <Route path="referrals" element={<ReferralsPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="nursing" element={<NursingPage />} />
+        <Route path="home-visits" element={<HomeVisitsPage />} />
+        <Route path="telemedicine" element={<TelemedicinePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

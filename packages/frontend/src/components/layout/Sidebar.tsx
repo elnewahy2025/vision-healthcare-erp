@@ -6,6 +6,7 @@ import {
   Receipt, PillBottle, FlaskConical, ScanLine,
   Package, UsersRound, BarChart3, Settings,
   Shield, X, ChevronLeft, Stethoscope,
+  ListOrdered, ArrowLeftRight, Home, Video,
 } from 'lucide-react';
 
 const navItems = [
@@ -13,6 +14,14 @@ const navItems = [
   { path: '/patients', icon: Users, labelKey: 'nav.patients' },
   { path: '/appointments', icon: CalendarCheck, labelKey: 'nav.appointments' },
   { path: '/emr', icon: FileText, labelKey: 'nav.emr' },
+  { path: '/laboratory', icon: FlaskConical, labelKey: 'nav.laboratory' },
+  { path: '/radiology', icon: ScanLine, labelKey: 'nav.radiology' },
+  { path: '/pharmacy', icon: PillBottle, labelKey: 'nav.pharmacy' },
+  { path: '/queue', icon: ListOrdered, labelKey: 'Queue' },
+  { path: '/referrals', icon: ArrowLeftRight, labelKey: 'Referrals' },
+  { path: '/nursing', icon: Stethoscope, labelKey: 'Nursing' },
+  { path: '/home-visits', icon: Home, labelKey: 'Home Visits' },
+  { path: '/telemedicine', icon: Video, labelKey: 'Telemedicine' },
   { path: '/billing', icon: Receipt, labelKey: 'nav.billing' },
 ];
 
