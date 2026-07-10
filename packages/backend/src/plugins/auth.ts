@@ -70,6 +70,7 @@ declare module '@fastify/jwt' {
       permissions: string[];
       locale: 'ar' | 'en';
       branchId?: string;
+      mfaPending?: boolean;
     };
     user: {
       tenantId: string;
@@ -78,6 +79,7 @@ declare module '@fastify/jwt' {
       permissions: string[];
       locale: 'ar' | 'en';
       branchId?: string;
+      mfaPending?: boolean;
     };
   }
 }

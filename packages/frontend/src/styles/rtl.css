@@ -1,0 +1,73 @@
+/* RTL (Right-to-Left) Support for Arabic */
+
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .sidebar-link-inactive,
+[dir="rtl"] .sidebar-link-active {
+  flex-direction: row-reverse;
+}
+
+/* Flip icons in RTL */
+[dir="rtl"] .rotate-180-rtl {
+  transform: rotate(180deg);
+}
+
+/* Data tables RTL */
+[dir="rtl"] table th:first-child,
+[dir="rtl"] table td:first-child {
+  text-align: right;
+}
+
+/* Spacing utilities for RTL */
+[dir="rtl"] .ml-auto { margin-right: auto; margin-left: 0; }
+[dir="rtl"] .mr-auto { margin-left: auto; margin-right: 0; }
+[dir="rtl"] .ml-4 { margin-right: 1rem; margin-left: 0; }
+[dir="rtl"] .mr-4 { margin-left: 1rem; margin-right: 0; }
+[dir="rtl"] .ml-6 { margin-right: 1.5rem; margin-left: 0; }
+[dir="rtl"] .mr-6 { margin-left: 1.5rem; margin-right: 0; }
+[dir="rtl"] .ml-8 { margin-right: 2rem; margin-left: 0; }
+[dir="rtl"] .mr-8 { margin-left: 2rem; margin-right: 0; }
+[dir="rtl"] .pl-4 { padding-right: 1rem; padding-left: 0; }
+[dir="rtl"] .pr-4 { padding-left: 1rem; padding-right: 0; }
+[dir="rtl"] .pl-6 { padding-right: 1.5rem; padding-left: 0; }
+[dir="rtl"] .pr-6 { padding-left: 1.5rem; padding-right: 0; }
+[dir="rtl"] .text-left { text-align: right; }
+[dir="rtl"] .text-right { text-align: left; }
+
+/* Form elements RTL */
+[dir="rtl"] input[type="checkbox"],
+[dir="rtl"] input[type="radio"] {
+  margin-right: 0.5rem;
+  margin-left: 0;
+}
+
+/* Modal RTL */
+[dir="rtl"] .modal-enter {
+  animation: slideInRtl 0.2s ease-out;
+}
+
+@keyframes slideInRtl {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* Badge positioning */
+[dir="rtl"] .badge-close {
+  left: 0.5rem;
+  right: auto;
+}
+
+/* Sidebar mobile RTL */
+[dir="rtl"] .sidebar-open {
+  left: auto;
+  right: 0;
+}
+
+/* Calendar/date picker RTL */
+[dir="rtl"] input[type="date"] {
+  text-align: right;
+  direction: ltr;
+}

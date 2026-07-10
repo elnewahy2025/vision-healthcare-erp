@@ -1,0 +1,77 @@
+import type { FastifyInstance } from 'fastify';
+import { db } from '../../core/database.js';
+import { sendSuccess } from '../../utils/response.js';
+import { getCtx, getTenantId } from '../../utils/route-helper.js';
+
+export async function registerPrintTemplatesModule(app: FastifyInstance) {
+  app.get('/api/v1/print/templates', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const tenantId = getTenantId(request); const { documentType } = request.query as any;
+    let q = db('print_templates').where({ tenant_id: tenantId });
+    if (documentType) q = q.andWhere('document_type', documentType);
+    const templates = await q.orderBy('name');
+    return sendSuccess(reply, templates.map((t: any) => ({
+      id: t.id, name: t.name, code: t.code, category: t.category,
+      documentType: t.document_type, variables: t.variables,
+      paperSize: t.paper_size, isDefault: t.is_default, isActive: t.is_active
+    })));
+  });
+
+  app.get('/api/v1/print/templates/:code', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const tenantId = getTenantId(request); const { code } = request.params as any;
+    const t = await db('print_templates').where({ tenant_id: tenantId, code }).first();
+    if (!t) return reply.status(404).send({ success: false, error: 'Template not found' });
+    return sendSuccess(reply, {
+      id: t.id, name: t.name, code: t.code, category: t.category,
+      documentType: t.document_type, contentHtml: t.content_html,
+      variables: t.variables, styles: t.styles,
+      paperSize: t.paper_size, isDefault: t.is_default
+    });
+  });
+
+  app.post('/api/v1/print/templates', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const tenantId = getTenantId(request); const body = request.body as any;
+    const [t] = await db('print_templates').insert({
+      tenant_id: tenantId, name: body.name, code: body.code,
+      category: body.category || 'clinical', document_type: body.documentType,
+      content_html: body.contentHtml, variables: JSON.stringify(body.variables || []),
+      styles: JSON.stringify(body.styles || {}), paper_size: body.paperSize || 'A4',
+      is_default: body.isDefault || false
+    }).returning('*');
+    return sendSuccess(reply, { id: t.id, code: t.code, name: t.name }, 'Template created', 201);
+  });
+
+  app.put('/api/v1/print/templates/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { id } = request.params as any; const body = request.body as any;
+    const update: any = { updated_at: new Date() };
+    if (body.name) update.name = body.name; if (body.contentHtml) update.content_html = body.contentHtml;
+    if (body.variables) update.variables = JSON.stringify(body.variables);
+    if (body.styles) update.styles = JSON.stringify(body.styles);
+    if (body.isDefault !== undefined) update.is_default = body.isDefault;
+    await db('print_templates').where({ id }).update(update);
+    return sendSuccess(reply, null, 'Template updated');
+  });
+
+  // Render a document (returns HTML for printing)
+  app.get('/api/v1/print/render/:documentType/:referenceId', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const tenantId = getTenantId(request); const { documentType, referenceId } = request.params as any;
+    const template = await db('print_templates').where({ tenant_id: tenantId, document_type: documentType, is_default: true }).first();
+    if (!template) return reply.status(404).send({ success: false, error: 'No default template for this document type' });
+
+    // Fetch reference data based on type
+    let data: any = {};
+    if (documentType === 'invoice') data = await db('invoices').where({ id: referenceId, tenant_id: tenantId }).first() || {};
+    else if (documentType === 'prescription') data = await db('pharmacy_prescriptions').where({ id: referenceId, tenant_id: tenantId }).first() || {};
+    else if (documentType === 'lab_report') data = await db('lab_orders').where({ id: referenceId, tenant_id: tenantId }).first() || {};
+    else if (documentType === 'patient_summary') data = await db('patients').where({ id: referenceId, tenant_id: tenantId }).first() || {};
+
+    // Replace variables in template
+    let html = template.content_html;
+    const vars = template.variables || [];
+    for (const v of vars) {
+      const val = data[v] || `{{${v}}}`;
+      html = html.replace(new RegExp(`\\{\\{${v}\\}\\}`, 'g'), String(val));
+    }
+
+    return reply.type('text/html').send(html);
+  });
+}

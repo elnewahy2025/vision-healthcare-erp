@@ -8,12 +8,24 @@
   }
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
+    /* Prevent iOS zoom on input focus */
+    touch-action: manipulation;
   }
   html[dir="rtl"] {
     font-family: 'Noto Sans Arabic', 'Tajawal', sans-serif;
   }
   html[dir="ltr"] {
     font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Improve tap targets on mobile */
+  @media (max-width: 767px) {
+    button, a, select, input[type="checkbox"], input[type="radio"] {
+      @apply cursor-default;
+    }
+    input, select, textarea {
+      font-size: 16px !important; /* Prevent iOS zoom */
+    }
   }
 }
 
@@ -133,4 +145,56 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+  /* Safe area insets for modern mobile devices */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 }
+
+/* Animations */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out;
+  }
+  .animate-slide-in-left {
+    animation: slide-in-left 0.3s ease-out;
+  }
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+  }
+  .animate-scale-in {
+    animation: scale-in 0.2s ease-out;
+  }
+}
+@import "./rtl.css";

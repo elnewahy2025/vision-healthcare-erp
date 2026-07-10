@@ -1,16 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../stores/authStore';
+import { useTheme } from '../../stores/themeStore';
+import QuickSearch from './QuickSearch';
 import {
   Menu, Search, Bell, Globe, User, LogOut,
-  ChevronDown, Settings,
+  ChevronDown, Settings, Sun, Moon, Command,
 } from 'lucide-react';
 
 export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const { t, i18n } = useTranslation();
   const { user, tenant, logout, setLocale } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -19,9 +23,18 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowUserMenu(false);
       if (langRef.current && !langRef.current.contains(e.target as Node)) setShowLangMenu(false);
     }
+    function handleKey(e: KeyboardEvent) {
+      if ((e.key === '/' || (e.key === 'k' && (e.metaKey || e.ctrlKey))) && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault(); setShowSearch(true);
+      }
+      if (e.key === 't' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault(); toggleTheme();
+      }
+    }
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
+    document.addEventListener('keydown', handleKey);
+    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey); };
+  }, [toggleTheme]);
 
   const setLocale2 = (locale: 'ar' | 'en') => {
     i18n.changeLanguage(locale);
@@ -34,29 +47,39 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
-      <div className="flex items-center justify-between h-16 px-4 sm:px-6">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between h-16 px-2 sm:px-4 lg:px-6 gap-2">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
+            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            aria-label="Toggle menu"
           >
             <Menu className="w-5 h-5 text-gray-600" />
           </button>
-          <div className="hidden sm:flex items-center relative">
-            <Search className="absolute left-3 w-4 h-4 text-gray-400" />
+          <div className="hidden md:flex items-center relative flex-1 max-w-xs">
+            <Search className="absolute left-3 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
               type="text"
               placeholder={t('common.search') + '...'}
-              className="input pl-10 w-64"
+              className="input pl-10 w-full"
+              aria-label="Search"
             />
           </div>
+          <button
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            onClick={() => setShowSearch(true)}
+            aria-label="Open search"
+          >
+            <Search className="w-5 h-5 text-gray-600" />
+          </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-2">
           <div className="relative" ref={langRef}>
             <button
               onClick={() => setShowLangMenu(!showLangMenu)}
-              className="p-2 rounded-lg hover:bg-gray-100 flex items-center gap-1"
+              className="p-2 rounded-lg hover:bg-gray-100 flex items-center gap-1 min-w-[44px] min-h-[44px] justify-center"
+              aria-label="Change language"
             >
               <Globe className="w-5 h-5 text-gray-600" />
               <span className="text-sm font-medium text-gray-600 hidden sm:inline">
@@ -81,33 +104,34 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
             )}
           </div>
 
-          <button className="p-2 rounded-lg hover:bg-gray-100 relative">
+          <button className="p-2 rounded-lg hover:bg-gray-100 relative min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Notifications">
             <Bell className="w-5 h-5 text-gray-600" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
           </button>
 
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-100"
+              className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-100 min-h-[44px]"
+              aria-label="User menu"
             >
-              <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center shrink-0">
                 <User className="w-4 h-4 text-primary-600" />
               </div>
-              <div className="hidden sm:block text-left">
-                <p className="text-sm font-medium text-gray-900">
+              <div className="hidden sm:block text-left min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate max-w-[120px]">
                   {user?.firstName} {user?.lastName}
                 </p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
+                <p className="text-xs text-gray-500 truncate max-w-[120px]">{user?.email}</p>
               </div>
-              <ChevronDown className="w-4 h-4 text-gray-400 hidden sm:block" />
+              <ChevronDown className="w-4 h-4 text-gray-400 hidden sm:block shrink-0" />
             </button>
 
             {showUserMenu && (
               <div className={`absolute ${isRtl ? 'left-0' : 'right-0'} mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50`}>
                 <div className="px-4 py-3 border-b border-gray-100 sm:hidden">
-                  <p className="text-sm font-medium text-gray-900">{user?.firstName} {user?.lastName}</p>
-                  <p className="text-xs text-gray-500">{user?.email}</p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{user?.firstName} {user?.lastName}</p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                 </div>
                 <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3">
                   <User className="w-4 h-4" /> Profile
@@ -127,6 +151,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
           </div>
         </div>
       </div>
+      <QuickSearch open={showSearch} onClose={() => setShowSearch(false)} />
     </header>
   );
 }

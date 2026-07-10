@@ -11,6 +11,7 @@ export interface User {
   locale: 'ar' | 'en';
   status: string;
   mfaEnabled: boolean;
+  passwordChangedAt?: string;
 }
 
 export interface Tenant {
@@ -36,10 +37,11 @@ interface AuthContextType {
   tenant: Tenant | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string, tenantSlug: string) => Promise<void>;
+  login: (email: string, password: string, tenantSlug: string) => Promise<any>;
   register: (data: { name: string; slug: string; adminEmail: string; adminPassword: string; adminName: string; locale?: string }) => Promise<void>;
   logout: () => void;
   setLocale: (locale: 'ar' | 'en') => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,6 +51,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('accessToken'));
   const [isLoading, setIsLoading] = useState(true);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const data = await authApi.me();
+      setUser(data.user);
+      setTenant(data.tenant);
+      setIsAuthenticated(true);
+      localStorage.setItem('locale', data.user.locale);
+    } catch {
+      throw new Error('Failed to refresh user');
+    }
+  }, []);
 
   useEffect(() => {
     if (localStorage.getItem('accessToken')) {
@@ -72,6 +86,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string, tenantSlug: string) => {
     const data = await authApi.login({ email, password, tenantSlug });
+
+    // If MFA is required, return the partial data
+    if (data.mfaRequired) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      return { mfaRequired: true, partialToken: data.partialToken, userId: data.userId };
+    }
+
     localStorage.setItem('accessToken', data.tokens.accessToken);
     localStorage.setItem('refreshToken', data.tokens.refreshToken);
     localStorage.setItem('tenantSlug', data.tenant.slug);
@@ -79,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
     setTenant(data.tenant);
     setIsAuthenticated(true);
+    return {};
   }, []);
 
   const register = useCallback(async (data: { name: string; slug: string; adminEmail: string; adminPassword: string; adminName: string; locale?: string }) => {
@@ -101,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, tenant, isAuthenticated, isLoading, login, register, logout, setLocale }}>
+    <AuthContext.Provider value={{ user, tenant, isAuthenticated, isLoading, login, register, logout, setLocale, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

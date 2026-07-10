@@ -20,5 +20,13 @@ export default defineConfig({
   build: {
     minify: 'esbuild',
     target: 'es2020',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['lucide-react', 'clsx'],
+        },
+      },
+    },
   },
 });

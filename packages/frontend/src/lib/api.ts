@@ -53,6 +53,124 @@ api.interceptors.response.use(
   },
 );
 
+
+
+// Security & Authentication (Phase 11)
+export const securityApi = {
+  forgotPassword: (email: string, tenantSlug: string) =>
+    api.post('/auth/forgot-password', { email, tenantSlug }).then(r => r.data.data),
+  resetPassword: (token: string, password: string) =>
+    api.post('/auth/reset-password', { token, password }).then(r => r.data.data),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.post('/auth/change-password', { currentPassword, newPassword }).then(r => r.data.data),
+  mfaSetup: () =>
+    api.post('/auth/mfa/setup').then(r => r.data.data),
+  mfaEnable: (code: string) =>
+    api.post('/auth/mfa/enable', { code }).then(r => r.data.data),
+  mfaDisable: (code: string) =>
+    api.post('/auth/mfa/disable', { code }).then(r => r.data.data),
+  mfaVerify: (partialToken: string, code: string) =>
+    api.post('/auth/mfa/verify', { partialToken, code }).then(r => r.data.data),
+  sendOtp: (identifier: string, tenantSlug: string) =>
+    api.post('/auth/otp/send', { identifier, tenantSlug }).then(r => r.data.data),
+  verifyOtp: (identifier: string, code: string, purpose?: string) =>
+    api.post('/auth/otp/verify', { identifier, code, purpose }).then(r => r.data.data),
+};
+
+// Audit Logs
+export const auditApi = {
+  list: (params?: any) => api.get('/audit-logs', { params }).then(r => r.data),
+  get: (id: string) => api.get(`/audit-logs/${id}`).then(r => r.data.data),
+  actionTypes: () => api.get('/audit-logs/actions/types').then(r => r.data.data),
+};
+
+// Communications (Phase 12)
+export const communicationsApi = {
+  templates: () => api.get('/notification-templates').then(r => r.data.data),
+  updateTemplate: (id: string, data: any) =>
+    api.put(`/notification-templates/${id}`, data).then(r => r.data.data),
+  createTemplate: (data: any) =>
+    api.post('/notification-templates', data).then(r => r.data.data),
+  testTemplate: (id: string, recipient: string) =>
+    api.post(`/notification-templates/${id}/test`, { recipient }).then(r => r.data.data),
+  logs: (params?: any) => api.get('/notification-logs', { params }).then(r => r.data),
+};
+
+
+
+// DMS (Document Management)
+export const dmsApi = {
+  list: (params?: any) => api.get('/dms/documents', { params }).then(r => r.data),
+  get: (id: string) => api.get(`/dms/documents/${id}`).then(r => r.data.data),
+  upload: (file: File, metadata: { title: string; category: string; patientId?: string; description?: string }) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('title', metadata.title);
+    formData.append('category', metadata.category);
+    if (metadata.patientId) formData.append('patientId', metadata.patientId);
+    if (metadata.description) formData.append('description', metadata.description);
+    return api.post('/dms/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data.data);
+  },
+  update: (id: string, data: any) => api.put(`/dms/documents/${id}`, data).then(r => r.data.data),
+  delete: (id: string) => api.delete(`/dms/documents/${id}`).then(r => r.data.data),
+  categories: () => api.get('/dms/categories').then(r => r.data.data),
+  downloadUrl: (id: string) => `/api/v1/dms/files/${id}/download`,
+  attachmentUrl: (id: string) => `/api/v1/dms/files/${id}/attachment`,
+  patientDocuments: (patientId: string) => api.get(`/patients/${patientId}/documents`).then(r => r.data.data),
+};
+
+
+
+// Financial Reports
+export const financialApi = {
+  revenue: (params?: any) => api.get('/billing/revenue', { params }).then(r => r.data.data),
+  revenueByMonth: (year?: number) => api.get('/billing/revenue/monthly', { params: { year } }).then(r => r.data.data),
+  aging: () => api.get('/billing/reports/aging').then(r => r.data.data),
+  topPatients: () => api.get('/billing/reports/top-patients').then(r => r.data.data),
+};
+
+// Insurance Claims
+export const claimsApi = {
+  companies: () => api.get('/insurance-companies').then(r => r.data.data),
+  createCompany: (data: any) => api.post('/insurance-companies', data).then(r => r.data.data),
+  list: (params?: any) => api.get('/insurance-claims', { params }).then(r => r.data),
+  create: (data: any) => api.post('/insurance-claims', data).then(r => r.data.data),
+  submit: (id: string) => api.post(`/insurance-claims/${id}/submit`).then(r => r.data.data),
+  updateStatus: (id: string, data: any) => api.patch(`/insurance-claims/${id}/status`, data).then(r => r.data.data),
+  summary: () => api.get('/insurance-claims/summary').then(r => r.data.data),
+};
+
+// Payment
+export const paymentApi = {
+  createStripeSession: (invoiceId: string, amount: number, currency: string) =>
+    api.post('/payments/stripe/create', { invoiceId, amount, currency }).then(r => r.data.data),
+  paymentLink: (invoiceId: string, tenantSlug: string) =>
+    api.get(`/payments/link/${tenantSlug}/${invoiceId}`).then(r => r.data.data),
+};
+
+
+// Clinical Reference (Phase 15)
+export const clinicalApi = {
+  searchIcd10: (q: string, params?: any) => api.get('/icd10', { params: { q, ...params } }).then(r => r.data),
+  searchMedications: (q: string) => api.get('/medications/search', { params: { q } }).then(r => r.data.data),
+  medicationCategories: () => api.get('/medications/categories').then(r => r.data.data),
+  patientAllergies: (patientId: string) => api.get(`/patients/${patientId}/allergies`).then(r => r.data.data),
+  addAllergy: (patientId: string, data: any) => api.post(`/patients/${patientId}/allergies`, data).then(r => r.data.data),
+  deleteAllergy: (patientId: string, id: string) => api.delete(`/patients/${patientId}/allergies/${id}`).then(r => r.data.data),
+  allergyCheck: (patientId: string, medication?: string) => api.get(`/patients/${patientId}/allergy-check`, { params: { medication } }).then(r => r.data.data),
+  patientTimeline: (patientId: string) => api.get(`/patients/${patientId}/timeline`).then(r => r.data.data),
+};
+
+
+// Egypt Payment Gateways
+export const egyptPaymentApi = {
+  fawry: (invoiceId: string, amount: number, customerPhone: string, customerName: string, customerEmail?: string) =>
+    api.post('/payments/fawry/create', { invoiceId, amount, customerPhone, customerName, customerEmail }).then(r => r.data.data),
+  instapay: (amount: number) =>
+    api.post('/payments/instapay', { amount }).then(r => r.data.data),
+  etaQr: (invoiceId: string) =>
+    api.get(`/invoices/${invoiceId}/eta-qr`).then(r => r.data.data),
+};
 export default api;
 
 // Auth

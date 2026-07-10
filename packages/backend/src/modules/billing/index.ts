@@ -5,6 +5,7 @@ import { db } from '../../core/database.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { createInvoiceSchema, paginationSchema } from '../../utils/validation.js';
 import { PatientNotFoundError } from '@healthcare/shared/errors';
+import { getEnv } from '@healthcare/shared/config';
 import { generateInvoiceNumber } from '@healthcare/shared/utils';
 
 export async function registerBillingModule(app: FastifyInstance) {
@@ -219,6 +220,67 @@ export async function registerBillingModule(app: FastifyInstance) {
       .first();
 
     return sendPaginated(reply, invoices.map(mapInvoice), Number(total?.count || 0), query.page, query.limit);
+  });
+  // Create Stripe checkout session
+  app.post('/api/v1/payments/stripe/create', {
+    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const { invoiceId, amount, currency } = z.object({
+      invoiceId: z.string().uuid(), amount: z.number().positive(), currency: z.string().default('sar'),
+    }).parse(request.body);
+
+    const { createStripePayment } = await import('../../services/payment.js');
+    const result = await createStripePayment(invoiceId, amount, currency.toUpperCase(), tenantId);
+    if (!result.success) return reply.code(400).send({ error: result.error });
+    return sendSuccess(reply, result);
+  });
+
+  // Get payment link
+  app.get('/api/v1/payments/link/:tenantSlug/:invoiceId', {
+    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+  }, async (request, reply) => {
+    const { invoiceId, tenantSlug } = request.params as any;
+    const { generatePaymentLink } = await import('../../services/payment.js');
+    return sendSuccess(reply, { url: generatePaymentLink(invoiceId, tenantSlug) });
+  });
+
+  // Revenue by month
+  app.get('/api/v1/billing/revenue/monthly', {
+    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const year = parseInt((request.query as any).year) || new Date().getFullYear();
+    const monthly = await db('invoices').where('tenant_id', tenantId).whereNull('deleted_at')
+      .whereRaw('EXTRACT(YEAR FROM issued_at) = ?', [year])
+      .select(db.raw("TO_CHAR(issued_at, 'Mon') as month"), db.raw('EXTRACT(MONTH FROM issued_at) as m'), db.raw('COALESCE(SUM(total),0) as revenue'), db.raw('COALESCE(SUM(paid),0) as collected'))
+      .groupByRaw('month, m').orderBy('m');
+    return sendSuccess(reply, monthly);
+  });
+
+  // Aging report
+  app.get('/api/v1/billing/reports/aging', {
+    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const [current] = await db('invoices').where('tenant_id', tenantId).whereNull('deleted_at').where('due', '>', 0).whereRaw("issued_at >= NOW() - INTERVAL '30 days'").select(db.raw('COALESCE(SUM(due),0) as amount'));
+    const [thirty] = await db('invoices').where('tenant_id', tenantId).whereNull('deleted_at').where('due', '>', 0).whereRaw("issued_at >= NOW() - INTERVAL '60 days'").whereRaw("issued_at < NOW() - INTERVAL '30 days'").select(db.raw('COALESCE(SUM(due),0) as amount'));
+    const [sixty] = await db('invoices').where('tenant_id', tenantId).whereNull('deleted_at').where('due', '>', 0).whereRaw("issued_at >= NOW() - INTERVAL '90 days'").whereRaw("issued_at < NOW() - INTERVAL '60 days'").select(db.raw('COALESCE(SUM(due),0) as amount'));
+    const [overdue] = await db('invoices').where('tenant_id', tenantId).whereNull('deleted_at').where('due', '>', 0).whereRaw("issued_at < NOW() - INTERVAL '90 days'").select(db.raw('COALESCE(SUM(due),0) as amount'));
+    return sendSuccess(reply, { current: Number(current.amount), thirty: Number(thirty.amount), sixty: Number(sixty.amount), overdue: Number(overdue.amount) });
+  });
+
+  // Top patients by revenue
+  app.get('/api/v1/billing/reports/top-patients', {
+    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const patients = await db('invoices').join('patients', 'invoices.patient_id', 'patients.id')
+      .where('invoices.tenant_id', tenantId).whereNull('invoices.deleted_at')
+      .select(db.raw("patients.first_name || ' ' || patients.last_name as name"), db.raw('COALESCE(SUM(invoices.total),0) as total'))
+      .groupBy('patients.id', 'patients.first_name', 'patients.last_name')
+      .orderBy('total', 'desc').limit(10);
+    return sendSuccess(reply, patients);
   });
 }
 

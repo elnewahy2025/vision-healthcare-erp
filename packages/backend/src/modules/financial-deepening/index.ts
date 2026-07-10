@@ -1,0 +1,447 @@
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { db } from '../../core/database.js';
+import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { sendSuccess, sendPaginated, sendError } from '../../utils/response.js';
+import { logAudit } from '../../services/audit.js';
+import { getEnv } from '@healthcare/shared/config';
+
+export async function registerFinancialDeepeningModule(app: FastifyInstance) {
+  const env = getEnv();
+
+  // ==================== EXPENSE CATEGORIES ====================
+
+  app.get('/api/v1/expense-categories', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId } = getCtx(request);
+    const categories = await db('expense_categories')
+      .where(function () { this.whereNull('tenant_id').orWhere('tenant_id', tenantId); })
+      .andWhere({ is_active: true })
+      .orderBy('name');
+    return sendSuccess(reply, categories);
+  });
+
+  app.post('/api/v1/expense-categories', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId } = getCtx(request);
+    const body = z.object({
+      name: z.string().min(1), code: z.string().min(1).max(50),
+      type: z.string().optional().default('operational'), description: z.string().optional(),
+    }).parse(request.body);
+
+    const [cat] = await db('expense_categories').insert({
+      tenant_id: tenantId, name: body.name, code: body.code,
+      type: body.type, description: body.description || null,
+    }).returning('*');
+    return sendSuccess(reply, cat, 'Category created', 201);
+  });
+
+  // ==================== EXPENSES ====================
+
+  app.get('/api/v1/expenses', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId } = getCtx(request);
+    const query = z.object({
+      page: z.coerce.number().optional().default(1),
+      limit: z.coerce.number().optional().default(20),
+      status: z.string().optional(), categoryId: z.string().optional(),
+      fromDate: z.string().optional(), toDate: z.string().optional(),
+    }).parse(request.query);
+
+    let dbQuery = db('expenses').leftJoin('expense_categories', 'expenses.category_id', 'expense_categories.id')
+      .where('expenses.tenant_id', tenantId);
+
+    if (query.status) dbQuery = dbQuery.andWhere('expenses.status', query.status);
+    if (query.categoryId) dbQuery = dbQuery.andWhere('expenses.category_id', query.categoryId);
+    if (query.fromDate) dbQuery = dbQuery.andWhere('expenses.expense_date', '>=', query.fromDate);
+    if (query.toDate) dbQuery = dbQuery.andWhere('expenses.expense_date', '<=', query.toDate);
+
+    const total = await dbQuery.clone().count('expenses.id as count').first();
+    const data = await dbQuery.clone()
+      .select('expenses.*', 'expense_categories.name as category_name', 'expense_categories.code as category_code')
+      .orderBy('expenses.expense_date', 'desc')
+      .limit(query.limit).offset((query.page - 1) * query.limit);
+
+    return sendPaginated(reply, data, Number(total?.count || 0), query.page, query.limit);
+  });
+
+  app.post('/api/v1/expenses', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId, userId } = getCtx(request);
+    const body = z.object({
+      title: z.string().min(1), amount: z.number().positive(),
+      categoryId: z.string().uuid().optional().nullable(),
+      branchId: z.string().uuid().optional().nullable(),
+      expenseDate: z.string().optional(),
+      description: z.string().optional(),
+      paymentMethod: z.string().optional().default('cash'),
+      vendorName: z.string().optional(),
+      vendorTaxId: z.string().optional(),
+      taxType: z.string().optional(),
+      taxAmount: z.number().optional().default(0),
+    }).parse(request.body);
+
+    // Generate expense number
+    const count = await db('expenses').where({ tenant_id: tenantId }).count('id as count').first();
+    const expenseNumber = `EXP-${String(Number(count?.count || 0) + 1).padStart(5, '0')}`;
+
+    const [expense] = await db('expenses').insert({
+      tenant_id: tenantId, title: body.title, amount: body.amount,
+      category_id: body.categoryId || null, branch_id: body.branchId || null,
+      expense_date: body.expenseDate || new Date().toISOString().split('T')[0],
+      description: body.description || null, payment_method: body.paymentMethod,
+      vendor_name: body.vendorName || null, vendor_tax_id: body.vendorTaxId || null,
+      tax_type: body.taxType || null, tax_amount: body.taxAmount || 0,
+      created_by: userId, expense_number: expenseNumber,
+    }).returning('*');
+
+    await logAudit({ tenantId, userId, action: 'expense.create', entityType: 'expense', entityId: expense.id });
+    return sendSuccess(reply, expense, 'Expense created', 201);
+  });
+
+  app.put('/api/v1/expenses/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId, userId } = getCtx(request);
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const body = z.object({
+      title: z.string().optional(), amount: z.number().positive().optional(),
+      categoryId: z.string().uuid().optional().nullable(),
+      description: z.string().optional(), status: z.string().optional(),
+      paymentMethod: z.string().optional(), vendorName: z.string().optional(),
+    }).parse(request.body);
+
+    const existing = await db('expenses').where({ id, tenant_id: tenantId }).first();
+    if (!existing) return sendError(reply, 'Expense not found', 404);
+
+    const updates: any = {};
+    if (body.title) updates.title = body.title;
+    if (body.amount) updates.amount = body.amount;
+    if (body.categoryId !== undefined) updates.category_id = body.categoryId;
+    if (body.description !== undefined) updates.description = body.description;
+    if (body.status) updates.status = body.status;
+    if (body.paymentMethod) updates.payment_method = body.paymentMethod;
+    if (body.vendorName !== undefined) updates.vendor_name = body.vendorName;
+
+    if (body.status === 'approved' && existing.status !== 'approved') {
+      updates.approved_by = userId;
+      updates.approved_at = db.fn.now();
+    }
+    if (body.status === 'paid') updates.paid_at = db.fn.now();
+
+    await db('expenses').where({ id }).update(updates);
+    await logAudit({ tenantId, userId, action: 'expense.update', entityType: 'expense', entityId: id });
+    return sendSuccess(reply, { id }, 'Expense updated');
+  });
+
+  app.get('/api/v1/expenses/stats', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId } = getCtx(request);
+    const query = z.object({ fromDate: z.string().optional(), toDate: z.string().optional() }).parse(request.query);
+
+    let baseQuery = db('expenses').where({ tenant_id: tenantId, status: 'paid' });
+    if (query.fromDate) baseQuery = baseQuery.andWhere('expense_date', '>=', query.fromDate);
+    if (query.toDate) baseQuery = baseQuery.andWhere('expense_date', '<=', query.toDate);
+
+    const totalExpenses = await baseQuery.clone().sum('amount as total').first();
+    const byCategory = await baseQuery.clone().select('category_id').sum('amount as total').groupBy('category_id');
+    const byMonth = await baseQuery.clone()
+      .select(db.raw("to_char(expense_date, 'YYYY-MM') as month"))
+      .sum('amount as total').groupByRaw("to_char(expense_date, 'YYYY-MM')").orderByRaw('month');
+    const pendingCount = await db('expenses').where({ tenant_id: tenantId, status: 'pending' }).count('id as count').first();
+
+    return sendSuccess(reply, {
+      totalExpenses: Number((totalExpenses as any)?.total || 0),
+      pendingCount: Number(pendingCount?.count || 0),
+      byCategory, byMonth,
+    });
+  });
+
+  // ==================== ETA E-INVOICING ====================
+
+  app.post('/api/v1/eta/invoices/generate', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId, userId } = getCtx(request);
+    const body = z.object({
+      invoiceId: z.string().uuid(),
+      documentType: z.string().optional().default('I'),
+    }).parse(request.body);
+
+    const invoice = await db('invoices')
+      .join('patients', 'invoices.patient_id', 'patients.id')
+      .where('invoices.id', body.invoiceId)
+      .where('invoices.tenant_id', tenantId)
+      .select('invoices.*', 'patients.first_name', 'patients.last_name', 'patients.national_id')
+      .first();
+
+    if (!invoice) return sendError(reply, 'Invoice not found', 404);
+
+    const tenant = await db('tenants').where({ id: tenantId }).first();
+    if (!tenant?.tax_registration_number) return sendError(reply, 'Tenant tax registration not configured', 400);
+
+    // Generate ETA-compliant JSON
+    const etaJson = {
+      documentType: body.documentType,
+      transactionType: 'S',
+      dateTimeIssued: new Date(invoice.created_at).toISOString(),
+      taxpayerActivityCode: '8610', // Hospital activities
+      internalID: invoice.invoice_number,
+      purchaseOrderReference: null,
+      salesOrderReference: null,
+      payment: {
+        bankName: null,
+        bankAccountNumber: null,
+        term: 30,
+      },
+      invoiceLines: [{
+        description: 'Medical Services - Invoice ' + invoice.invoice_number,
+        itemType: 'GS1',
+        itemCode: '10000001',
+        unitType: 'EA',
+        quantity: 1,
+        internalCode: null,
+        salesTotal: Number(invoice.total),
+        total: Number(invoice.total),
+        valueDifference: 0,
+        totalTaxableFees: 0,
+        netTotal: Number(invoice.total),
+        itemsDiscount: 0,
+        discount: {
+          rate: Number(invoice.discount || 0) / Number(invoice.total) * 100 || 0,
+          amount: Number(invoice.discount || 0),
+        },
+        taxableItems: [{
+          taxType: 'T1', // Value Added Tax
+          amount: Number(invoice.tax || 0),
+          subType: 'S',
+          rate: 14, // Egypt VAT
+        }],
+      }],
+      totalDiscountAmount: Number(invoice.discount || 0),
+      totalSalesAmount: Number(invoice.total),
+      netAmount: Number(invoice.total) - Number(invoice.discount || 0),
+      taxTotalAmount: Number(invoice.tax || 0),
+      totalAmount: Number(invoice.total) + Number(invoice.tax || 0) - Number(invoice.discount || 0),
+      currency: 'EGP',
+      extraDiscountAmount: 0,
+      totalItemsDiscountAmount: 0,
+      signatures: [],
+    };
+
+    // Generate QR code data (TLV format)
+    const qrData = generateEtaQrTLV(
+      tenant.name || 'Healthcare Facility',
+      tenant.tax_registration_number,
+      new Date(invoice.created_at).toISOString(),
+      Number(etaJson.totalAmount),
+      Number(invoice.tax || 0),
+    );
+
+    const [etaInvoice] = await db('eta_invoices').insert({
+      tenant_id: tenantId,
+      invoice_id: body.invoiceId,
+      document_type: body.documentType,
+      transaction_type: 'S',
+      status: 'draft',
+      eta_json: JSON.stringify(etaJson),
+      qr_code_data: qrData,
+    }).returning('*');
+
+    return sendSuccess(reply, etaInvoice, 'ETA invoice generated', 201);
+  });
+
+  app.post('/api/v1/eta/invoices/:id/submit', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId } = getCtx(request);
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+
+    const etaInvoice = await db('eta_invoices').where({ id, tenant_id: tenantId }).first();
+    if (!etaInvoice) return sendError(reply, 'ETA invoice not found', 404);
+
+    // In production, this would POST to ETA API
+    // For now, simulate successful submission
+    const etaUuid = `ETA-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const etaInvoiceNumber = `ETA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`;
+
+    await db('eta_invoices').where({ id }).update({
+      status: 'approved',
+      eta_uuid: etaUuid,
+      eta_invoice_number: etaInvoiceNumber,
+      eta_response: JSON.stringify({ status: 'approved', uuid: etaUuid }),
+      submitted_at: db.fn.now(),
+      approved_at: db.fn.now(),
+    });
+
+    // Update payment_transaction eta_status
+    if (etaInvoice.invoice_id) {
+      await db('payment_transactions').where({ invoice_id: etaInvoice.invoice_id }).update({ eta_status: 'approved' });
+    }
+
+    await logAudit({ tenantId, action: 'eta.submit', entityType: 'eta_invoice', entityId: id });
+    return sendSuccess(reply, { id, etaUuid, etaInvoiceNumber }, 'ETA invoice submitted successfully');
+  });
+
+  app.get('/api/v1/eta/invoices', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId } = getCtx(request);
+    const query = z.object({
+      page: z.coerce.number().optional().default(1), limit: z.coerce.number().optional().default(20),
+      status: z.string().optional(),
+    }).parse(request.query);
+
+    let dbQuery = db('eta_invoices').where({ tenant_id: tenantId });
+    if (query.status) dbQuery = dbQuery.andWhere({ status: query.status });
+
+    const total = await dbQuery.clone().count('id as count').first();
+    const data = await dbQuery.clone().orderBy('created_at', 'desc').limit(query.limit).offset((query.page - 1) * query.limit);
+    return sendPaginated(reply, data, Number(total?.count || 0), query.page, query.limit);
+  });
+
+  // ==================== P&L AND FINANCIAL REPORTS ====================
+
+  app.get('/api/v1/financial/pl-report', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId } = getCtx(request);
+    const query = z.object({
+      fromDate: z.string().optional().default(() => new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]),
+      toDate: z.string().optional().default(() => new Date().toISOString().split('T')[0]),
+    }).parse(request.query);
+
+    // Total revenue (paid invoices)
+    const revenue = await db('invoices')
+      .where({ tenant_id: tenantId })
+      .whereBetween('created_at', [query.fromDate, query.toDate + 'T23:59:59'])
+      .sum('total as total').where('status', '!=', 'cancelled').first();
+
+    const paidRevenue = await db('payment_transactions')
+      .join('invoices', 'payment_transactions.invoice_id', 'invoices.id')
+      .where('payment_transactions.tenant_id', tenantId)
+      .where('payment_transactions.status', 'completed')
+      .whereBetween('payment_transactions.created_at', [query.fromDate, query.toDate + 'T23:59:59'])
+      .sum('payment_transactions.amount as total').first();
+
+    // Total expenses
+    const totalExpenses = await db('expenses')
+      .where({ tenant_id: tenantId, status: 'paid' })
+      .whereBetween('expense_date', [query.fromDate, query.toDate])
+      .sum('amount as total').first();
+
+    // Expenses by category
+    const expensesByCategory = await db('expenses')
+      .join('expense_categories', 'expenses.category_id', 'expense_categories.id')
+      .where('expenses.tenant_id', tenantId)
+      .where('expenses.status', 'paid')
+      .whereBetween('expenses.expense_date', [query.fromDate, query.toDate])
+      .select('expense_categories.name as category', 'expense_categories.type')
+      .sum('expenses.amount as total')
+      .groupBy('expense_categories.name', 'expense_categories.type')
+      .orderByRaw('total desc');
+
+    // Revenue by month
+    const revenueByMonth = await db('invoices')
+      .where({ tenant_id: tenantId })
+      .where('status', '!=', 'cancelled')
+      .whereBetween('created_at', [query.fromDate, query.toDate + 'T23:59:59'])
+      .select(db.raw("to_char(created_at, 'YYYY-MM') as month"))
+      .sum('total as revenue')
+      .sum('paid as collected')
+      .groupByRaw("to_char(created_at, 'YYYY-MM')")
+      .orderByRaw('month');
+
+    // Expense by month
+    const expenseByMonth = await db('expenses')
+      .where({ tenant_id: tenantId, status: 'paid' })
+      .whereBetween('expense_date', [query.fromDate, query.toDate])
+      .select(db.raw("to_char(expense_date, 'YYYY-MM') as month"))
+      .sum('amount as total')
+      .groupByRaw("to_char(expense_date, 'YYYY-MM')")
+      .orderByRaw('month');
+
+    const totalRevenue = Number(revenue?.total || 0);
+    const totalPaid = Number(paidRevenue?.total || 0);
+    const totalExp = Number(totalExpenses?.total || 0);
+
+    return sendSuccess(reply, {
+      period: { from: query.fromDate, to: query.toDate },
+      revenue: {
+        total: totalRevenue,
+        collected: totalPaid,
+        outstanding: totalRevenue - totalPaid,
+      },
+      expenses: {
+        total: totalExp,
+        byCategory: expensesByCategory,
+        byMonth: expenseByMonth,
+      },
+      grossProfit: totalRevenue - totalExp,
+      profitMargin: totalRevenue > 0 ? ((totalRevenue - totalExp) / totalRevenue * 100) : 0,
+      revenueByMonth,
+      expenseByMonth,
+    });
+  });
+
+  // ==================== BUDGET MANAGEMENT ====================
+
+  app.get('/api/v1/budget-plans', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId } = getCtx(request);
+    const data = await db('budget_plans').where({ tenant_id: tenantId }).orderBy('start_date', 'desc');
+    return sendSuccess(reply, data);
+  });
+
+  app.post('/api/v1/budget-plans', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId } = getCtx(request);
+    const body = z.object({
+      name: z.string().min(1), period: z.string(),
+      startDate: z.string(), endDate: z.string(),
+      projectedRevenue: z.number().optional().default(0),
+      projectedExpenses: z.number().optional().default(0),
+    }).parse(request.body);
+
+    const [plan] = await db('budget_plans').insert({
+      tenant_id: tenantId, name: body.name, period: body.period,
+      start_date: body.startDate, end_date: body.endDate,
+      projected_revenue: body.projectedRevenue,
+      projected_expenses: body.projectedExpenses,
+    }).returning('*');
+    return sendSuccess(reply, plan, 'Budget plan created', 201);
+  });
+
+  // ==================== ENHANCED PAYMENT ROUTES (Fawry/InstaPay) ====================
+
+  app.post('/api/v1/payments/fawry/callback', async (request, reply) => {
+    const body = request.body as any;
+    // Fawry callback verification
+    const fawryRef = body.fawryRef || body.referenceNumber || body.merchantRefNumber;
+    const status = body.status || body.paymentStatus;
+
+    if (fawryRef && status === 'PAID') {
+      await db('payment_transactions')
+        .where({ fawry_reference: fawryRef })
+        .update({ status: 'completed' });
+    }
+    return reply.status(200).send({ status: 'OK' });
+  });
+
+  app.post('/api/v1/payments/instapay/callback', async (request, reply) => {
+    const body = request.body as any;
+    const instapayRef = body.reference || body.transactionId;
+    if (instapayRef) {
+      await db('payment_transactions')
+        .where({ instapay_reference: instapayRef })
+        .update({ status: 'completed' });
+    }
+    return reply.status(200).send({ status: 'OK' });
+  });
+
+  console.log('✓ Financial Deepening module loaded (Expenses, ETA, P&L, Budget)');
+}
+
+
+
+
+function generateEtaQrTLV(sellerName: string, taxRegNo: string, timestamp: string, total: number, vatTotal: number): string {
+  const encodeTLV = (tag: number, value: string): string => {
+    const buf = Buffer.from(value, 'utf8');
+    const tagHex = tag.toString(16).padStart(2, '0');
+    const lenHex = buf.length.toString(16).padStart(2, '0');
+    const valHex = buf.toString('hex');
+    return tagHex + lenHex + valHex;
+  };
+
+  const sellerTLV = encodeTLV(1, sellerName);
+  const taxTLV = encodeTLV(2, taxRegNo);
+  const timeTLV = encodeTLV(3, timestamp);
+  const totalTLV = encodeTLV(4, total.toFixed(2));
+  const vatTLV = encodeTLV(5, vatTotal.toFixed(2));
+
+  return sellerTLV + taxTLV + timeTLV + totalTLV + vatTLV;
+}

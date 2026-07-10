@@ -1,17 +1,24 @@
 import { getCtx, getTenantId } from "../../utils/route-helper.js";
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { z } from 'zod';
 import { db } from '../../core/database.js';
 import { sendSuccess, sendError } from '../../utils/response.js';
 import { loginSchema } from '../../utils/validation.js';
 import { UnauthorizedError, ConflictError } from '@healthcare/shared/errors';
 import type { User, Role } from '@healthcare/shared/types';
+import { generateSecret, verifyToken, generateQrCode } from '../../services/totp.js';
+import { createAndSendOtp, verifyOtp, incrementOtpAttempt } from '../../services/otp.js';
+import { sendNotification } from '../../services/notification.js';
+import { logAudit } from '../../services/audit.js';
+import { getEnv } from '@healthcare/shared/config';
 
 const TENANT_SLUG_REGEX = /^[a-z0-9-]{3,30}$/;
 
 export async function registerAuthModule(app: FastifyInstance) {
-  // Register tenant
+
+  // ===================== REGISTER TENANT =====================
   app.post('/api/v1/tenants', async (request, reply) => {
     const schema = z.object({
       name: z.string().min(2).max(200),
@@ -33,19 +40,12 @@ export async function registerAuthModule(app: FastifyInstance) {
 
     const result = await db.transaction(async (trx) => {
       const [tenant] = await trx('tenants').insert({
-        name: body.name,
-        slug: body.slug,
-        locale: body.locale,
+        name: body.name, slug: body.slug, locale: body.locale,
         settings: JSON.stringify({
           dateFormat: body.locale === 'ar' ? 'DD/MM/YYYY' : 'MM/DD/YYYY',
-          currency: 'SAR',
-          timezone: 'Asia/Riyadh',
-          theme: {
-            primaryColor: '#0ea5e9',
-            brandName: body.name,
-          },
-          language: body.locale,
-          direction: body.locale === 'ar' ? 'rtl' : 'ltr',
+          currency: 'SAR', timezone: 'Asia/Riyadh',
+          theme: { primaryColor: '#0ea5e9', brandName: body.name },
+          language: body.locale, direction: body.locale === 'ar' ? 'rtl' : 'ltr',
           features: {},
         }),
         status: 'active',
@@ -54,9 +54,7 @@ export async function registerAuthModule(app: FastifyInstance) {
       const passwordHash = await bcrypt.hash(body.adminPassword, 12);
 
       const [adminRole] = await trx('roles').insert({
-        tenant_id: tenant.id,
-        name: 'Super Admin',
-        slug: 'super_admin',
+        tenant_id: tenant.id, name: 'Super Admin', slug: 'super_admin',
         description: 'Full system access',
         permissions: JSON.stringify([
           'patient:read', 'patient:write', 'patient:delete',
@@ -64,15 +62,13 @@ export async function registerAuthModule(app: FastifyInstance) {
           'emr:read', 'emr:write', 'emr:delete',
           'billing:read', 'billing:write', 'billing:delete',
           'admin:access', 'admin:users', 'admin:settings',
-          'settings:read', 'settings:write',
+          'settings:read', 'settings:write', 'audit:read',
         ]),
         is_system: true,
       }).returning('*');
 
       const [user] = await trx('users').insert({
-        tenant_id: tenant.id,
-        email: body.adminEmail,
-        password_hash: passwordHash,
+        tenant_id: tenant.id, email: body.adminEmail, password_hash: passwordHash,
         first_name: body.adminName.split(' ')[0],
         last_name: body.adminName.split(' ').slice(1).join(' ') || '',
         role_id: adminRole.id,
@@ -83,11 +79,9 @@ export async function registerAuthModule(app: FastifyInstance) {
           'emr:read', 'emr:write', 'emr:delete',
           'billing:read', 'billing:write', 'billing:delete',
           'admin:access', 'admin:users', 'admin:settings',
-          'settings:read', 'settings:write',
+          'settings:read', 'settings:write', 'audit:read',
         ]),
-        locale: body.locale,
-        status: 'active',
-        mfa_enabled: false,
+        locale: body.locale, status: 'active', mfa_enabled: false,
         password_changed_at: new Date(),
       }).returning('*');
 
@@ -96,20 +90,18 @@ export async function registerAuthModule(app: FastifyInstance) {
 
     return sendSuccess(reply, {
       tenant: { id: result.tenant.id, name: result.tenant.name, slug: result.tenant.slug },
-      message: 'Organization created successfully. You can now log in.',
+      message: 'Organization created successfully.',
     }, 'Organization created', 201);
   });
 
-  // Login
+  // ===================== LOGIN =====================
   app.post('/api/v1/auth/login', async (request, reply) => {
     const { email, password, tenantSlug } = loginSchema.parse(request.body);
 
     const tenant = await db('tenants').where({ slug: tenantSlug }).first();
     if (!tenant) throw new UnauthorizedError('Invalid organization code');
 
-    const user = await db('users')
-      .where({ email, tenant_id: tenant.id })
-      .first();
+    const user = await db('users').where({ email, tenant_id: tenant.id }).first();
     if (!user) throw new UnauthorizedError('Invalid email or password');
 
     const validPassword = await bcrypt.compare(password, user.password_hash);
@@ -117,154 +109,267 @@ export async function registerAuthModule(app: FastifyInstance) {
 
     if (user.status !== 'active') throw new UnauthorizedError('Account is not active');
 
-    const permissions = typeof user.permissions === 'string'
-      ? JSON.parse(user.permissions) : user.permissions;
+    // Check if MFA is enabled — return partial tokens for MFA step
+    if (user.mfa_enabled) {
+      const partialToken = (app.jwt.sign as any)({ tenantId: tenant.id, userId: user.id, roles: [], permissions: [], locale: user.locale || 'en', mfaPending: true }, { expiresIn: '5m' });
+      return sendSuccess(reply, { mfaRequired: true, partialToken, userId: user.id });
+    }
 
-    const roles = typeof user.roles === 'string'
-      ? JSON.parse(user.roles) : user.roles;
+    const permissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
+    const roles = typeof user.roles === 'string' ? JSON.parse(user.roles) : user.roles;
 
     const token = app.jwt.sign({
-      tenantId: tenant.id,
-      userId: user.id,
-      roles,
-      permissions,
-      locale: user.locale,
-      branchId: user.branch_id,
-    });
-
+      tenantId: tenant.id, userId: user.id,
+      roles, permissions, locale: user.locale || 'en',
+    }, { expiresIn: '1h' });
     const refreshToken = app.jwt.sign(
-      { tenantId: tenant.id, userId: user.id, type: 'refresh' } as any,
-      { expiresIn: '7d' },
+      { tenantId: tenant.id, userId: user.id, roles: [], permissions: [], locale: user.locale || 'en' },
+      { expiresIn: '7d' }
     );
 
-    const settings = typeof tenant.settings === 'string'
-      ? JSON.parse(tenant.settings) : tenant.settings;
+    await db('users').where({ id: user.id }).update({ last_login_at: new Date() });
 
-    await db('users').where({ id: user.id }).update({
-      last_login_at: new Date(),
-    });
+    await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.login', ipAddress: (request as any).ip, userAgent: (request as any).headers['user-agent'] });
 
     return sendSuccess(reply, {
-      user: {
-        id: user.id,
-        tenantId: user.tenant_id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        roleId: user.role_id,
-        roles,
-        permissions,
-        locale: user.locale,
-        status: user.status,
-        mfaEnabled: user.mfa_enabled,
-        branchId: user.branch_id,
-        passwordChangedAt: user.password_changed_at,
-        createdAt: user.created_at,
-        updatedAt: user.updated_at,
-      },
-      tokens: {
-        accessToken: token,
-        refreshToken,
-        expiresIn: 900,
-      },
-      tenant: {
-        id: tenant.id,
-        name: tenant.name,
-        slug: tenant.slug,
-        locale: tenant.locale,
-        direction: settings.direction || (tenant.locale === 'ar' ? 'rtl' : 'ltr'),
+      user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name,
+        roles, permissions, locale: user.locale, status: user.status, mfaEnabled: user.mfa_enabled,
+        lastLoginAt: user.last_login_at, createdAt: user.created_at },
+      tokens: { accessToken: token, refreshToken, expiresIn: 3600 },
+      tenant: tenant ? { id: tenant.id, name: tenant.name, slug: tenant.slug, locale: tenant.locale,
+        direction: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).direction || 'ltr' : 'ltr',
         settings: {
-          dateFormat: settings.dateFormat,
-          currency: settings.currency || 'SAR',
-          timezone: settings.timezone,
-          theme: settings.theme || { primaryColor: '#0ea5e9', brandName: tenant.name },
-        },
-      },
-    });
-  });
-
-  // Refresh token
-  app.post('/api/v1/auth/refresh', async (request, reply) => {
-    const { refreshToken: token } = request.body as { refreshToken: string };
-    try {
-      const decoded = app.jwt.verify<{tenantId: string; userId: string; type?: string}>(token) as any;
-      if (decoded.type !== 'refresh') throw new UnauthorizedError('Invalid refresh token');
-
-      const user = await db('users').where({ id: decoded.userId }).first();
-      if (!user || user.status !== 'active') throw new UnauthorizedError('User not found or inactive');
-
-      const tenant = await db('tenants').where({ id: decoded.tenantId }).first();
-      if (!tenant) throw new UnauthorizedError('Organization not found');
-
-      const permissions = typeof user.permissions === 'string'
-        ? JSON.parse(user.permissions) : user.permissions;
-      const roles = typeof user.roles === 'string'
-        ? JSON.parse(user.roles) : user.roles;
-
-      const newToken = app.jwt.sign({
-        tenantId: tenant.id,
-        userId: user.id,
-        roles,
-        permissions,
-        locale: user.locale,
-      });
-
-      return sendSuccess(reply, {
-        accessToken: newToken,
-        expiresIn: 900,
-      });
-    } catch {
-      throw new UnauthorizedError('Invalid or expired refresh token');
-    }
-  });
-
-  // Get current user profile
-  app.get('/api/v1/auth/me', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
-  }, async (request, reply) => {
-    const tenantId = getTenantId(request); const userId = getCtx(request).userId;
-    const user = await db('users').where({ id: userId, tenant_id: tenantId }).first();
-    if (!user) throw new UnauthorizedError('User not found');
-
-    const tenant = await db('tenants').where({ id: tenantId }).first();
-    const settings = typeof tenant?.settings === 'string'
-      ? JSON.parse(tenant.settings) : (tenant?.settings || {});
-
-    const permissions = typeof user.permissions === 'string'
-      ? JSON.parse(user.permissions) : user.permissions;
-    const roles = typeof user.roles === 'string'
-      ? JSON.parse(user.roles) : user.roles;
-
-    return sendSuccess(reply, {
-      user: {
-        id: user.id,
-        tenantId: user.tenant_id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        roleId: user.role_id,
-        roles,
-        permissions,
-        locale: user.locale,
-        status: user.status,
-        mfaEnabled: user.mfa_enabled,
-        branchId: user.branch_id,
-        createdAt: user.created_at,
-        updatedAt: user.updated_at,
-      },
-      tenant: tenant ? {
-        id: tenant.id,
-        name: tenant.name,
-        slug: tenant.slug,
-        locale: tenant.locale,
-        direction: settings.direction || 'ltr',
-        settings: {
-          dateFormat: settings.dateFormat,
-          currency: settings.currency,
-          timezone: settings.timezone,
-          theme: settings.theme,
+          dateFormat: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).dateFormat : 'MM/DD/YYYY',
+          currency: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).currency : 'SAR',
+          timezone: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).timezone : 'Asia/Riyadh',
+          theme: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).theme : {},
         },
       } : null,
     });
+  });
+
+  // ===================== VERIFY MFA TOKEN =====================
+  app.post('/api/v1/auth/mfa/verify', async (request, reply) => {
+    const schema = z.object({ partialToken: z.string(), code: z.string().length(6) });
+    const { partialToken, code } = schema.parse(request.body);
+
+    let decoded: any;
+    try { decoded = app.jwt.verify(partialToken); } catch { throw new UnauthorizedError('Invalid or expired token'); }
+    if (!decoded.mfaPending) throw new UnauthorizedError('Invalid token type');
+
+    const user = await db('users').where({ id: decoded.userId }).first();
+    if (!user || !user.mfa_secret) throw new UnauthorizedError('MFA not configured');
+
+    const valid = verifyToken(code, user.mfa_secret);
+    if (!valid) throw new UnauthorizedError('Invalid MFA code');
+
+    const tenant = await db('tenants').where({ id: decoded.tenantId }).first();
+    const permissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
+    const roles = typeof user.roles === 'string' ? JSON.parse(user.roles) : user.roles;
+
+    const token = app.jwt.sign({
+      tenantId: tenant.id, userId: user.id, roles, permissions, locale: user.locale || 'en',
+    }, { expiresIn: '1h' });
+    const refreshToken = app.jwt.sign({ tenantId: tenant.id, userId: user.id, roles: [], permissions: [], locale: user.locale || 'en' }, { expiresIn: '7d' });
+
+    await db('users').where({ id: user.id }).update({ last_login_at: new Date() });
+    await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.login.mfa', ipAddress: (request as any).ip });
+
+    return sendSuccess(reply, {
+      user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name,
+        roles, permissions, locale: user.locale, status: user.status, mfaEnabled: true,
+        lastLoginAt: user.last_login_at, createdAt: user.created_at },
+      tokens: { accessToken: token, refreshToken, expiresIn: 3600 },
+      tenant: tenant ? { id: tenant.id, name: tenant.name, slug: tenant.slug, locale: tenant.locale,
+        direction: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).direction || 'ltr' : 'ltr',
+        settings: { dateFormat: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).dateFormat : 'MM/DD/YYYY',
+          currency: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).currency : 'SAR',
+          timezone: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).timezone : 'Asia/Riyadh',
+          theme: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).theme : {},
+        },
+      } : null,
+    });
+  });
+
+  // ===================== REFRESH TOKEN =====================
+  app.post('/api/v1/auth/refresh', async (request, reply) => {
+    const { refreshToken } = (request.body as any) || {};
+    if (!refreshToken) throw new UnauthorizedError('Refresh token required');
+    let decoded: any;
+    try { decoded = app.jwt.verify(refreshToken); } catch { throw new UnauthorizedError('Invalid refresh token'); }
+    const user = await db('users').where({ id: decoded.userId }).first();
+    if (!user || user.status !== 'active') throw new UnauthorizedError('Account not active');
+    const tenant = await db('tenants').where({ id: decoded.tenantId }).first();
+    const permissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
+    const roles = typeof user.roles === 'string' ? JSON.parse(user.roles) : user.roles;
+    const token = app.jwt.sign({ tenantId: tenant.id, userId: user.id, roles, permissions, locale: user.locale || 'en' }, { expiresIn: '1h' });
+    return sendSuccess(reply, { accessToken: token, expiresIn: 3600 });
+  });
+
+  // ===================== CURRENT USER =====================
+  app.get('/api/v1/auth/me', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { userId, tenantId } = getCtx(request);
+    const user = await db('users').where({ id: userId }).first();
+    const tenant = await db('tenants').where({ id: tenantId }).first();
+    if (!user) throw new UnauthorizedError('User not found');
+    const permissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
+    const roles = typeof user.roles === 'string' ? JSON.parse(user.roles) : user.roles;
+    return sendSuccess(reply, {
+      user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name,
+        roles, permissions, locale: user.locale, status: user.status, mfaEnabled: user.mfa_enabled,
+        lastLoginAt: user.last_login_at, passwordChangedAt: user.password_changed_at, createdAt: user.created_at },
+      tenant: tenant ? { id: tenant.id, name: tenant.name, slug: tenant.slug, locale: tenant.locale,
+        direction: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).direction || 'ltr' : 'ltr',
+        settings: { dateFormat: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).dateFormat : 'MM/DD/YYYY',
+          currency: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).currency : 'SAR',
+          timezone: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).timezone : 'Asia/Riyadh',
+          theme: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).theme : {},
+        },
+      } : null,
+    });
+  });
+
+  // ===================== FORGOT PASSWORD =====================
+  app.post('/api/v1/auth/forgot-password', async (request, reply) => {
+    const { email, tenantSlug } = z.object({ email: z.string().email(), tenantSlug: z.string() }).parse(request.body);
+
+    const tenant = await db('tenants').where({ slug: tenantSlug }).first();
+    if (!tenant) return sendSuccess(reply, { message: 'If the email is registered, you will receive a reset link.' });
+
+    const user = await db('users').where({ email, tenant_id: tenant.id }).first();
+
+    if (user) {
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await db('password_resets').insert({ tenant_id: tenant.id, user_id: user.id, token, type: 'password_reset', expires_at: expiresAt });
+
+      const resetLink = `${getEnv().APP_URL}/reset-password?token=${token}`;
+
+      await sendNotification({ tenantId: tenant.id, userId: user.id, channel: 'email', recipient: email,
+        templateKey: 'password.reset', variables: { resetLink }, locale: user.locale });
+
+      await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.forgot_password' });
+    }
+
+    return sendSuccess(reply, { message: 'If the email is registered, you will receive a reset link.' });
+  });
+
+  // ===================== RESET PASSWORD =====================
+  app.post('/api/v1/auth/reset-password', async (request, reply) => {
+    const { token, password } = z.object({ token: z.string(), password: z.string().min(8) }).parse(request.body);
+
+    const reset = await db('password_resets').where({ token, type: 'password_reset', used_at: null }).first();
+    if (!reset || new Date(reset.expires_at) < new Date()) throw new UnauthorizedError('Invalid or expired reset token');
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await db.transaction(async (trx) => {
+      await trx('users').where({ id: reset.user_id }).update({ password_hash: passwordHash, password_changed_at: new Date() });
+      await trx('password_resets').where({ id: reset.id }).update({ used_at: new Date() });
+    });
+
+    await logAudit({ tenantId: reset.tenant_id, userId: reset.user_id, action: 'user.reset_password' });
+
+    return sendSuccess(reply, { message: 'Password reset successfully. You can now log in.' });
+  });
+
+  // ===================== CHANGE PASSWORD =====================
+  app.post('/api/v1/auth/change-password', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { currentPassword, newPassword } = z.object({ currentPassword: z.string(), newPassword: z.string().min(8) }).parse(request.body);
+    const { userId, tenantId } = getCtx(request);
+
+    const user = await db('users').where({ id: userId }).first();
+    if (!user) throw new UnauthorizedError('User not found');
+
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) throw new UnauthorizedError('Current password is incorrect');
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await db('users').where({ id: userId }).update({ password_hash: passwordHash, password_changed_at: new Date() });
+
+    await logAudit({ tenantId, userId, action: 'user.change_password' });
+
+    return sendSuccess(reply, { message: 'Password changed successfully.' });
+  });
+
+  // ===================== 2FA SETUP (Generate Secret + QR) =====================
+  app.post('/api/v1/auth/mfa/setup', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { userId } = getCtx(request);
+
+    const { secret, otpauthUrl } = generateSecret();
+    const qrCode = await generateQrCode(otpauthUrl);
+
+    // Store secret temporarily (not enabled yet)
+    await db('users').where({ id: userId }).update({ mfa_secret: secret });
+
+    return sendSuccess(reply, { secret, qrCode, otpauthUrl });
+  });
+
+  // ===================== 2FA ENABLE (Confirm code to activate) =====================
+  app.post('/api/v1/auth/mfa/enable', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { code } = z.object({ code: z.string().length(6) }).parse(request.body);
+    const { userId, tenantId } = getCtx(request);
+
+    const user = await db('users').where({ id: userId }).first();
+    if (!user || !user.mfa_secret) throw new UnauthorizedError('MFA not set up');
+
+    const valid = verifyToken(code, user.mfa_secret);
+    if (!valid) throw new UnauthorizedError('Invalid code. Please try again.');
+
+    await db('users').where({ id: userId }).update({ mfa_enabled: true });
+
+    // Generate recovery codes (8 random codes)
+    const recoveryCodes = Array.from({ length: 8 }, () => crypto.randomBytes(4).toString('hex'));
+
+    await logAudit({ tenantId, userId, action: 'user.mfa_enabled' });
+
+    return sendSuccess(reply, { message: 'Two-factor authentication enabled.', recoveryCodes });
+  });
+
+  // ===================== 2FA DISABLE =====================
+  app.post('/api/v1/auth/mfa/disable', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { code } = z.object({ code: z.string().length(6) }).parse(request.body);
+    const { userId, tenantId } = getCtx(request);
+
+    const user = await db('users').where({ id: userId }).first();
+    if (!user || !user.mfa_enabled) throw new UnauthorizedError('MFA is not enabled');
+
+    const valid = verifyToken(code, user.mfa_secret!);
+    if (!valid) throw new UnauthorizedError('Invalid code.');
+
+    await db('users').where({ id: userId }).update({ mfa_enabled: false, mfa_secret: null });
+
+    await logAudit({ tenantId, userId, action: 'user.mfa_disabled' });
+
+    return sendSuccess(reply, { message: 'Two-factor authentication disabled.' });
+  });
+
+  // ===================== SEND OTP =====================
+  app.post('/api/v1/auth/otp/send', async (request, reply) => {
+    const { identifier, tenantSlug } = z.object({ identifier: z.string(), tenantSlug: z.string() }).parse(request.body);
+
+    const tenant = await db('tenants').where({ slug: tenantSlug }).first();
+    if (!tenant) throw new UnauthorizedError('Invalid organization');
+
+    const sent = await createAndSendOtp(tenant.id, identifier, 'verify_phone');
+    if (!sent) throw new UnauthorizedError('Failed to send OTP');
+
+    return sendSuccess(reply, { message: 'OTP sent successfully.' });
+  });
+
+  // ===================== VERIFY OTP =====================
+  app.post('/api/v1/auth/otp/verify', async (request, reply) => {
+    const { identifier, code, purpose } = z.object({
+      identifier: z.string(), code: z.string(), purpose: z.string().optional(),
+    }).parse(request.body);
+
+    const valid = await verifyOtp(identifier, code, purpose || 'verify_phone');
+    if (!valid) {
+      await incrementOtpAttempt(identifier, code, purpose || 'verify_phone');
+      throw new UnauthorizedError('Invalid or expired OTP code.');
+    }
+
+    return sendSuccess(reply, { message: 'OTP verified successfully.' });
   });
 }

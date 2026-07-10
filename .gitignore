@@ -1,13 +1,50 @@
+# Dependencies
 node_modules/
-dist/
-.turbo/
+
+# Build output
+packages/backend/dist/
+packages/frontend/dist/
+packages/shared/dist/
+
+# Environment files
 .env
 .env.local
-*.log
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
 coverage/
-*.tsbuildinfo
+
+# Database backups
+/backups/
+
+# Docker volumes
+postgres_data/
+redis_data/
+minio_data/
+es_data/
+
+# Certificates
 deployment/nginx/ssl/*.pem
 deployment/nginx/ssl/*.key
-public/icon-*.png
-public/apple-touch-icon.png
+
+# Generated icons
+packages/frontend/public/icons/icon-192.png
+packages/frontend/public/icons/icon-512.png
+packages/frontend/public/icons/generate-icons.mjs
+
+# Lock files
+package-lock.json

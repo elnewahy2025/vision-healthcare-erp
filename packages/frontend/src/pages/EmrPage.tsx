@@ -180,7 +180,7 @@ export default function EmrPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label">Encounter Type</label>
                     <select className="input" value={newEmr.encounterType}
@@ -201,7 +201,7 @@ export default function EmrPage() {
                     placeholder="Patient's main concern" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label">Subjective (S)</label>
                     <textarea className="input" rows={3} value={newEmr.subjective}
@@ -216,7 +216,7 @@ export default function EmrPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label">Assessment (A)</label>
                     <textarea className="input" rows={3} value={newEmr.assessment}

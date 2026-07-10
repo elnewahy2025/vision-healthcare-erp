@@ -22,10 +22,16 @@
     "setup": "npm install && npm run build"
   },
   "devDependencies": {
+    "@types/pdfmake": "^0.3.3",
     "concurrently": "^8.2.2",
     "typescript": "^5.4.0"
   },
   "optionalDependencies": {
     "better-sqlite3": "^12.11.1"
+  },
+  "dependencies": {
+    "@fastify/websocket": "^8.3.1",
+    "bullmq": "^5.80.0",
+    "pdfmake": "^0.2.23"
   }
 }

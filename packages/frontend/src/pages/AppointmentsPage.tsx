@@ -123,7 +123,7 @@ export default function AppointmentsPage() {
       {/* Filters */}
       <div className="card mb-6">
         <div className="card-body">
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-4">
             <div>
               <label className="label">{t('appointment.date')}</label>
               <input type="date" className="input" value={filterDate}
@@ -179,7 +179,7 @@ export default function AppointmentsPage() {
                   <td>{a.doctorName || '-'}</td>
                   <td><span className={statusBadge(a.status)}>{a.status}</span></td>
                   <td>
-                    <div className="flex gap-1">
+                    <div className="flex flex-wrap gap-1">
                       {a.status === 'scheduled' && (
                         <button onClick={() => handleCheckIn(a.id)} className="btn-ghost btn-sm">Check In</button>
                       )}
@@ -236,7 +236,7 @@ export default function AppointmentsPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label">{t('appointment.date')} *</label>
                     <input type="date" className="input"
@@ -251,7 +251,7 @@ export default function AppointmentsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label">{t('appointment.type')}</label>
                     <select className="input" value={newAppointment.type}
@@ -283,7 +283,7 @@ export default function AppointmentsPage() {
                     onChange={e => setNewAppointment({...newAppointment, reason: e.target.value})} />
                 </div>
 
-                <div className="flex gap-4">
+                <div className="flex flex-wrap gap-4">
                   <label className="flex items-center gap-2">
                     <input type="checkbox" checked={newAppointment.isWalkIn}
                       onChange={e => setNewAppointment({...newAppointment, isWalkIn: e.target.checked})}

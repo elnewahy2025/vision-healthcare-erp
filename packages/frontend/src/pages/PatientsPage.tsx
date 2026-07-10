@@ -17,6 +17,8 @@ export default function PatientsPage() {
   const [newPatient, setNewPatient] = useState({
     firstName: '', lastName: '', dateOfBirth: '', gender: 'male' as const,
     phone: '', email: '', bloodType: '', nationality: '',
+    nationalId: '',
+    nationalIdType: 'national',
   });
 
   const loadPatients = async () => {
@@ -41,7 +43,7 @@ export default function PatientsPage() {
       await patientsApi.create(newPatient);
       toast.success('Patient created successfully');
       setShowNewModal(false);
-      setNewPatient({ firstName: '', lastName: '', dateOfBirth: '', gender: 'male', phone: '', email: '', bloodType: '', nationality: '' });
+      setNewPatient({ firstName: '', lastName: '', dateOfBirth: '', gender: 'male', phone: '', email: '', bloodType: '', nationality: '', nationalId: '', nationalIdType: 'national' });
       loadPatients();
     } catch {
       toast.error('Failed to create patient');
@@ -185,7 +187,7 @@ export default function PatientsPage() {
             </div>
             <form onSubmit={handleCreate}>
               <div className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label">{t('patient.firstName')} *</label>
                     <input className="input" value={newPatient.firstName}
@@ -197,7 +199,7 @@ export default function PatientsPage() {
                       onChange={e => setNewPatient({...newPatient, lastName: e.target.value})} required />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label">{t('patient.dob')} *</label>
                     <input type="date" className="input" value={newPatient.dateOfBirth}
@@ -212,7 +214,7 @@ export default function PatientsPage() {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label">{t('patient.phone')} *</label>
                     <input className="input" value={newPatient.phone}
@@ -224,7 +226,7 @@ export default function PatientsPage() {
                       onChange={e => setNewPatient({...newPatient, email: e.target.value})} />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label">{t('patient.bloodType')}</label>
                     <select className="input" value={newPatient.bloodType}
@@ -237,7 +239,14 @@ export default function PatientsPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="label">{t('patient.nationality')}</label>
+                    <label className="label">National ID (رقم قومي)</label>
+                  <input className="input" placeholder="14-digit ID" maxLength={14} value={newPatient.nationalId}
+                    onChange={e => setNewPatient({...newPatient, nationalId: e.target.value.replace(/\D/g, '').substring(0, 14)})} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">{t('patient.nationality')}</label>
                     <input className="input" value={newPatient.nationality}
                       onChange={e => setNewPatient({...newPatient, nationality: e.target.value})} />
                   </div>
