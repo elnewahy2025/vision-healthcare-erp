@@ -2,75 +2,85 @@ import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
   // Password reset tokens
-  await knex.schema.createTable('password_resets', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
-    table.uuid('user_id').references('id').inTable('users').onDelete('CASCADE');
-    table.string('token', 255).notNullable().index();
-    table.string('type', 20).notNullable().defaultTo('password_reset'); // password_reset | mfa_recovery
-    table.timestamp('expires_at').notNullable();
-    table.timestamp('used_at').nullable();
-    table.timestamp('created_at').defaultTo(knex.fn.now());
-  });
+  if (!(await knex.schema.hasTable('password_resets'))) {
+    await knex.schema.createTable('password_resets', (table) => {
+      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+      table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
+      table.uuid('user_id').references('id').inTable('users').onDelete('CASCADE');
+      table.string('token', 255).notNullable().index();
+      table.string('type', 20).notNullable().defaultTo('password_reset'); // password_reset | mfa_recovery
+      table.timestamp('expires_at').notNullable();
+      table.timestamp('used_at').nullable();
+      table.timestamp('created_at').defaultTo(knex.fn.now());
+    });
+  }
 
   // One-time passwords for verification
-  await knex.schema.createTable('otp_codes', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
-    table.string('identifier', 255).notNullable(); // email or phone
-    table.string('code', 6).notNullable();
-    table.string('purpose', 50).notNullable(); // login | verify_email | verify_phone | password_reset
-    table.timestamp('expires_at').notNullable();
-    table.integer('attempts').defaultTo(0);
-    table.timestamp('verified_at').nullable();
-    table.timestamp('created_at').defaultTo(knex.fn.now());
-    table.index(['identifier', 'purpose']);
-  });
+  if (!(await knex.schema.hasTable('otp_codes'))) {
+    await knex.schema.createTable('otp_codes', (table) => {
+      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+      table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
+      table.string('identifier', 255).notNullable(); // email or phone
+      table.string('code', 6).notNullable();
+      table.string('purpose', 50).notNullable(); // login | verify_email | verify_phone | password_reset
+      table.timestamp('expires_at').notNullable();
+      table.integer('attempts').defaultTo(0);
+      table.timestamp('verified_at').nullable();
+      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.index(['identifier', 'purpose']);
+    });
+  }
 
   // Audit log
-  await knex.schema.createTable('audit_logs', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
-    table.uuid('user_id').nullable();
-    table.string('action', 100).notNullable(); // patient.created, user.login, etc.
-    table.string('entity_type', 50).nullable(); // patient, appointment, invoice
-    table.uuid('entity_id').nullable();
-    table.jsonb('metadata').nullable(); // changed fields, old/new values
-    table.string('ip_address', 45).nullable();
-    table.string('user_agent', 500).nullable();
-    table.timestamp('created_at').defaultTo(knex.fn.now()).index();
-  });
+  if (!(await knex.schema.hasTable('audit_logs'))) {
+    await knex.schema.createTable('audit_logs', (table) => {
+      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+      table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
+      table.uuid('user_id').nullable();
+      table.string('action', 100).notNullable(); // patient.created, user.login, etc.
+      table.string('entity_type', 50).nullable(); // patient, appointment, invoice
+      table.uuid('entity_id').nullable();
+      table.jsonb('metadata').nullable(); // changed fields, old/new values
+      table.string('ip_address', 45).nullable();
+      table.string('user_agent', 500).nullable();
+      table.timestamp('created_at').defaultTo(knex.fn.now()).index();
+    });
+  }
 
   // Notification templates
-  await knex.schema.createTable('notification_templates', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
-    table.string('key', 100).notNullable(); // appointment.reminder, invoice.paid, etc.
-    table.string('channel', 20).notNullable(); // email | sms | both
-    table.string('locale', 2).notNullable().defaultTo('en');
-    table.string('subject', 255).nullable(); // email subject
-    table.text('body').notNullable(); // template body with {{variables}}
-    table.boolean('is_active').defaultTo(true);
-    table.timestamp('created_at').defaultTo(knex.fn.now());
-    table.timestamp('updated_at').defaultTo(knex.fn.now());
-    table.unique(['tenant_id', 'key', 'channel', 'locale']);
-  });
+  if (!(await knex.schema.hasTable('notification_templates'))) {
+    await knex.schema.createTable('notification_templates', (table) => {
+      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+      table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
+      table.string('key', 100).notNullable(); // appointment.reminder, invoice.paid, etc.
+      table.string('channel', 20).notNullable(); // email | sms | both
+      table.string('locale', 2).notNullable().defaultTo('en');
+      table.string('subject', 255).nullable(); // email subject
+      table.text('body').notNullable(); // template body with {{variables}}
+      table.boolean('is_active').defaultTo(true);
+      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('updated_at').defaultTo(knex.fn.now());
+      table.unique(['tenant_id', 'key', 'channel', 'locale']);
+    });
+  }
 
   // Notification logs
-  await knex.schema.createTable('notification_logs', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
-    table.uuid('user_id').nullable();
-    table.string('channel', 20).notNullable(); // email | sms
-    table.string('recipient', 255).notNullable();
-    table.string('template_key', 100).nullable();
-    table.string('subject', 255).nullable();
-    table.text('body').nullable();
-    table.string('status', 20).notNullable().defaultTo('pending'); // pending | sent | failed
-    table.text('error_message').nullable();
-    table.timestamp('sent_at').nullable();
-    table.timestamp('created_at').defaultTo(knex.fn.now());
-  });
+  if (!(await knex.schema.hasTable('notification_logs'))) {
+    await knex.schema.createTable('notification_logs', (table) => {
+      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+      table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
+      table.uuid('user_id').nullable();
+      table.string('channel', 20).notNullable(); // email | sms
+      table.string('recipient', 255).notNullable();
+      table.string('template_key', 100).nullable();
+      table.string('subject', 255).nullable();
+      table.text('body').nullable();
+      table.string('status', 20).notNullable().defaultTo('pending'); // pending | sent | failed
+      table.text('error_message').nullable();
+      table.timestamp('sent_at').nullable();
+      table.timestamp('created_at').defaultTo(knex.fn.now());
+    });
+  }
 
   // Seed default notification templates
   const templates = [

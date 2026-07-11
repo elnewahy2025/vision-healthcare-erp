@@ -2,50 +2,56 @@ import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
   // Patient allergies
-  await knex.schema.createTable('patient_allergies', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
-    table.uuid('patient_id').references('id').inTable('patients').onDelete('CASCADE');
-    table.string('allergen', 255).notNullable();
-    table.string('severity', 20).defaultTo('moderate'); // mild, moderate, severe, anaphylaxis
-    table.string('reaction', 255).nullable();
-    table.text('notes').nullable();
-    table.uuid('recorded_by').nullable();
-    table.timestamp('created_at').defaultTo(knex.fn.now());
-    table.index(['patient_id']);
-  });
+  if (!(await knex.schema.hasTable('patient_allergies'))) {
+    await knex.schema.createTable('patient_allergies', (table) => {
+      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+      table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
+      table.uuid('patient_id').references('id').inTable('patients').onDelete('CASCADE');
+      table.string('allergen', 255).notNullable();
+      table.string('severity', 20).defaultTo('moderate'); // mild, moderate, severe, anaphylaxis
+      table.string('reaction', 255).nullable();
+      table.text('notes').nullable();
+      table.uuid('recorded_by').nullable();
+      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.index(['patient_id']);
+    });
+  }
 
   // Medication database
-  await knex.schema.createTable('medication_database', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.string('generic_name', 255).notNullable();
-    table.string('brand_names', 500).nullable();
-    table.string('category', 100).nullable();
-    table.string('route', 50).nullable(); // oral, topical, IV, IM, etc.
-    table.string('dosage_form', 100).nullable();
-    table.string('strength', 100).nullable();
-    table.text('indications').nullable();
-    table.text('contraindications').nullable();
-    table.text('side_effects').nullable();
-    table.text('interactions').nullable();
-    table.string('status', 20).defaultTo('active');
-    table.timestamp('created_at').defaultTo(knex.fn.now());
-    table.index(['generic_name']);
-    table.index(['category']);
-  });
+  if (!(await knex.schema.hasTable('medication_database'))) {
+    await knex.schema.createTable('medication_database', (table) => {
+      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+      table.string('generic_name', 255).notNullable();
+      table.string('brand_names', 500).nullable();
+      table.string('category', 100).nullable();
+      table.string('route', 50).nullable(); // oral, topical, IV, IM, etc.
+      table.string('dosage_form', 100).nullable();
+      table.string('strength', 100).nullable();
+      table.text('indications').nullable();
+      table.text('contraindications').nullable();
+      table.text('side_effects').nullable();
+      table.text('interactions').nullable();
+      table.string('status', 20).defaultTo('active');
+      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.index(['generic_name']);
+      table.index(['category']);
+    });
+  }
 
   // ICD-10 Codes
-  await knex.schema.createTable('icd10_codes', (table) => {
-    table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-    table.string('code', 10).notNullable().unique();
-    table.string('category', 10).nullable();
-    table.string('description', 500).notNullable();
-    table.text('full_description').nullable();
-    table.boolean('is_chronic').defaultTo(false);
-    table.timestamp('created_at').defaultTo(knex.fn.now());
-    table.index(['code']);
-    table.index(['description']);
-  });
+  if (!(await knex.schema.hasTable('icd10_codes'))) {
+    await knex.schema.createTable('icd10_codes', (table) => {
+      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+      table.string('code', 10).notNullable().unique();
+      table.string('category', 10).nullable();
+      table.string('description', 500).notNullable();
+      table.text('full_description').nullable();
+      table.boolean('is_chronic').defaultTo(false);
+      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.index(['code']);
+      table.index(['description']);
+    });
+  }
 
   // Seed common ICD-10 codes
   const icd10Codes = [

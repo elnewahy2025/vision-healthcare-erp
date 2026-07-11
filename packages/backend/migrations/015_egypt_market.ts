@@ -2,16 +2,22 @@ import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
   // Add national ID to patients (Egyptian National ID = 14 digits)
-  await knex.schema.alterTable('patients', (table) => {
-    table.string('national_id', 20).nullable();
-    table.string('national_id_type', 20).defaultTo('national'); // national, passport, gcc
-  });
+  const hasNationalId = await knex.schema.hasColumn('patients', 'national_id');
+  if (!hasNationalId) {
+    await knex.schema.alterTable('patients', (table) => {
+      table.string('national_id', 20).nullable();
+      table.string('national_id_type', 20).defaultTo('national');
+    });
+  }
 
   // Add tax registration to tenants (ETA requirement)
-  await knex.schema.alterTable('tenants', (table) => {
-    table.string('tax_registration_number', 20).nullable();
-    table.string('commercial_registration', 30).nullable();
-  });
+  const hasTaxReg = await knex.schema.hasColumn('tenants', 'tax_registration_number');
+  if (!hasTaxReg) {
+    await knex.schema.alterTable('tenants', (table) => {
+      table.string('tax_registration_number', 20).nullable();
+      table.string('commercial_registration', 30).nullable();
+    });
+  }
 
   // Egypt-specific insurance companies seed data
   const egyptInsurers = [
