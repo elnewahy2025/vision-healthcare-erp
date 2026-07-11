@@ -2,7 +2,21 @@ import { config as dotenvConfig } from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenvConfig({ path: path.resolve(__dirname, '../../../.env') });
+const envPath = path.resolve(__dirname, '../../../.env');
+const envPathAlt = path.resolve(__dirname, '../../../../.env');
+const envPathCwd = path.resolve(process.cwd(), '.env');
+// Try multiple paths
+let result = dotenvConfig({ path: envPath });
+if (!result.parsed || Object.keys(result.parsed).length === 0) {
+  result = dotenvConfig({ path: envPathAlt });
+}
+if (!result.parsed || Object.keys(result.parsed).length === 0) {
+  result = dotenvConfig({ path: envPathCwd });
+}
+console.log('ENV DEBUG: __dirname =', __dirname);
+console.log('ENV DEBUG: DB_USER =', process.env.DB_USER || 'NOT SET');
+console.log('ENV DEBUG: DB_PASSWORD =', process.env.DB_PASSWORD ? 'SET (' + process.env.DB_PASSWORD.length + ' chars)' : 'NOT SET');
+console.log('ENV DEBUG: DB_NAME =', process.env.DB_NAME || 'NOT SET');
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
