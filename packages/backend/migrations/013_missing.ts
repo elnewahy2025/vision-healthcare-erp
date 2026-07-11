@@ -101,3 +101,23 @@ export async function up(knex: Knex): Promise<void> {
     });
   }
 }
+
+export async function down(knex: Knex): Promise<void> {
+  await knex.schema.dropTableIfExists('webhooks');
+  await knex.schema.dropTableIfExists('report_schedules');
+  await knex.schema.dropTableIfExists('reports');
+  
+  const hasApptBranch = await knex.schema.hasColumn('appointments', 'branch_id');
+  if (hasApptBranch) {
+    await knex.schema.alterTable('appointments', (table) => { table.dropColumn('branch_id'); });
+  }
+  const hasPatientBranch = await knex.schema.hasColumn('patients', 'branch_id');
+  if (hasPatientBranch) {
+    await knex.schema.alterTable('patients', (table) => { table.dropColumn('branch_id'); });
+  }
+  const hasBranchCol = await knex.schema.hasColumn('users', 'branch_id');
+  if (hasBranchCol) {
+    await knex.schema.alterTable('users', (table) => { table.dropColumn('branch_id'); });
+  }
+  await knex.schema.dropTableIfExists('branches');
+}
