@@ -30,13 +30,5 @@ export async function registerNotificationModule(app: FastifyInstance) {
     return sendSuccess(reply, { unread: unreadCount });
   });
 
-  // Templates
-  app.get('/api/v1/notification-templates', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request);
-    const templates = await db('notification_templates').where({ tenant_id: tenantId, is_active: true });
-    return sendSuccess(reply, templates.map((t: any) => ({
-      id: t.id, code: t.code, name: t.name, channel: t.channel,
-      subject: t.subject, bodyTemplate: t.body_template, variables: t.variables,
-    })));
-  });
+
 }

@@ -7,7 +7,7 @@ import { generateInvoicePdf, generatePrescriptionPdf, generateLabReportPdf } fro
 export async function registerPdfModule(app: FastifyInstance) {
 
   // Generate invoice PDF
-  app.get('/api/v1/pdf/invoice/:invoiceId', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/pdf/invoice/:invoiceId-old', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
     const { invoiceId } = z.object({ invoiceId: z.string().uuid() }).parse(request.params);
 
     const buffer = await generateInvoicePdf(invoiceId);
@@ -21,7 +21,7 @@ export async function registerPdfModule(app: FastifyInstance) {
   });
 
   // Generate prescription PDF
-  app.get('/api/v1/pdf/prescription/:prescriptionId', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/pdf/prescription/:prescriptionId-old', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
     const { prescriptionId } = z.object({ prescriptionId: z.string().uuid() }).parse(request.params);
 
     const buffer = await generatePrescriptionPdf(prescriptionId);
@@ -34,7 +34,7 @@ export async function registerPdfModule(app: FastifyInstance) {
   });
 
   // Generate lab report PDF
-  app.get('/api/v1/pdf/lab-report/:labOrderId', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/pdf/lab-report/:labOrderId-old', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
     const { labOrderId } = z.object({ labOrderId: z.string().uuid() }).parse(request.params);
 
     const buffer = await generateLabReportPdf(labOrderId);
