@@ -94,23 +94,23 @@ export async function up(knex: Knex): Promise<void> {
   for (const t of templates) {
     await knex('notification_templates').insert({
       id: knex.raw('gen_random_uuid()'),
-      tenant_id: null, // global templates
-      key: t.key,
+      tenant_id: null,
+      code: t.key,
+      name: t.key,
       channel: t.channel,
-      locale: 'en',
       subject: t.subject_en,
-      body: t.body_en,
+      body_template: t.body_en,
       is_active: true,
     });
     if (t.subject_ar || t.body_ar) {
       await knex('notification_templates').insert({
         id: knex.raw('gen_random_uuid()'),
         tenant_id: null,
-        key: t.key,
+        code: t.key,
+        name: t.key,
         channel: t.channel,
-        locale: 'ar',
         subject: t.subject_ar,
-        body: t.body_ar,
+        body_template: t.body_ar,
         is_active: true,
       });
     }
