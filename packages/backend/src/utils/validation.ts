@@ -282,6 +282,27 @@ export const createCampaignSchema = z.object({
   budget: z.number().min(0).default(0),
   targetCount: z.number().int().min(0).default(0),
 });
+// Workflow validation
+export const createWorkflowDefinitionSchema = z.object({
+  name: z.string().min(1).max(200),
+  slug: z.string().max(100).optional(),
+  category: z.string().max(50).default('general'),
+  steps: z.array(z.unknown()).optional(),
+  description: z.string().max(1000).optional(),
+  isActive: z.boolean().default(true),
+});
+
+export const startWorkflowInstanceSchema = z.object({
+  definitionId: z.string().uuid(),
+  referenceType: z.string().max(50).optional(),
+  referenceId: z.string().uuid().optional(),
+  currentStep: z.number().int().min(0).default(0),
+  context: z.record(z.unknown()).optional(),
+  data: z.record(z.unknown()).optional(),
+  assignedTo: z.string().uuid().optional(),
+});
+
+
 
 
 
