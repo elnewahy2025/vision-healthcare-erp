@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { dashboardApi, appointmentsApi } from '../lib/api';
+import { Spinner } from '../components/ui';
 import {
   CalendarCheck, Receipt, Users, DollarSign,
-  Stethoscope, TrendingUp, ArrowUp, ArrowDown,
+  Stethoscope, TrendingUp, ArrowUp,
   Clock, CheckCircle, XCircle, UserCheck,
 } from 'lucide-react';
 
@@ -17,7 +19,8 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalPatients: 0, totalAppointments: 0, todayAppointments: 0,
     pendingBills: 0, revenueToday: 0, activeDoctors: 0,
@@ -46,7 +49,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        <Spinner />
       </div>
     );
   }
@@ -57,10 +60,10 @@ export default function DashboardPage() {
         <div>
           <h1 className="page-title">{t('dashboard.title')}</h1>
           <p className="text-gray-500 mt-1">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {new Date().toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        <button className="btn-primary">
+        <button className="btn-primary" onClick={() => navigate("/analytics-dashboard")}>
           <TrendingUp className="w-4 h-4" />
           View Reports
         </button>
@@ -157,39 +160,22 @@ export default function DashboardPage() {
             <h2 className="text-lg font-semibold text-gray-900">{t('dashboard.recentActivity')}</h2>
           </div>
           <div className="card-body">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <UserCheck className="w-8 h-8 text-green-500 bg-green-50 p-1.5 rounded-lg" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">New patient registered</p>
-                  <p className="text-xs text-gray-500">Mohammed Al-Otaibi</p>
+            <div className="space-y-3">
+              {[
+                { icon: UserCheck, color: 'green', text: 'New patient registered', sub: 'Ahmed Mohamed', time: '2m ago' },
+                { icon: Clock, color: 'blue', text: 'Appointment checked in', sub: 'Fatma Hassan - Check-up', time: '15m ago' },
+                { icon: CheckCircle, color: 'purple', text: 'Invoice paid', sub: 'INV-001 - 1,250 EGP', time: '1h ago' },
+                { icon: XCircle, color: 'red', text: 'Appointment cancelled', sub: 'Omar Ali - Follow-up', time: '2h ago' },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <item.icon className={`w-8 h-8 text-${item.color}-500 bg-${item.color}-50 p-1.5 rounded-lg`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{item.text}</p>
+                    <p className="text-xs text-gray-500 truncate">{item.sub}</p>
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap">{item.time}</span>
                 </div>
-                <span className="text-xs text-gray-400 mr-auto">2m ago</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <Clock className="w-8 h-8 text-blue-500 bg-blue-50 p-1.5 rounded-lg" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Appointment checked in</p>
-                  <p className="text-xs text-gray-500">Fatima Al-Zahrani - Check-up</p>
-                </div>
-                <span className="text-xs text-gray-400 mr-auto">15m ago</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <CheckCircle className="w-8 h-8 text-purple-500 bg-purple-50 p-1.5 rounded-lg" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Invoice paid</p>
-                  <p className="text-xs text-gray-500">INV-DEMO-2026-0001 - 517.50 EGP</p>
-                </div>
-                <span className="text-xs text-gray-400 mr-auto">1h ago</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <XCircle className="w-8 h-8 text-red-500 bg-red-50 p-1.5 rounded-lg" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Appointment cancelled</p>
-                  <p className="text-xs text-gray-500">Khalid Al-Ghamdi - Follow-up</p>
-                </div>
-                <span className="text-xs text-gray-400 mr-auto">2h ago</span>
-              </div>
+              ))}
             </div>
           </div>
         </div>
