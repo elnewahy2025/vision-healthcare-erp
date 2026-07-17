@@ -3,13 +3,13 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: healthcare-db
+    container_name: vision-healthcare-db
     environment:
       POSTGRES_DB: healthcare2
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: Omar2009!
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,9 +22,9 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: healthcare-redis
+    container_name: vision-healthcare-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -37,11 +37,11 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: healthcare-minio
+    container_name: vision-healthcare-minio
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9010:9000"
+      - "9011:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -54,9 +54,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: healthcare-backend
+    container_name: vision-healthcare-backend
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       NODE_ENV: production
       DB_HOST: postgres
@@ -77,7 +77,7 @@ services:
       SMTP_PORT: 587
       SMTP_FROM: noreply@visionhealthcare.com
       CORS_ORIGIN: "*"
-      APP_URL: http://localhost:5173
+      APP_URL: http://localhost:5174
       PORT: 3000
       HOST: 0.0.0.0
     depends_on:
@@ -92,9 +92,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: healthcare-frontend
+    container_name: vision-healthcare-frontend
     ports:
-      - "5173:80"
+      - "5174:80"
     depends_on:
       - backend
     networks:
@@ -102,9 +102,9 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: healthcare-nginx
+    container_name: vision-healthcare-nginx
     ports:
-      - "80:80"
+      - "8080:80"
     volumes:
       - ./deployment/nginx/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:
