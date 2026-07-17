@@ -375,6 +375,78 @@ export const billingApi = {
     api.get(`/patients/${patientId}/invoices`, { params }).then((r) => r.data),
 };
 
+export interface CompliancePolicy {
+  id: string;
+  title: string;
+  code: string;
+  category: string;
+  description?: string;
+  content?: string;
+  status: string;
+  effectiveDate?: string;
+  reviewDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComplianceAudit {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  scheduledDate?: string;
+  completedDate?: string;
+  scope?: string;
+  findings?: string;
+  recommendations?: string;
+  auditor?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConsentLog {
+  id: string;
+  patientId: string;
+  patientName: string;
+  consentType: string;
+  granted: boolean;
+  details?: string;
+  ipAddress?: string;
+  consentedAt: string;
+}
+
+export interface BreachLog {
+  id: string;
+  type: string;
+  detectedDate: string;
+  reportedDate?: string;
+  severity: string;
+  description?: string;
+  affectedData?: string;
+  affectedRecords: number;
+  actionTaken?: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const complianceApi = {
+  listPolicies: (params?: { category?: string; status?: string }) =>
+    api.get('/compliance/policies', { params }).then((r) => r.data.data),
+  createPolicy: (data: Partial<CompliancePolicy>) =>
+    api.post('/compliance/policies', data).then((r) => r.data.data),
+  listAudits: (params?: { status?: string; type?: string }) =>
+    api.get('/compliance/audits', { params }).then((r) => r.data.data),
+  createAudit: (data: Partial<ComplianceAudit>) =>
+    api.post('/compliance/audits', data).then((r) => r.data.data),
+  listConsents: (params?: { patientId?: string }) =>
+    api.get('/compliance/consents', { params }).then((r) => r.data.data),
+  listBreaches: (params?: { status?: string; severity?: string }) =>
+    api.get('/compliance/breaches', { params }).then((r) => r.data.data),
+  createBreach: (data: Partial<BreachLog>) =>
+    api.post('/compliance/breaches', data).then((r) => r.data.data),
+};
+
 export interface FormDefinition {
   id: string;
   name: string;

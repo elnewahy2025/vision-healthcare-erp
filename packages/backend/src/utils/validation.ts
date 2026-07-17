@@ -319,6 +319,39 @@ export const submitFormSchema = z.object({
   data: z.record(z.unknown()),
   status: z.string().max(20).default('completed'),
 });
+// Compliance validation
+export const createCompliancePolicySchema = z.object({
+  title: z.string().min(1).max(200),
+  code: z.string().min(1).max(50),
+  category: z.string().max(50).default('general'),
+  description: z.string().max(1000).optional(),
+  content: z.string().max(10000).optional(),
+  status: z.enum(['draft', 'active', 'archived']).default('draft'),
+  effectiveDate: z.string().optional(),
+  reviewDate: z.string().optional(),
+});
+
+export const createComplianceAuditSchema = z.object({
+  title: z.string().min(1).max(200),
+  type: z.enum(['internal', 'external', 'regulatory']).default('internal'),
+  status: z.enum(['planned', 'in_progress', 'completed', 'cancelled']).default('planned'),
+  scheduledDate: z.string().optional(),
+  scope: z.string().max(1000).optional(),
+  auditor: z.string().max(200).optional(),
+});
+
+export const createBreachLogSchema = z.object({
+  type: z.string().min(1).max(100),
+  detectedDate: z.string().optional(),
+  severity: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
+  description: z.string().max(2000).optional(),
+  affectedData: z.string().max(500).optional(),
+  affectedRecords: z.number().int().min(0).default(0),
+  actionTaken: z.string().max(1000).optional(),
+  status: z.enum(['open', 'investigating', 'resolved', 'closed']).default('open'),
+});
+
+
 
 
 
