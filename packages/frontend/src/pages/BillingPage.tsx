@@ -142,15 +142,15 @@ export default function BillingPage() {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
           <div className="stat-card">
             <p className="stat-label">Total Revenue</p>
-            <p className="stat-value text-primary-600">{Number(revenue.total_revenue).toLocaleString()} SAR</p>
+            <p className="stat-value text-primary-600">{Number(revenue.total_revenue).toLocaleString()} EGP</p>
           </div>
           <div className="stat-card">
             <p className="stat-label">Collected</p>
-            <p className="stat-value text-green-600">{Number(revenue.total_collected).toLocaleString()} SAR</p>
+            <p className="stat-value text-green-600">{Number(revenue.total_collected).toLocaleString()} EGP</p>
           </div>
           <div className="stat-card">
             <p className="stat-label">Pending</p>
-            <p className="stat-value text-yellow-600">{Number(revenue.total_pending).toLocaleString()} SAR</p>
+            <p className="stat-value text-yellow-600">{Number(revenue.total_pending).toLocaleString()} EGP</p>
           </div>
           <div className="stat-card">
             <p className="stat-label">Invoice Count</p>
@@ -199,9 +199,9 @@ export default function BillingPage() {
                 <tr key={inv.id} className="hover:bg-gray-50">
                   <td className="font-mono text-xs font-medium">{inv.invoiceNumber}</td>
                   <td className="font-medium">{inv.patientName}</td>
-                  <td className="font-medium">{Number(inv.total).toLocaleString()} SAR</td>
-                  <td className="text-green-600">{Number(inv.paid).toLocaleString()} SAR</td>
-                  <td className={inv.due > 0 ? 'text-red-600 font-medium' : ''}>{Number(inv.due).toLocaleString()} SAR</td>
+                  <td className="font-medium">{Number(inv.total).toLocaleString()} EGP</td>
+                  <td className="text-green-600">{Number(inv.paid).toLocaleString()} EGP</td>
+                  <td className={inv.due > 0 ? 'text-red-600 font-medium' : ''}>{Number(inv.due).toLocaleString()} EGP</td>
                   <td><span className={statusBadge(inv.status)}>{inv.status}</span></td>
                   <td className="text-xs">{inv.issuedAt?.split('T')[0]}</td>
                   <td>
@@ -287,7 +287,7 @@ export default function BillingPage() {
                 </div>
 
                 <div className="text-right text-lg font-bold text-gray-900">
-                  Total: {calcTotal().toFixed(2)} SAR
+                  Total: {calcTotal().toFixed(2)} EGP
                 </div>
 
                 <div>
@@ -317,7 +317,7 @@ export default function BillingPage() {
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm text-gray-500">Invoice: {selectedInvoice.invoiceNumber}</p>
                 <p className="text-sm text-gray-500">Patient: {selectedInvoice.patientName}</p>
-                <p className="text-lg font-bold mt-2">Amount Due: {Number(selectedInvoice.due).toLocaleString()} SAR</p>
+                <p className="text-lg font-bold mt-2">Amount Due: {Number(selectedInvoice.due).toLocaleString()} EGP</p>
               </div>
               <div>
                 <label className="label">Payment Method</label>
@@ -334,7 +334,7 @@ export default function BillingPage() {
               <button type="button" onClick={() => setShowPayModal(false)} className="btn-secondary">{t('common.cancel')}</button>
               <button onClick={handlePay} disabled={saving} className="btn-primary">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                Pay {Number(selectedInvoice.due).toLocaleString()} SAR
+                Pay {Number(selectedInvoice.due).toLocaleString()} EGP
               </button>
             </div>
           </div>

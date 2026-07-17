@@ -95,8 +95,8 @@ export default function HrPage() {
                     <td className="font-medium">{p.periodName}</td>
                     <td className="text-xs">{p.periodStart}</td>
                     <td className="text-xs">{p.periodEnd}</td>
-                    <td>{p.totalGross?.toFixed(2)} SAR</td>
-                    <td>{p.totalNet?.toFixed(2)} SAR</td>
+                    <td>{p.totalGross?.toFixed(2)} EGP</td>
+                    <td>{p.totalNet?.toFixed(2)} EGP</td>
                     <td>{p.employeeCount}</td>
                     <td><Badge>{p.status}</Badge></td>
                   </tr>

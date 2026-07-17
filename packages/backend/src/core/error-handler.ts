@@ -1,6 +1,7 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from '@healthcare/shared/errors';
 import { captureError } from '../services/sentry.js';
+import { ZodError } from 'zod';
 
 export function errorHandler(
   error: FastifyError | AppError | Error,
@@ -8,6 +9,21 @@ export function errorHandler(
   reply: FastifyReply,
 ) {
   request.log.error(error);
+
+  // Handle Zod validation errors → 400
+  if (error instanceof ZodError) {
+    const formatted = error.errors.map((e) => ({
+      field: e.path.join('.'),
+      message: e.message,
+    }));
+    return reply.status(400).send({
+      success: false,
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: formatted,
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   // Capture in Sentry (only 5xx errors)
   if (!('statusCode' in error) || (typeof error.statusCode === 'number' && error.statusCode >= 500)) {

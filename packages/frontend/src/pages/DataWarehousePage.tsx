@@ -43,7 +43,7 @@ export default function DataWarehousePage() {
 
   if (loading) return <Spinner size="lg" className="py-16" />;
 
-  const formatCurrency = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
+  const formatCurrency = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EGP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
 
   return (
     <div>

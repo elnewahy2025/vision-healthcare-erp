@@ -54,7 +54,7 @@ export default function InventoryPage() {
                     <td><Badge>{i.category}</Badge></td>
                     <td><span className={`font-medium ${i.quantity <= i.reorderPoint ? 'text-red-600' : 'text-green-600'}`}>{i.quantity}</span></td>
                     <td className="text-xs">{i.reorderPoint}</td>
-                    <td>{i.unitPrice?.toFixed(2)} SAR</td>
+                    <td>{i.unitPrice?.toFixed(2)} EGP</td>
                     <td><Badge>{i.status}</Badge></td>
                   </tr>
                 ))}
@@ -91,7 +91,7 @@ export default function InventoryPage() {
                   <tr key={po.id} className="hover:bg-gray-50">
                     <td className="font-mono text-xs">{po.poNumber}</td>
                     <td>{po.supplier}</td>
-                    <td>{po.totalAmount?.toFixed(2)} SAR</td>
+                    <td>{po.totalAmount?.toFixed(2)} EGP</td>
                     <td><Badge>{po.status}</Badge></td>
                     <td className="text-xs">{po.orderDate}</td>
                     <td>{po.items?.length || 0}</td>

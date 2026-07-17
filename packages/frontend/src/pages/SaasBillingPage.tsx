@@ -46,7 +46,7 @@ export default function SaasBillingPage() {
               </CardBody></Card>
               <Card><CardBody>
                 <p className="text-sm text-gray-500">Amount</p>
-                <p className="text-xl font-bold">{Number(subscription.amount).toFixed(2)} SAR</p>
+                <p className="text-xl font-bold">{Number(subscription.amount).toFixed(2)} EGP</p>
                 <p className="text-xs text-gray-400">{subscription.billingCycle}</p>
               </CardBody></Card>
               <Card><CardBody>
@@ -83,8 +83,8 @@ export default function SaasBillingPage() {
                   <h3 className="font-bold text-lg">{p.name}</h3>
                   <Badge>{p.category}</Badge>
                 </div>
-                <p className="text-3xl font-bold mb-1">{p.priceMonthly} <span className="text-sm font-normal text-gray-500">SAR/mo</span></p>
-                {p.priceYearly > 0 && <p className="text-sm text-gray-500 mb-4">{p.priceYearly} SAR/yr (save {Math.round((1 - p.priceYearly / (p.priceMonthly * 12)) * 100)}%)</p>}
+                <p className="text-3xl font-bold mb-1">{p.priceMonthly} <span className="text-sm font-normal text-gray-500">EGP/mo</span></p>
+                {p.priceYearly > 0 && <p className="text-sm text-gray-500 mb-4">{p.priceYearly} EGP/yr (save {Math.round((1 - p.priceYearly / (p.priceMonthly * 12)) * 100)}%)</p>}
                 <div className="text-sm space-y-2 mb-4">
                   <p>👤 {p.maxUsers} users · 🏥 {p.maxBranches} branches · 💾 {p.maxStorageGb}GB</p>
                   <p className="font-medium">Modules: {(p.modules || []).join(', ')}</p>
@@ -117,7 +117,7 @@ export default function SaasBillingPage() {
                     <td className="text-xs">{i.periodStart} → {i.periodEnd}</td>
                     <td>{Number(i.amount).toFixed(2)}</td>
                     <td>{Number(i.tax).toFixed(2)}</td>
-                    <td className="font-medium">{Number(i.total).toFixed(2)} SAR</td>
+                    <td className="font-medium">{Number(i.total).toFixed(2)} EGP</td>
                     <td><Badge variant={i.status === 'paid' ? 'success' : i.status === 'failed' ? 'danger' : 'warning'}>{i.status}</Badge></td>
                     <td className="text-xs">{i.paidAt?.split('T')[0] || '-'}</td>
                   </tr>

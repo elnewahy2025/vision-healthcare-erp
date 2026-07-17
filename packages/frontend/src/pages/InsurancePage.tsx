@@ -70,7 +70,7 @@ export default function InsurancePage() {
                     <td className="font-mono text-xs">{cl.claimNumber}</td>
                     <td className="font-medium">{cl.patientName}</td>
                     <td className="text-xs">{cl.insuranceName}</td>
-                    <td>{cl.claimedAmount?.toFixed(2)} SAR</td>
+                    <td>{cl.claimedAmount?.toFixed(2)} EGP</td>
                     <td><Badge>{cl.status}</Badge></td>
                     <td className="text-xs">{cl.submissionDate || '-'}</td>
                   </tr>
@@ -84,7 +84,7 @@ export default function InsurancePage() {
         <div className="space-y-4">
           <Input placeholder="Patient ID" value={newClaim.patientId} onChange={e => setNewClaim({ ...newClaim, patientId: e.target.value })} />
           <Input placeholder="Insurance Company ID" value={newClaim.insuranceId} onChange={e => setNewClaim({ ...newClaim, insuranceId: e.target.value })} />
-          <Input placeholder="Claimed Amount (SAR)" type="number" value={String(newClaim.claimedAmount)} onChange={e => setNewClaim({ ...newClaim, claimedAmount: Number(e.target.value) })} />
+          <Input placeholder="Claimed Amount (EGP)" type="number" value={String(newClaim.claimedAmount)} onChange={e => setNewClaim({ ...newClaim, claimedAmount: Number(e.target.value) })} />
           <Button onClick={async () => {
             await api.post('/insurance/claims', newClaim);
             setShowNewModal(false);

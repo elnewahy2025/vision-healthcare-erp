@@ -98,7 +98,7 @@ export default function PatientDetailPage() {
                     <Receipt className="w-8 h-8 text-purple-500 bg-purple-50 p-1.5 rounded-lg" />
                     <div className="flex-1">
                       <p className="text-sm font-medium">{inv.invoice_number}</p>
-                      <p className="text-xs text-gray-500">{inv.total} SAR</p>
+                      <p className="text-xs text-gray-500">{inv.total} EGP</p>
                     </div>
                     <span className={`badge ${
                       inv.status === 'paid' ? 'badge-success' :

@@ -50,7 +50,7 @@ export default function PatientTimelinePage() {
                       </div>
                       <span className="badge badge-gray text-xs capitalize">{event.type}</span>
                     </div>
-                    {event.type === 'invoice' && <p className="text-sm mt-2"><strong>{Number(event.total || 0).toLocaleString()} SAR</strong> — <span className={event.status === 'paid' ? 'text-green-600' : 'text-yellow-600'}>{event.status}</span></p>}
+                    {event.type === 'invoice' && <p className="text-sm mt-2"><strong>{Number(event.total || 0).toLocaleString()} EGP</strong> — <span className={event.status === 'paid' ? 'text-green-600' : 'text-yellow-600'}>{event.status}</span></p>}
                     {event.type === 'allergy' && <p className="text-sm mt-2"><span className={`font-medium ${event.severity === 'severe' || event.severity === 'anaphylaxis' ? 'text-red-600' : 'text-yellow-600'}`}>{event.severity}</span> — {event.title}</p>}
                     {event.diagnosis && <p className="text-xs text-gray-500 mt-1 truncate">Dx: {typeof event.diagnosis === 'string' ? event.diagnosis : JSON.stringify(event.diagnosis)}</p>}
                   </div>

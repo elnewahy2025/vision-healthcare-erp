@@ -51,7 +51,7 @@ export default function CrmPage() {
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="font-medium">{c.name}</td>
                   <td><Badge>{c.type}</Badge></td>
-                  <td>{c.budget?.toFixed(2)} SAR</td>
+                  <td>{c.budget?.toFixed(2)} EGP</td>
                   <td>{c.targetCount}</td>
                   <td>{c.reachedCount}</td>
                   <td>{c.conversionCount}</td>

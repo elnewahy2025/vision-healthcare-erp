@@ -57,7 +57,7 @@ export default function InsuranceClaimsPage() {
           <div className="card p-3 text-center"><p className="text-lg font-bold text-blue-600">{summary.submitted}</p><p className="text-xs text-gray-500">Submitted</p></div>
           <div className="card p-3 text-center"><p className="text-lg font-bold text-green-600">{summary.approved}</p><p className="text-xs text-gray-500">Approved</p></div>
           <div className="card p-3 text-center"><p className="text-lg font-bold text-red-600">{summary.denied}</p><p className="text-xs text-gray-500">Denied</p></div>
-          <div className="card p-3 col-span-2 sm:col-span-3 lg:col-span-5"><p className="text-sm">Claimed: <strong>{Number(summary.total_claimed || 0).toLocaleString()} SAR</strong> | Approved: <strong>{Number(summary.total_approved || 0).toLocaleString()} SAR</strong> | Paid: <strong className="text-green-600">{Number(summary.total_paid || 0).toLocaleString()} SAR</strong></p></div>
+          <div className="card p-3 col-span-2 sm:col-span-3 lg:col-span-5"><p className="text-sm">Claimed: <strong>{Number(summary.total_claimed || 0).toLocaleString()} EGP</strong> | Approved: <strong>{Number(summary.total_approved || 0).toLocaleString()} EGP</strong> | Paid: <strong className="text-green-600">{Number(summary.total_paid || 0).toLocaleString()} EGP</strong></p></div>
         </div>
       )}
 

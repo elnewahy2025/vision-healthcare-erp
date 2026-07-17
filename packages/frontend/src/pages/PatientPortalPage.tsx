@@ -152,7 +152,7 @@ export default function PatientPortalPage() {
               {dashboard.pendingBills.map((b: any) => (
                 <div key={b.id} className="flex items-center justify-between py-2 border-b last:border-0">
                   <div><p className="font-medium">{b.invoiceNumber}</p><p className="text-xs text-gray-500">Due: {b.dueDate}</p></div>
-                  <p className="font-bold text-red-600">{Number(b.dueAmount).toFixed(2)} SAR</p>
+                  <p className="font-bold text-red-600">{Number(b.dueAmount).toFixed(2)} EGP</p>
                 </div>
               ))}
             </CardBody></Card>
@@ -185,7 +185,7 @@ export default function PatientPortalPage() {
                 bills.map((b: any) => (
                   <tr key={b.id} className="hover:bg-gray-50">
                     <td className="font-mono text-xs">{b.invoiceNumber}</td>
-                    <td>{Number(b.total).toFixed(2)} SAR</td>
+                    <td>{Number(b.total).toFixed(2)} EGP</td>
                     <td>{Number(b.paid).toFixed(2)}</td>
                     <td className="font-medium text-red-600">{Number(b.dueAmount).toFixed(2)}</td>
                     <td><Badge variant={b.status === 'paid' ? 'success' : b.status === 'pending' ? 'warning' : 'danger'}>{b.status}</Badge></td>
