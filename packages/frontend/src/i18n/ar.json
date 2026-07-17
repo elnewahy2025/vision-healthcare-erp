@@ -386,5 +386,13 @@
   "tele.zoom": "زوم",
   "tele.teams": "مايكروسوفت تيمز",
   "tele.other": "أخرى",
-  "validate.tele.patientRequired": "يرجى اختيار مريض"
+  "validate.tele.patientRequired": "يرجى اختيار مريض",
+  "notif.title": "الإشعارات",
+  "notif.unread": "غير مقروء",
+  "notif.of": "من",
+  "notif.total": "إجمالي",
+  "notif.noNotifs": "لا توجد إشعارات",
+  "notif.markRead": "تحديد كمقروء",
+  "notif.notification": "إشعار",
+  "notif.markAllRead": "تحديد الكل كمقروء"
 }

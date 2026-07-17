@@ -386,5 +386,13 @@
   "tele.zoom": "Zoom",
   "tele.teams": "Microsoft Teams",
   "tele.other": "Other",
-  "validate.tele.patientRequired": "Please select a patient"
+  "validate.tele.patientRequired": "Please select a patient",
+  "notif.title": "Notifications",
+  "notif.unread": "unread",
+  "notif.of": "of",
+  "notif.total": "total",
+  "notif.noNotifs": "No notifications",
+  "notif.markRead": "Mark Read",
+  "notif.notification": "Notification",
+  "notif.markAllRead": "Mark All Read"
 }
