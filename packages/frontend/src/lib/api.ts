@@ -222,14 +222,52 @@ export const emrApi = {
 };
 
 // Billing
+export interface BillingListParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  patientId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface CreateInvoicePayload {
+  patientId: string;
+  appointmentId?: string;
+  items: { description: string; code: string; quantity: number; unitPrice: number; type: string; total: number }[];
+  discount: number;
+  tax: number;
+  dueDate: string;
+  notes?: string;
+  insuranceClaim?: string;
+}
+
+export interface PayInvoicePayload {
+  amount: number;
+  method: string;
+  notes?: string;
+}
+
+export interface RevenueSummary {
+  total_revenue: number;
+  total_collected: number;
+  total_pending: number;
+  invoice_count: number;
+  paid_count: number;
+  pending_count: number;
+  overdue_count: number;
+  period: { start: string; end: string };
+}
+
 export const billingApi = {
-  list: (params?: any) => api.get('/invoices', { params }).then((r) => r.data),
+  list: (params?: BillingListParams) => api.get('/invoices', { params }).then((r) => r.data),
   get: (id: string) => api.get(`/invoices/${id}`).then((r) => r.data.data),
-  create: (data: any) => api.post('/invoices', data).then((r) => r.data.data),
-  pay: (id: string, data: { amount: number; method: string; notes?: string }) =>
+  create: (data: CreateInvoicePayload) => api.post('/invoices', data).then((r) => r.data.data),
+  pay: (id: string, data: PayInvoicePayload) =>
     api.post(`/invoices/${id}/pay`, data).then((r) => r.data.data),
-  revenue: (params?: any) => api.get('/billing/revenue', { params }).then((r) => r.data.data),
-  patientInvoices: (patientId: string, params?: any) =>
+  revenue: (params?: { startDate?: string; endDate?: string }) =>
+    api.get('/billing/revenue', { params }).then((r) => r.data.data),
+  patientInvoices: (patientId: string, params?: BillingListParams) =>
     api.get(`/patients/${patientId}/invoices`, { params }).then((r) => r.data),
 };
 

@@ -1,345 +1,710 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { billingApi, patientsApi } from '../lib/api';
-import { Plus, Receipt, Loader2, Search, User, DollarSign } from 'lucide-react';
+import { billingApi } from '../lib/api';
+import type { Invoice, InvoiceItem, InvoiceStatus, PaymentMethod } from '@healthcare/shared/types';
+import { Modal, Input, Select, PatientSearchField, Button, Badge, EmptyState, PageLoader } from '../components/ui';
+import { Plus, Trash2, DollarSign, FileText, TrendingUp, AlertTriangle } from 'lucide-react';
+import { sanitizeNumber } from '../lib/sanitize';
 import toast from 'react-hot-toast';
+
+interface InvoiceItemForm {
+  description: string;
+  code: string;
+  quantity: number;
+  unitPrice: number;
+  type: InvoiceItem['type'];
+}
+
+interface InvoiceForm {
+  patientId: string;
+  items: InvoiceItemForm[];
+  discount: number;
+  tax: number;
+  dueDate: string;
+  notes: string;
+}
+
+interface FormErrors {
+  patientId?: string;
+  items?: string;
+  dueDate?: string;
+}
+
+interface RevenueSummary {
+  total_revenue: number;
+  total_collected: number;
+  total_pending: number;
+  invoice_count: number;
+  paid_count: number;
+  pending_count: number;
+  overdue_count: number;
+  period: { start: string; end: string };
+}
+
+interface PaymentForm {
+  method: PaymentMethod;
+  notes: string;
+}
+
+const ITEM_TYPES: { value: InvoiceItem['type']; labelKey: string }[] = [
+  { value: 'consultation', labelKey: 'billing.typeConsultation' },
+  { value: 'procedure', labelKey: 'billing.typeProcedure' },
+  { value: 'medication', labelKey: 'billing.typeMedication' },
+  { value: 'laboratory', labelKey: 'billing.typeLaboratory' },
+  { value: 'radiology', labelKey: 'billing.typeRadiology' },
+  { value: 'supply', labelKey: 'billing.typeSupply' },
+  { value: 'other', labelKey: 'billing.typeOther' },
+];
+
+const PAYMENT_METHODS: { value: PaymentMethod; labelKey: string }[] = [
+  { value: 'cash', labelKey: 'billing.cash' },
+  { value: 'card', labelKey: 'billing.card' },
+  { value: 'bank_transfer', labelKey: 'billing.bankTransfer' },
+  { value: 'online', labelKey: 'billing.online' },
+  { value: 'insurance', labelKey: 'billing.insurance' },
+  { value: 'wallet', labelKey: 'billing.wallet' },
+];
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'partial', label: 'Partial' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'overdue', label: 'Overdue' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+const INITIAL_FORM: InvoiceForm = {
+  patientId: '',
+  items: [{ description: '', code: '', quantity: 1, unitPrice: 0, type: 'consultation' }],
+  discount: 0,
+  tax: 0,
+  dueDate: '',
+  notes: '',
+};
+
+const INITIAL_PAYMENT: PaymentForm = {
+  method: 'cash',
+  notes: '',
+};
+
+function createEmptyItem(): InvoiceItemForm {
+  return { description: '', code: '', quantity: 1, unitPrice: 0, type: 'consultation' };
+}
+
+function calcItemTotal(item: InvoiceItemForm): number {
+  return item.quantity * item.unitPrice;
+}
+
+function calcInvoiceTotal(items: InvoiceItemForm[], discount: number, tax: number): number {
+  const subtotal = items.reduce((sum, item) => sum + calcItemTotal(item), 0);
+  return subtotal - discount + tax;
+}
+
+function validateForm(form: InvoiceForm, t: (key: string) => string): FormErrors {
+  const errors: FormErrors = {};
+
+  if (!form.patientId) {
+    errors.patientId = t('billing.selectPatientError');
+  }
+
+  const hasEmptyItem = form.items.some(
+    (item) => !item.description.trim() || item.quantity <= 0 || item.unitPrice <= 0,
+  );
+  if (hasEmptyItem) {
+    errors.items = 'All items must have a description, quantity, and price';
+  }
+
+  if (!form.dueDate) {
+    errors.dueDate = 'Due date is required';
+  }
+
+  return errors;
+}
+
+function formatEgp(amount: number): string {
+  return `${Number(amount).toLocaleString('en-EG')} EGP`;
+}
+
+function getStatusVariant(status: InvoiceStatus): 'success' | 'warning' | 'danger' | 'info' | 'gray' {
+  const map: Record<InvoiceStatus, 'success' | 'warning' | 'danger' | 'info' | 'gray'> = {
+    paid: 'success',
+    pending: 'warning',
+    partial: 'info',
+    overdue: 'danger',
+    draft: 'gray',
+    cancelled: 'gray',
+    refunded: 'warning',
+  };
+  return map[status] || 'gray';
+}
+
+function getStatusLabel(status: InvoiceStatus, t: (key: string) => string): string {
+  const map: Record<InvoiceStatus, string> = {
+    draft: t('billing.statusDraft'),
+    pending: t('billing.statusPending'),
+    partial: t('billing.statusPartial'),
+    paid: t('billing.statusPaid'),
+    cancelled: t('billing.statusCancelled'),
+    refunded: t('billing.statusRefunded'),
+    overdue: t('billing.statusOverdue'),
+  };
+  return map[status] || status;
+}
 
 export default function BillingPage() {
   const { t } = useTranslation();
-  const [invoices, setInvoices] = useState<any[]>([]);
+
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });
   const [statusFilter, setStatusFilter] = useState('');
+  const [revenue, setRevenue] = useState<RevenueSummary | null>(null);
+  const [revenueLoading, setRevenueLoading] = useState(true);
+
   const [showNewModal, setShowNewModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [saving, setSaving] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [revenue, setRevenue] = useState<any>(null);
 
-  const [newInvoice, setNewInvoice] = useState({
-    patientId: '', items: [{ description: '', code: '', quantity: 1, unitPrice: 0, type: 'consultation' as const }],
-    discount: 0, tax: 0, dueDate: '', notes: '',
-  });
+  const [newInvoice, setNewInvoice] = useState<InvoiceForm>(INITIAL_FORM);
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [paymentForm, setPaymentForm] = useState<PaymentForm>(INITIAL_PAYMENT);
 
-  const loadInvoices = async () => {
+  const loadInvoices = useCallback(async () => {
     setLoading(true);
     try {
       const data = await billingApi.list({ page, limit: 10, status: statusFilter || undefined });
       setInvoices(data.data);
       setPagination(data.pagination);
-    } catch { toast.error('Failed to load invoices'); }
-    finally { setLoading(false); }
-  };
+    } catch {
+      toast.error(t('billing.loadFailed'));
+    } finally {
+      setLoading(false);
+    }
+  }, [page, statusFilter, t]);
 
-  const loadRevenue = async () => {
+  const loadRevenue = useCallback(async () => {
+    setRevenueLoading(true);
     try {
       const data = await billingApi.revenue();
       setRevenue(data);
-    } catch {}
-  };
+    } catch {
+      // Revenue stats are non-critical; silently handle
+    } finally {
+      setRevenueLoading(false);
+    }
+  }, []);
 
-  useEffect(() => { loadInvoices(); }, [page, statusFilter]);
-  useEffect(() => { loadRevenue(); }, []);
+  useEffect(() => { loadInvoices(); }, [loadInvoices]);
+  useEffect(() => { loadRevenue(); }, [loadRevenue]);
 
-  const searchPatients = async (q: string) => {
-    if (q.length < 2) return setSearchResults([]);
-    try { setSearchResults(await patientsApi.search(q)); }
-    catch { setSearchResults([]); }
-  };
-
-  const selectPatient = (patient: any) => {
-    setNewInvoice({ ...newInvoice, patientId: patient.id });
-    (document.getElementById('patient-search') as HTMLInputElement)!.value = `${patient.name} (${patient.mrn})`;
-    setSearchResults([]);
-  };
-
-  const addItem = () => {
-    setNewInvoice({
-      ...newInvoice,
-      items: [...newInvoice.items, { description: '', code: '', quantity: 1, unitPrice: 0, type: 'consultation' as const }],
-    });
-  };
-
-  const removeItem = (idx: number) => {
-    setNewInvoice({ ...newInvoice, items: newInvoice.items.filter((_, i) => i !== idx) });
-  };
-
-  const updateItem = (idx: number, field: string, value: any) => {
-    const items = [...newInvoice.items];
-    (items[idx] as any)[field] = value;
-    setNewInvoice({ ...newInvoice, items });
-  };
-
-  const calcTotal = () => {
-    const subtotal = newInvoice.items.reduce((s, item) => s + item.quantity * item.unitPrice, 0);
-    return subtotal - newInvoice.discount + newInvoice.tax;
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newInvoice.patientId) { toast.error('Select a patient'); return; }
+    const errors = validateForm(newInvoice, t);
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setSaving(true);
     try {
+      const items: InvoiceItem[] = newInvoice.items.map((item) => ({
+        ...item,
+        total: calcItemTotal(item),
+      }));
+
       await billingApi.create({
         patientId: newInvoice.patientId,
-        items: newInvoice.items,
+        items,
         discount: newInvoice.discount,
         tax: newInvoice.tax,
         dueDate: newInvoice.dueDate,
-        notes: newInvoice.notes,
+        notes: newInvoice.notes || undefined,
       });
-      toast.success('Invoice created');
+      toast.success(t('billing.createSuccess'));
       setShowNewModal(false);
+      setNewInvoice(INITIAL_FORM);
+      setFormErrors({});
       loadInvoices();
       loadRevenue();
-    } catch { toast.error('Failed to create invoice'); }
-    finally { setSaving(false); }
+    } catch {
+      toast.error(t('billing.createFailed'));
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handlePay = async () => {
+  const handleRecordPayment = async () => {
     if (!selectedInvoice) return;
+
     setSaving(true);
     try {
       await billingApi.pay(selectedInvoice.id, {
         amount: selectedInvoice.due,
-        method: 'cash',
+        method: paymentForm.method,
+        notes: paymentForm.notes || undefined,
       });
-      toast.success('Payment recorded');
+      toast.success(t('billing.paymentSuccess'));
       setShowPayModal(false);
       setSelectedInvoice(null);
+      setPaymentForm(INITIAL_PAYMENT);
       loadInvoices();
       loadRevenue();
-    } catch { toast.error('Payment failed'); }
-    finally { setSaving(false); }
+    } catch {
+      toast.error(t('billing.paymentFailed'));
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const statusBadge = (s: string) => {
-    const map: Record<string, string> = {
-      paid: 'badge-success', pending: 'badge-warning',
-      partial: 'badge-info', overdue: 'badge-danger',
-      draft: 'badge-gray', cancelled: 'badge-gray',
-    };
-    return map[s] || 'badge-gray';
+  const openPayModal = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setPaymentForm(INITIAL_PAYMENT);
+    setShowPayModal(true);
   };
+
+  const closeNewModal = () => {
+    setShowNewModal(false);
+    setNewInvoice(INITIAL_FORM);
+    setFormErrors({});
+  };
+
+  const closePayModal = () => {
+    setShowPayModal(false);
+    setSelectedInvoice(null);
+    setPaymentForm(INITIAL_PAYMENT);
+  };
+
+  const addItem = () => {
+    setNewInvoice((prev) => ({
+      ...prev,
+      items: [...prev.items, createEmptyItem()],
+    }));
+  };
+
+  const removeItem = (index: number) => {
+    setNewInvoice((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateItem = (index: number, field: keyof InvoiceItemForm, value: string | number) => {
+    setNewInvoice((prev) => ({
+      ...prev,
+      items: prev.items.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item,
+      ),
+    }));
+  };
+
+  const newItemTypeOptions = ITEM_TYPES.map((item) => ({
+    value: item.value,
+    label: t(item.labelKey),
+  }));
+
+  const paymentMethodOptions = PAYMENT_METHODS.map((m) => ({
+    value: m.value,
+    label: t(m.labelKey),
+  }));
+
+  const statusOptions = STATUS_OPTIONS.map((s) => ({
+    value: s.value,
+    label: s.label,
+  }));
 
   return (
     <div>
+      {/* Page Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('billing.title')}</h1>
-          <p className="text-gray-500 mt-1">{pagination.total} invoices</p>
+          <p className="text-gray-500 mt-1">{t('billing.invoiceCount', { count: pagination.total })}</p>
         </div>
-        <button onClick={() => setShowNewModal(true)} className="btn-primary">
-          <Plus className="w-4 h-4" />
+        <Button
+          icon={<Plus className="w-4 h-4" />}
+          onClick={() => setShowNewModal(true)}
+        >
           {t('billing.new')}
-        </button>
+        </Button>
       </div>
 
-      {/* Revenue Summary */}
-      {revenue && (
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-          <div className="stat-card">
-            <p className="stat-label">Total Revenue</p>
-            <p className="stat-value text-primary-600">{Number(revenue.total_revenue).toLocaleString()} EGP</p>
+      {/* Revenue Summary Cards */}
+      {!revenueLoading && revenue && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">{t('billing.totalRevenue')}</p>
+                <p className="text-lg font-bold text-gray-900">{formatEgp(revenue.total_revenue)}</p>
+              </div>
+            </div>
           </div>
-          <div className="stat-card">
-            <p className="stat-label">Collected</p>
-            <p className="stat-value text-green-600">{Number(revenue.total_collected).toLocaleString()} EGP</p>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">{t('billing.collected')}</p>
+                <p className="text-lg font-bold text-green-600">{formatEgp(revenue.total_collected)}</p>
+              </div>
+            </div>
           </div>
-          <div className="stat-card">
-            <p className="stat-label">Pending</p>
-            <p className="stat-value text-yellow-600">{Number(revenue.total_pending).toLocaleString()} EGP</p>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-yellow-50 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">{t('billing.outstanding')}</p>
+                <p className="text-lg font-bold text-yellow-600">{formatEgp(revenue.total_pending)}</p>
+              </div>
+            </div>
           </div>
-          <div className="stat-card">
-            <p className="stat-label">Invoice Count</p>
-            <p className="stat-value">{revenue.invoice_count}</p>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">{t('billing.overdueCount')}</p>
+                <p className="text-lg font-bold text-red-600">{revenue.overdue_count}</p>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* Filters */}
-      <div className="card mb-6">
-        <div className="card-body">
-          <select className="input w-48" value={statusFilter}
-            onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
-            <option value="">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="partial">Partial</option>
-            <option value="paid">Paid</option>
-            <option value="overdue">Overdue</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
+      <div className="mb-4">
+        <Select
+          options={statusOptions}
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          placeholder={t('common.filter')}
+          className="w-48"
+        />
       </div>
 
-      {/* Invoices Table */}
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>{t('billing.invoice')}</th>
-              <th>{t('appointment.patient')}</th>
-              <th>{t('billing.total')}</th>
-              <th>{t('billing.paid')}</th>
-              <th>{t('billing.due')}</th>
-              <th>{t('common.status')}</th>
-              <th>Date</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={8} className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
-            ) : invoices.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-12 text-gray-500">{t('common.noData')}</td></tr>
-            ) : (
-              invoices.map((inv: any) => (
-                <tr key={inv.id} className="hover:bg-gray-50">
-                  <td className="font-mono text-xs font-medium">{inv.invoiceNumber}</td>
-                  <td className="font-medium">{inv.patientName}</td>
-                  <td className="font-medium">{Number(inv.total).toLocaleString()} EGP</td>
-                  <td className="text-green-600">{Number(inv.paid).toLocaleString()} EGP</td>
-                  <td className={inv.due > 0 ? 'text-red-600 font-medium' : ''}>{Number(inv.due).toLocaleString()} EGP</td>
-                  <td><span className={statusBadge(inv.status)}>{inv.status}</span></td>
-                  <td className="text-xs">{inv.issuedAt?.split('T')[0]}</td>
-                  <td>
-                    {inv.status !== 'paid' && inv.status !== 'cancelled' && (
-                      <button onClick={() => { setSelectedInvoice(inv); setShowPayModal(true); }}
-                        className="btn-ghost btn-sm text-green-600">Pay</button>
-                    )}
-                    <button className="btn-ghost btn-sm">View</button>
-                  </td>
+      {/* Invoice Table */}
+      {loading ? (
+        <PageLoader message={t('common.loading')} />
+      ) : invoices.length === 0 ? (
+        <EmptyState
+          title={t('common.noData')}
+          message={t('common.noData')}
+          action={
+            <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowNewModal(true)}>
+              {t('billing.new')}
+            </Button>
+          }
+        />
+      ) : (
+        <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('billing.invoiceNumber')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('billing.patient')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('billing.total')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('billing.paid')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('billing.due')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('common.status')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('common.actions')}
+                  </th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {invoices.map((invoice) => (
+                  <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {invoice.invoiceNumber}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {invoice.patientName || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      {formatEgp(invoice.total)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
+                      {formatEgp(invoice.paid)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                      {formatEgp(invoice.due)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <Badge variant={getStatusVariant(invoice.status)}>
+                        {getStatusLabel(invoice.status, t)}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {invoice.due > 0 && invoice.status !== 'cancelled' && invoice.status !== 'paid' && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={<DollarSign className="w-3 h-3" />}
+                          onClick={() => openPayModal(invoice)}
+                        >
+                          {t('billing.pay')}
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 bg-gray-50">
+              <p className="text-sm text-gray-500">
+                {t('common.pageOf', { current: page, total: pagination.totalPages })}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  {t('common.start')}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                  disabled={page >= pagination.totalPages}
+                >
+                  {t('common.complete')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* New Invoice Modal */}
-      {showNewModal && (
-        <div className="modal-overlay" onClick={() => setShowNewModal(false)}>
-          <div className="modal-content max-w-2xl" onClick={e => e.stopPropagation()}>
-            <div className="card-header"><h2 className="text-lg font-semibold">{t('billing.new')}</h2></div>
-            <form onSubmit={handleCreate}>
-              <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-                <div className="relative">
-                  <label className="label">Patient</label>
-                  <input id="patient-search" className="input" placeholder="Search patient..."
-                    onChange={e => searchPatients(e.target.value)} />
-                  {searchResults.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
-                      {searchResults.map((p: any) => (
-                        <button key={p.id} type="button" onClick={() => selectPatient(p)}
-                          className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm">{p.name} - {p.mrn}</button>
-                      ))}
-                    </div>
+      <Modal
+        open={showNewModal}
+        onClose={closeNewModal}
+        title={t('billing.newInvoice')}
+        size="xl"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeNewModal}>
+              {t('common.cancel')}
+            </Button>
+            <Button loading={saving} onClick={() => {
+              const form = document.getElementById('invoice-form') as HTMLFormElement 
+              if (form) form.requestSubmit();
+            }}>
+              {t('common.create')}
+            </Button>
+          </>
+        }
+      >
+        <form id="invoice-form" onSubmit={handleCreateInvoice} className="space-y-6">
+          <PatientSearchField
+            value={newInvoice.patientId}
+            onChange={(patientId) => {
+              setNewInvoice((prev) => ({ ...prev, patientId }));
+              setFormErrors((prev) => ({ ...prev, patientId: undefined }));
+            }}
+            error={formErrors.patientId}
+            required
+          />
+
+          {/* Invoice Items */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-700">{t('billing.items')}</h3>
+              <Button variant="ghost" size="sm" type="button" icon={<Plus className="w-3 h-3" />} onClick={addItem}>
+                {t('billing.addItem')}
+              </Button>
+            </div>
+            {formErrors.items && (
+              <p className="text-xs text-red-600 mb-2">{formErrors.items}</p>
+            )}
+            <div className="space-y-3">
+              {newInvoice.items.map((item, idx) => (
+                <div key={idx} className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1">
+                    <Input
+                      placeholder={t('billing.description')}
+                      value={item.description}
+                      onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="w-32">
+                    <Input
+                      placeholder={t('billing.code')}
+                      value={item.code}
+                      onChange={(e) => updateItem(idx, 'code', e.target.value)}
+                    />
+                  </div>
+                  <div className="w-24">
+                    <Input
+                      type="number"
+                      placeholder={t('billing.quantity')}
+                      value={item.quantity}
+                      min="1"
+                      onChange={(e) => updateItem(idx, 'quantity', sanitizeNumber(e.target.value))}
+                      required
+                    />
+                  </div>
+                  <div className="w-28">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder={t('billing.unitPrice')}
+                      value={item.unitPrice}
+                      min="0"
+                      onChange={(e) => updateItem(idx, 'unitPrice', sanitizeNumber(e.target.value))}
+                      required
+                    />
+                  </div>
+                  <div className="w-32">
+                    <Select
+                      options={newItemTypeOptions}
+                      value={item.type}
+                      onChange={(e) => updateItem(idx, 'type', e.target.value as InvoiceItem['type'])}
+                    />
+                  </div>
+                  <div className="w-20 text-sm font-medium pt-2 text-right text-gray-700">
+                    {formatEgp(calcItemTotal(item))}
+                  </div>
+                  {newInvoice.items.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      onClick={() => removeItem(idx)}
+                      aria-label={t('billing.removeItem')}
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
                   )}
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="label mb-0">Invoice Items</label>
-                    <button type="button" onClick={addItem} className="btn-ghost btn-sm text-primary-600">+ Add Item</button>
-                  </div>
-                  {newInvoice.items.map((item, idx) => (
-                    <div key={idx} className="flex gap-2 mb-2 items-start">
-                      <div className="flex-1">
-                        <input className="input text-sm" placeholder="Description" value={item.description}
-                          onChange={e => updateItem(idx, 'description', e.target.value)} required />
-                      </div>
-                      <div className="w-20">
-                        <input type="number" className="input text-sm" placeholder="Qty" value={item.quantity}
-                          onChange={e => updateItem(idx, 'quantity', Number(e.target.value))} min="1" required />
-                      </div>
-                      <div className="w-24">
-                        <input type="number" step="0.01" className="input text-sm" placeholder="Price" value={item.unitPrice}
-                          onChange={e => updateItem(idx, 'unitPrice', Number(e.target.value))} min="0" required />
-                      </div>
-                      <div className="w-20 text-sm font-medium pt-2 text-right">
-                        {(item.quantity * item.unitPrice).toFixed(2)}
-                      </div>
-                      {newInvoice.items.length > 1 && (
-                        <button type="button" onClick={() => removeItem(idx)} className="btn-ghost btn-sm text-red-500 mt-1">X</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <label className="label">{t('billing.discount')}</label>
-                    <input type="number" step="0.01" className="input" value={newInvoice.discount}
-                      onChange={e => setNewInvoice({...newInvoice, discount: Number(e.target.value)})} />
-                  </div>
-                  <div>
-                    <label className="label">{t('billing.tax')}</label>
-                    <input type="number" step="0.01" className="input" value={newInvoice.tax}
-                      onChange={e => setNewInvoice({...newInvoice, tax: Number(e.target.value)})} />
-                  </div>
-                  <div>
-                    <label className="label">{t('billing.dueDate')}</label>
-                    <input type="date" className="input" value={newInvoice.dueDate}
-                      onChange={e => setNewInvoice({...newInvoice, dueDate: e.target.value})} required />
-                  </div>
-                </div>
-
-                <div className="text-right text-lg font-bold text-gray-900">
-                  Total: {calcTotal().toFixed(2)} EGP
-                </div>
-
-                <div>
-                  <label className="label">Notes</label>
-                  <textarea className="input" rows={2} value={newInvoice.notes}
-                    onChange={e => setNewInvoice({...newInvoice, notes: e.target.value})} />
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 px-6 py-4 border-t">
-                <button type="button" onClick={() => setShowNewModal(false)} className="btn-secondary">{t('common.cancel')}</button>
-                <button type="submit" disabled={saving} className="btn-primary">
-                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {t('common.create')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Pay Modal */}
-      {showPayModal && selectedInvoice && (
-        <div className="modal-overlay" onClick={() => setShowPayModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="card-header"><h2 className="text-lg font-semibold">Record Payment</h2></div>
-            <div className="p-6 space-y-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm text-gray-500">Invoice: {selectedInvoice.invoiceNumber}</p>
-                <p className="text-sm text-gray-500">Patient: {selectedInvoice.patientName}</p>
-                <p className="text-lg font-bold mt-2">Amount Due: {Number(selectedInvoice.due).toLocaleString()} EGP</p>
-              </div>
-              <div>
-                <label className="label">Payment Method</label>
-                <select className="input" defaultValue="cash">
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="online">Online</option>
-                  <option value="insurance">Insurance</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 px-6 py-4 border-t">
-              <button type="button" onClick={() => setShowPayModal(false)} className="btn-secondary">{t('common.cancel')}</button>
-              <button onClick={handlePay} disabled={saving} className="btn-primary">
-                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                Pay {Number(selectedInvoice.due).toLocaleString()} EGP
-              </button>
+              ))}
             </div>
           </div>
-        </div>
-      )}
+
+          {/* Totals */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Input
+              type="number"
+              step="0.01"
+              label={t('billing.discount')}
+              value={newInvoice.discount}
+              min="0"
+              onChange={(e) => setNewInvoice((prev) => ({ ...prev, discount: sanitizeNumber(e.target.value) }))}
+            />
+            <Input
+              type="number"
+              step="0.01"
+              label={t('billing.tax')}
+              value={newInvoice.tax}
+              min="0"
+              onChange={(e) => setNewInvoice((prev) => ({ ...prev, tax: sanitizeNumber(e.target.value) }))}
+            />
+            <Input
+              type="date"
+              label={t('billing.dueDate')}
+              value={newInvoice.dueDate}
+              onChange={(e) => {
+                setNewInvoice((prev) => ({ ...prev, dueDate: e.target.value }));
+                setFormErrors((prev) => ({ ...prev, dueDate: undefined }));
+              }}
+              error={formErrors.dueDate}
+              required
+            />
+          </div>
+
+          <div className="text-right text-lg font-bold text-gray-900">
+            {t('billing.totalEgp', { amount: calcInvoiceTotal(newInvoice.items, newInvoice.discount, newInvoice.tax).toLocaleString('en-EG') })}
+          </div>
+
+          <Input
+            label={t('billing.notes')}
+            value={newInvoice.notes}
+            onChange={(e) => setNewInvoice((prev) => ({ ...prev, notes: e.target.value }))}
+          />
+        </form>
+      </Modal>
+
+      {/* Record Payment Modal */}
+      <Modal
+        open={showPayModal}
+        onClose={closePayModal}
+        title={t('billing.recordPayment')}
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closePayModal}>
+              {t('common.cancel')}
+            </Button>
+            <Button loading={saving} onClick={handleRecordPayment}>
+              {t('billing.pay')} {selectedInvoice ? formatEgp(selectedInvoice.due) : ''}
+            </Button>
+          </>
+        }
+      >
+        {selectedInvoice && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-sm text-gray-500">
+                {t('billing.invoiceNumber')}: {selectedInvoice.invoiceNumber}
+              </p>
+              <p className="text-sm text-gray-500">
+                {t('billing.patient')}: {selectedInvoice.patientName}
+              </p>
+              <p className="text-lg font-bold mt-2 text-gray-900">
+                {t('billing.amountDue')}: {formatEgp(selectedInvoice.due)}
+              </p>
+            </div>
+
+            <Select
+              label={t('billing.paymentMethod')}
+              options={paymentMethodOptions}
+              value={paymentForm.method}
+              onChange={(e) => setPaymentForm((prev) => ({ ...prev, method: e.target.value as PaymentMethod }))}
+            />
+
+            <Input
+              label={t('billing.notes')}
+              value={paymentForm.notes}
+              onChange={(e) => setPaymentForm((prev) => ({ ...prev, notes: e.target.value }))}
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
