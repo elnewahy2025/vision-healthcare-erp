@@ -5,7 +5,7 @@ services:
     image: postgres:15-alpine
     container_name: healthcare-db
     environment:
-      POSTGRES_DB: healthcare
+      POSTGRES_DB: healthcare2
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -49,6 +49,42 @@ services:
       - minio_data:/data
     networks:
       - healthcare-net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  create-buckets:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add local http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb -p local/healthcare;
+      /usr/bin/mc policy set public local/healthcare;
+      "
+    networks:
+      - healthcare-net
+
+  db-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["sh", "-c", "npx knex migrate:latest --knexfile dist/core/knexfile.js && npx knex seed:run --knexfile dist/core/knexfile.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: healthcare2
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    networks:
+      - healthcare-net
 
   elasticsearch:
     image: elasticsearch:8.11.0
@@ -71,17 +107,20 @@ services:
     container_name: healthcare-backend
     ports:
       - "3000:3000"
+    command: ["node", "dist/index.js"]
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: healthcare
+      DB_NAME: healthcare2
       DB_USER: postgres
       DB_PASSWORD: postgres
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-min-32-chars}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-refresh-secret-key-min-32-chars}
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_ACCESS_KEY: minioadmin
@@ -90,10 +129,10 @@ services:
       CORS_ORIGIN: "*"
       APP_URL: http://localhost:5173
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+      create-buckets:
+        condition: service_completed_successfully
     networks:
       - healthcare-net
 
@@ -101,26 +140,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: healthcare-frontend
-    ports:
-      - "5173:80"
-    depends_on:
-      - backend
-    networks:
-      - healthcare-net
-
-  nginx:
-    image: nginx:alpine
     container_name: healthcare-nginx
-    ports:
-      - "80:80"
-      - "443:443"
+    ports: # Align with README and Vite dev port for consistency
+      - "5173:80"
     volumes:
       - ./deployment/nginx/default.conf:/etc/nginx/conf.d/default.conf
       - ./deployment/nginx/ssl:/etc/nginx/ssl
     depends_on:
       - backend
-      - frontend
     networks:
       - healthcare-net
 

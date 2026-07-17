@@ -12,23 +12,23 @@
     },
     "./types": {
       "types": "./dist/types/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/types/index.js"
     },
     "./errors": {
       "types": "./dist/errors/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/errors/index.js"
     },
     "./config": {
       "types": "./dist/config/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/config/index.js"
     },
     "./utils": {
       "types": "./dist/utils/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/utils/index.js"
     },
     "./middleware": {
       "types": "./dist/middleware/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/middleware/index.js"
     }
   },
   "scripts": {
