@@ -251,5 +251,28 @@ export const createPurchaseOrderSchema = z.object({
     unitCost: z.number().min(0).default(0),
   })).min(1),
 });
+// HR validation
+export const createEmployeeSchema = z.object({
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  email: z.string().email(),
+  phone: z.string().max(20).optional(),
+  department: z.string().min(1).max(100),
+  position: z.string().min(1).max(100),
+  employmentType: z.enum(['full_time', 'part_time', 'contract', 'intern']).default('full_time'),
+  hireDate: z.string().optional(),
+  baseSalary: z.number().min(0).default(0),
+  payFrequency: z.enum(['monthly', 'weekly', 'biweekly']).default('monthly'),
+});
+
+export const createLeaveRequestSchema = z.object({
+  employeeId: z.string().uuid(),
+  leaveType: z.enum(['annual', 'sick', 'personal', 'maternity', 'unpaid']).default('annual'),
+  startDate: z.string(),
+  endDate: z.string(),
+  reason: z.string().max(500).optional(),
+});
+
+
 
 
