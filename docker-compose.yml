@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: healthcare2
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: Omar2009!
     ports:
       - "5432:5432"
     volumes:

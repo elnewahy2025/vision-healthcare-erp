@@ -277,7 +277,7 @@ docker compose up -d
 npm install
 
 # 2. Create PostgreSQL database
-psql -U postgres -c "CREATE DATABASE healthcare;"
+psql -U postgres -c "CREATE DATABASE healthcare2;"
 
 # 3. Configure environment
 cp .env.example .env
