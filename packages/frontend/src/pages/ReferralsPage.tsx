@@ -159,12 +159,11 @@ export default function ReferralsPage() {
               <th>{t('referral.status')}</th>
               <th>{t('referral.priority')}</th>
               <th>{t('referral.date')}</th>
-              <th>{t('referral.actions')}</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-12 text-gray-500">{t('referral.noReferrals')}</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-gray-500">{t('referral.noReferrals')}</td></tr>
             ) : filtered.map((r: any) => (
               <tr key={r.id} className="hover:bg-gray-50">
                 <td className="font-mono text-xs text-primary-600">{r.referralNumber}</td>
@@ -173,7 +172,6 @@ export default function ReferralsPage() {
                 <td><span className={`badge ${r.status === 'completed' ? 'badge-success' : r.status === 'cancelled' ? 'badge-danger' : 'badge-info'}`}>{r.status}</span></td>
                 <td><span className={`badge ${r.priority === 'emergency' ? 'badge-danger' : r.priority === 'urgent' ? 'badge-warning' : 'badge-info'}`}>{r.priority}</span></td>
                 <td className="text-xs">{r.referralDate}</td>
-                <td><button className="btn-ghost btn-sm"><ArrowLeftRight className="w-3.5 h-3.5" /> View</button></td>
               </tr>
             ))}
           </tbody>

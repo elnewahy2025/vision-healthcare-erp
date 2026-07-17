@@ -199,12 +199,11 @@ export default function LaboratoryPage() {
               <th>{t('lab.status')}</th>
               <th>{t('lab.priority')}</th>
               <th>{t('lab.date')}</th>
-              <th>{t('lab.actions')}</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-12 text-gray-500">{t('lab.noOrders')}</td></tr>
+              <tr><td colSpan={5} className="text-center py-12 text-gray-500">{t('lab.noOrders')}</td></tr>
             ) : filtered.map((o: any) => (
               <tr key={o.id} className="hover:bg-gray-50">
                 <td className="font-mono text-xs text-primary-600">{o.orderNumber}</td>
@@ -215,12 +214,7 @@ export default function LaboratoryPage() {
                 <td><span className={`badge ${o.status === 'completed' ? 'badge-success' : o.status === 'cancelled' ? 'badge-danger' : 'badge-info'}`}>{o.status}</span></td>
                 <td><span className={`badge ${o.priority === 'urgent' ? 'badge-danger' : o.priority === 'stat' ? 'badge-warning' : 'badge-info'}`}>{t(`lab.${o.priority}`)}</span></td>
                 <td className="text-xs">{o.orderDate}</td>
-                <td>
-                  <button className="btn-ghost btn-sm">
-                    <FlaskConical className="w-3.5 h-3.5" />
-                    {t('lab.view')}
-                  </button>
-                </td>
+
               </tr>
             ))}
           </tbody>
