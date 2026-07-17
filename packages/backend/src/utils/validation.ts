@@ -205,3 +205,51 @@ export const createReferralSchema = z.object({
   externalDoctor: z.string().max(200).optional(),
   consentObtained: z.boolean().default(true),
 });
+// Inventory validation
+export const createInventoryItemSchema = z.object({
+  warehouseId: z.string().uuid(),
+  sku: z.string().min(1).max(50),
+  name: z.string().min(1).max(200),
+  category: z.string().min(1).max(100),
+  unit: z.string().max(20).default('piece'),
+  quantity: z.number().int().min(0).default(0),
+  reorderPoint: z.number().int().min(0).default(10),
+  unitCost: z.number().min(0).default(0),
+  unitPrice: z.number().min(0).default(0),
+  batchNumber: z.string().max(50).optional(),
+  expiryDate: z.string().optional(),
+  serialNumber: z.string().max(100).optional(),
+  manufacturer: z.string().max(200).optional(),
+  supplier: z.string().max(200).optional(),
+  description: z.string().max(1000).optional(),
+});
+
+export const createWarehouseSchema = z.object({
+  name: z.string().min(1).max(200),
+  code: z.string().min(1).max(50),
+  type: z.enum(['main', 'branch', 'storage']).default('main'),
+});
+
+export const updateStockSchema = z.object({
+  quantity: z.number().int(),
+  type: z.enum(['receipt', 'dispensation', 'adjustment', 'transfer', 'return']).default('receipt'),
+  referenceType: z.string().max(50).optional(),
+  referenceId: z.string().uuid().optional(),
+  notes: z.string().max(500).optional(),
+});
+
+export const createPurchaseOrderSchema = z.object({
+  warehouseId: z.string().uuid().optional(),
+  supplier: z.string().min(1).max(200),
+  orderDate: z.string().optional(),
+  expectedDate: z.string().optional(),
+  notes: z.string().max(1000).optional(),
+  items: z.array(z.object({
+    itemName: z.string().min(1).max(200),
+    sku: z.string().max(50).optional(),
+    quantityOrdered: z.number().int().positive(),
+    unitCost: z.number().min(0).default(0),
+  })).min(1),
+});
+
+
