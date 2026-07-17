@@ -104,3 +104,104 @@ export const loginSchema = z.object({
   tenantSlug: z.string().min(1),
   mfaCode: z.string().optional(),
 });
+
+// Queue validation
+export const createQueueEntrySchema = z.object({
+  patientId: z.string().uuid(),
+  serviceType: z.string().min(1).max(50),
+  priority: z.number().int().min(0).max(2).default(0),
+});
+
+// Nursing validation
+export const createNursingTaskSchema = z.object({
+  patientId: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  category: z.enum(['general', 'medication', 'vitals', 'wound_care', 'patient_education', 'discharge']).default('general'),
+  priority: z.enum(['normal', 'high', 'urgent']).default('normal'),
+  dueAt: z.string().optional(),
+});
+
+// Home Visits validation
+export const createHomeVisitSchema = z.object({
+  patientId: z.string().uuid(),
+  visitType: z.enum(['checkup', 'followup', 'emergency', 'vaccination', 'physiotherapy']).default('checkup'),
+  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  scheduledTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  address: z.string().min(1).max(500),
+  notes: z.string().max(2000).optional(),
+});
+
+// Telemedicine validation
+export const createTelemedicineSessionSchema = z.object({
+  patientId: z.string().uuid(),
+  provider: z.enum(['internal', 'zoom', 'teams', 'other']).default('internal'),
+  meetingLink: z.string().url().optional().or(z.literal('')),
+  recordingEnabled: z.boolean().default(false),
+  notes: z.string().max(2000).optional(),
+});
+
+// Laboratory validation
+export const createLabOrderSchema = z.object({
+  patientId: z.string().uuid(),
+  priority: z.enum(['routine', 'urgent', 'stat']).default('routine'),
+  clinicalNotes: z.string().max(2000).optional(),
+  tests: z.array(z.object({
+    testCode: z.string(),
+    testName: z.string(),
+    specimenType: z.string().optional(),
+    referenceRange: z.string().optional(),
+    unit: z.string().optional(),
+  })).min(1),
+});
+
+// Radiology validation
+export const createRadiologyOrderSchema = z.object({
+  patientId: z.string().uuid(),
+  studyType: z.string().min(1).max(100),
+  bodyPart: z.string().max(100).optional(),
+  priority: z.enum(['routine', 'urgent', 'stat']).default('routine'),
+  clinicalIndication: z.string().max(2000).optional(),
+});
+
+// Pharmacy validation
+export const createDrugSchema = z.object({
+  drugName: z.string().min(1).max(200),
+  genericName: z.string().max(200).optional(),
+  brandName: z.string().max(200).optional(),
+  dosageForm: z.enum(['tablet', 'capsule', 'syrup', 'injection', 'cream', 'drops', 'inhaler']).default('tablet'),
+  strength: z.string().max(50).optional(),
+  stockQuantity: z.number().int().min(0).default(0),
+  reorderLevel: z.number().int().min(0).default(10),
+  unitPrice: z.number().min(0).default(0),
+  batchNumber: z.string().max(50).optional(),
+  expiryDate: z.string().optional(),
+  manufacturer: z.string().max(200).optional(),
+});
+
+export const createPrescriptionSchema = z.object({
+  patientId: z.string().uuid(),
+  notes: z.string().max(2000).optional(),
+  items: z.array(z.object({
+    drugName: z.string().min(1),
+    dosage: z.string().optional(),
+    route: z.string().optional(),
+    frequency: z.string().optional(),
+    duration: z.string().optional(),
+    quantity: z.number().int().min(1).default(1),
+    refills: z.number().int().min(0).default(0),
+    instructions: z.string().optional(),
+  })).min(1),
+});
+
+// Referral validation
+export const createReferralSchema = z.object({
+  patientId: z.string().uuid(),
+  referralType: z.enum(['specialist', 'general', 'internal', 'external']).default('specialist'),
+  priority: z.enum(['normal', 'urgent', 'emergency']).default('normal'),
+  reason: z.string().min(1).max(2000),
+  clinicalNotes: z.string().max(2000).optional(),
+  externalFacility: z.string().max(200).optional(),
+  externalDoctor: z.string().max(200).optional(),
+  consentObtained: z.boolean().default(true),
+});
