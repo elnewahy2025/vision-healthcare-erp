@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: healthcare2
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: Omar2009!
     ports:
       - "5432:5432"
     volumes:
@@ -63,11 +63,11 @@ services:
       DB_PORT: 5432
       DB_NAME: healthcare2
       DB_USER: postgres
-      DB_PASSWORD: postgres
+      DB_PASSWORD: Omar2009!
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: ${JWT_SECRET:-change_this_in_production}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_this_in_production}
+      JWT_SECRET: c09956b4d7ddaf2abbbdd00f6bb2e8cbc6658b758402b021c8dd00a58b9e70f6
+      JWT_REFRESH_SECRET: c09956b4d7ddaf2abbbdd00f6bb2e8cbc6658b758402b021c8dd00a58b9e70f6
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_ACCESS_KEY: minioadmin
