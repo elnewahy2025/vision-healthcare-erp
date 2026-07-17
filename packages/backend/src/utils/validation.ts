@@ -272,6 +272,18 @@ export const createLeaveRequestSchema = z.object({
   endDate: z.string(),
   reason: z.string().max(500).optional(),
 });
+// CRM validation
+export const createCampaignSchema = z.object({
+  name: z.string().min(1).max(200),
+  type: z.enum(['email', 'sms', 'social', 'other']).default('email'),
+  description: z.string().max(1000).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  budget: z.number().min(0).default(0),
+  targetCount: z.number().int().min(0).default(0),
+});
+
+
 
 
 
