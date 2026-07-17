@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+**/dist
+**/.git
+**/.env
+**/.env.local
+**/.env.production
+*.log
+.DS_Store
+Thumbs.db
+**/*.md
+!packages/*/package.json
