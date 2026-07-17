@@ -39,7 +39,7 @@ export default function DashboardPage() {
     { label: t('dashboard.todayAppointments'), value: stats.todayAppointments, icon: CalendarCheck, color: 'bg-blue-500', change: '+12%' },
     { label: t('dashboard.totalPatients'), value: stats.totalPatients, icon: Users, color: 'bg-green-500', change: '+5%' },
     { label: t('dashboard.pendingBills'), value: stats.pendingBills, icon: Receipt, color: 'bg-yellow-500', change: '-3%' },
-    { label: t('dashboard.revenueToday'), value: `${(stats.revenueToday || 0).toLocaleString()} SAR`, icon: DollarSign, color: 'bg-purple-500', change: '+8%' },
+    { label: t('dashboard.revenueToday'), value: `${(stats.revenueToday || 0).toLocaleString()} EGP`, icon: DollarSign, color: 'bg-purple-500', change: '+8%' },
     { label: t('dashboard.activeDoctors'), value: stats.activeDoctors, icon: Stethoscope, color: 'bg-teal-500', change: '0%' },
   ];
 
@@ -178,7 +178,7 @@ export default function DashboardPage() {
                 <CheckCircle className="w-8 h-8 text-purple-500 bg-purple-50 p-1.5 rounded-lg" />
                 <div>
                   <p className="text-sm font-medium text-gray-900">Invoice paid</p>
-                  <p className="text-xs text-gray-500">INV-DEMO-2026-0001 - 517.50 SAR</p>
+                  <p className="text-xs text-gray-500">INV-DEMO-2026-0001 - 517.50 EGP</p>
                 </div>
                 <span className="text-xs text-gray-400 mr-auto">1h ago</span>
               </div>
