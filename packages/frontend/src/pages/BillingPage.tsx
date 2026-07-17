@@ -65,15 +65,17 @@ const PAYMENT_METHODS: { value: PaymentMethod; labelKey: string }[] = [
   { value: 'wallet', labelKey: 'billing.wallet' },
 ];
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'All' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'partial', label: 'Partial' },
-  { value: 'paid', label: 'Paid' },
-  { value: 'overdue', label: 'Overdue' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
+function getStatusFilterOptions(t: (key: string) => string) {
+  return [
+    { value: '', label: t('common.all') },
+    { value: 'draft', label: t('billing.statusDraft') },
+    { value: 'pending', label: t('billing.statusPending') },
+    { value: 'partial', label: t('billing.statusPartial') },
+    { value: 'paid', label: t('billing.statusPaid') },
+    { value: 'overdue', label: t('billing.statusOverdue') },
+    { value: 'cancelled', label: t('billing.statusCancelled') },
+  ];
+}
 
 const INITIAL_FORM: InvoiceForm = {
   patientId: '',
@@ -113,11 +115,11 @@ function validateForm(form: InvoiceForm, t: (key: string) => string): FormErrors
     (item) => !item.description.trim() || item.quantity <= 0 || item.unitPrice <= 0,
   );
   if (hasEmptyItem) {
-    errors.items = 'All items must have a description, quantity, and price';
+    errors.items = t('billing.itemsRequired');
   }
 
   if (!form.dueDate) {
-    errors.dueDate = 'Due date is required';
+    errors.dueDate = t('billing.dueDateRequired');
   }
 
   return errors;
@@ -309,10 +311,7 @@ export default function BillingPage() {
     label: t(m.labelKey),
   }));
 
-  const statusOptions = STATUS_OPTIONS.map((s) => ({
-    value: s.value,
-    label: s.label,
-  }));
+  const statusOptions = getStatusFilterOptions(t);
 
   return (
     <div>

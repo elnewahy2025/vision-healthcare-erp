@@ -448,5 +448,10 @@
   "billing.statusCancelled": "Cancelled",
   "billing.statusRefunded": "Refunded",
   "billing.statusOverdue": "Overdue",
-  "common.close": "Close"
+  "common.close": "Close",
+  "common.all": "All",
+  "billing.filterAll": "All",
+  "billing.itemsRequired": "All items must have a description, quantity, and price",
+  "billing.dueDateRequired": "Due date is required",
+  "billing.patientRequired": "Please select a patient"
 }

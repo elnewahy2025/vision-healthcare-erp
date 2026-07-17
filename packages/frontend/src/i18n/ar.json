@@ -448,5 +448,10 @@
   "billing.statusCancelled": "ملغي",
   "billing.statusRefunded": "مسترد",
   "billing.statusOverdue": "متأخر",
-  "common.close": "إغلاق"
+  "common.close": "إغلاق",
+  "common.all": "الكل",
+  "billing.filterAll": "الكل",
+  "billing.itemsRequired": "جميع العناصر يجب أن تحتوي على وصف وكمية وسعر",
+  "billing.dueDateRequired": "تاريخ الاستحقاق مطلوب",
+  "billing.patientRequired": "يرجى اختيار مريض"
 }
