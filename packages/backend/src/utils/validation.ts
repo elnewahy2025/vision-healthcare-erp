@@ -301,6 +301,26 @@ export const startWorkflowInstanceSchema = z.object({
   data: z.record(z.unknown()).optional(),
   assignedTo: z.string().uuid().optional(),
 });
+// Forms validation
+export const createFormDefinitionSchema = z.object({
+  name: z.string().min(1).max(200),
+  slug: z.string().max(100).optional(),
+  category: z.string().max(50).default('general'),
+  schema: z.record(z.unknown()).optional(),
+  uiSchema: z.record(z.unknown()).optional(),
+  description: z.string().max(1000).optional(),
+  isActive: z.boolean().default(true),
+});
+
+export const submitFormSchema = z.object({
+  formId: z.string().uuid(),
+  patientId: z.string().uuid().optional(),
+  appointmentId: z.string().uuid().optional(),
+  data: z.record(z.unknown()),
+  status: z.string().max(20).default('completed'),
+});
+
+
 
 
 
