@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { billingApi } from '../lib/api';
 import type { Invoice, InvoiceItem, InvoiceStatus, PaymentMethod } from '@healthcare/shared/types';
 import { Modal, Input, Select, PatientSearchField, Button, Badge, EmptyState, PageLoader } from '../components/ui';
-import { Plus, Trash2, DollarSign, FileText, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, DollarSign, FileText, TrendingUp, AlertTriangle, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { sanitizeNumber } from '../lib/sanitize';
 import toast from 'react-hot-toast';
 
@@ -155,6 +155,13 @@ function getStatusLabel(status: InvoiceStatus, t: (key: string) => string): stri
   return map[status] || status;
 }
 
+function SortIndicator({ active, direction }: { active: boolean; direction: 'asc' | 'desc' }) {
+  if (!active) return <ArrowUpDown className="w-3 h-3 text-gray-400" />;
+  return direction === 'asc'
+    ? <ChevronUp className="w-3 h-3 text-primary-600" />
+    : <ChevronDown className="w-3 h-3 text-primary-600" />;
+}
+
 export default function BillingPage() {
   const { t } = useTranslation();
 
@@ -163,6 +170,8 @@ export default function BillingPage() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });
   const [statusFilter, setStatusFilter] = useState('');
+  const [sortField, setSortField] = useState<'createdAt' | 'total' | 'due' | 'status'>('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [revenue, setRevenue] = useState<RevenueSummary | null>(null);
   const [revenueLoading, setRevenueLoading] = useState(true);
 
@@ -175,33 +184,41 @@ export default function BillingPage() {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [paymentForm, setPaymentForm] = useState<PaymentForm>(INITIAL_PAYMENT);
 
-  const loadInvoices = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await billingApi.list({ page, limit: 10, status: statusFilter || undefined });
-      setInvoices(data.data);
-      setPagination(data.pagination);
-    } catch {
-      toast.error(t('billing.loadFailed'));
-    } finally {
-      setLoading(false);
-    }
-  }, [page, statusFilter, t]);
 
-  const loadRevenue = useCallback(async () => {
-    setRevenueLoading(true);
-    try {
-      const data = await billingApi.revenue();
-      setRevenue(data);
-    } catch {
-      // Revenue stats are non-critical; silently handle
-    } finally {
-      setRevenueLoading(false);
-    }
-  }, []);
 
-  useEffect(() => { loadInvoices(); }, [loadInvoices]);
-  useEffect(() => { loadRevenue(); }, [loadRevenue]);
+
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      setRevenueLoading(true);
+      try {
+        const [invoiceData, revenueData] = await Promise.allSettled([
+          billingApi.list({ page, limit: 10, status: statusFilter || undefined, sort: sortField, order: sortDirection }),
+          billingApi.revenue(),
+        ]);
+        if (!cancelled) {
+          if (invoiceData.status === 'fulfilled') {
+            setInvoices(invoiceData.value.data);
+            setPagination(invoiceData.value.pagination);
+          } else {
+            toast.error(t('billing.loadFailed'));
+          }
+          if (revenueData.status === 'fulfilled') {
+            setRevenue(revenueData.value);
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setRevenueLoading(false);
+        }
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [page, statusFilter, sortField, sortDirection, t]);
 
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,8 +245,7 @@ export default function BillingPage() {
       setShowNewModal(false);
       setNewInvoice(INITIAL_FORM);
       setFormErrors({});
-      loadInvoices();
-      loadRevenue();
+      setPage(1);
     } catch {
       toast.error(t('billing.createFailed'));
     } finally {
@@ -251,8 +267,7 @@ export default function BillingPage() {
       setShowPayModal(false);
       setSelectedInvoice(null);
       setPaymentForm(INITIAL_PAYMENT);
-      loadInvoices();
-      loadRevenue();
+      setPage(1);
     } catch {
       toast.error(t('billing.paymentFailed'));
     } finally {
@@ -310,6 +325,15 @@ export default function BillingPage() {
     value: m.value,
     label: t(m.labelKey),
   }));
+
+  const toggleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
 
   const statusOptions = getStatusFilterOptions(t);
 
@@ -415,23 +439,43 @@ export default function BillingPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t('billing.invoiceNumber')}
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => toggleSort('createdAt')}
+                  >
+                    <span className="flex items-center gap-1">
+                      {t('billing.invoiceNumber')} <SortIndicator active={sortField === "createdAt"} direction={sortDirection} />
+                    </span>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {t('billing.patient')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t('billing.total')}
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => toggleSort('total')}
+                  >
+                    <span className="flex items-center gap-1">
+                      {t('billing.total')} <SortIndicator active={sortField === "total"} direction={sortDirection} />
+                    </span>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {t('billing.paid')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t('billing.due')}
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => toggleSort('due')}
+                  >
+                    <span className="flex items-center gap-1">
+                      {t('billing.due')} <SortIndicator active={sortField === "due"} direction={sortDirection} />
+                    </span>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {t('common.status')}
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    onClick={() => toggleSort('status')}
+                  >
+                    <span className="flex items-center gap-1">
+                      {t('common.status')} <SortIndicator active={sortField === "status"} direction={sortDirection} />
+                    </span>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {t('common.actions')}

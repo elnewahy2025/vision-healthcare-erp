@@ -23,7 +23,12 @@
   },
   "devDependencies": {
     "@types/pdfmake": "^0.3.3",
+    "@typescript-eslint/eslint-plugin": "^8.64.0",
+    "@typescript-eslint/parser": "^8.64.0",
     "concurrently": "^8.2.2",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "typescript": "^5.4.0"
   },
   "optionalDependencies": {

@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 
 const api = axios.create({
   baseURL: '/api/v1',
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -23,6 +24,18 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      toast.error('Request timed out. Please check your connection and try again.');
+      return Promise.reject(error);
+    }
+    if (!error.response) {
+      toast.error('Network error. Please check your connection.');
+      return Promise.reject(error);
+    }
+    if (error.response?.status === 429) {
+      toast.error('Too many requests. Please wait and try again.');
+      return Promise.reject(error);
+    }
     const originalRequest = error.config as any;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -229,6 +242,8 @@ export interface BillingListParams {
   patientId?: string;
   startDate?: string;
   endDate?: string;
+  sort?: string;
+  order?: 'asc' | 'desc';
 }
 
 export interface CreateInvoicePayload {
