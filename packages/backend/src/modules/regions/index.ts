@@ -55,11 +55,11 @@ export async function registerRegionsModule(app: FastifyInstance) {
     const existing = await db('regions').count('id as c').first();
     if (Number((existing as any)?.c || 0) > 0) return sendSuccess(reply, null, 'Regions already seeded');
     const defaultRegions = [
-      { code: 'me-south-1', name: 'Middle East (Bahrain)', provider: 'aws', location: 'Bahrain', compliance_flights: '["hipaa","gdpr"]' },
-      { code: 'eu-central-1', name: 'Europe (Frankfurt)', provider: 'aws', location: 'Germany', compliance_flights: '["gdpr"]' },
-      { code: 'us-east-1', name: 'US East (N. Virginia)', provider: 'aws', location: 'United States', compliance_flights: '["hipaa"]' },
-      { code: 'ap-southeast-1', name: 'Asia Pacific (Singapore)', provider: 'aws', location: 'Singapore', compliance_flights: '["gdpr"]' },
-      { code: 'local', name: 'Self-Hosted (On-Premise)', provider: 'self', location: 'Local', compliance_flights: '[]' },
+      { code: 'me-south-1', name: 'Middle East (Bahrain)', provider: 'aws', location: 'Bahrain', compliance_flags: '["hipaa","gdpr"]' },
+      { code: 'eu-central-1', name: 'Europe (Frankfurt)', provider: 'aws', location: 'Germany', compliance_flags: '["gdpr"]' },
+      { code: 'us-east-1', name: 'US East (N. Virginia)', provider: 'aws', location: 'United States', compliance_flags: '["hipaa"]' },
+      { code: 'ap-southeast-1', name: 'Asia Pacific (Singapore)', provider: 'aws', location: 'Singapore', compliance_flags: '["gdpr"]' },
+      { code: 'local', name: 'Self-Hosted (On-Premise)', provider: 'self', location: 'Local', compliance_flags: '[]' },
     ];
     for (const r of defaultRegions) {
       await db('regions').insert({ code: r.code, name: r.name, provider: r.provider, location: r.location, compliance_flags: r.compliance_flights });
