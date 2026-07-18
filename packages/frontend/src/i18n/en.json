@@ -1474,5 +1474,20 @@
   "preferences.search": "Search",
   "preferences.actions": "Actions",
   "preferences.help": "Help",
-  "preferences.appearanceCategory": "Appearance"
+  "preferences.appearanceCategory": "Appearance",
+  "printTemplates.title": "Print Templates",
+  "printTemplates.templateCount": "{count} templates",
+  "printTemplates.newTemplate": "New Template",
+  "printTemplates.searchPlaceholder": "Search templates...",
+  "printTemplates.all": "All",
+  "printTemplates.noTemplates": "No print templates",
+  "printTemplates.type": "Type",
+  "printTemplates.paper": "Paper",
+  "printTemplates.variables": "variables",
+  "printTemplates.default": "Default",
+  "printTemplates.loadError": "Failed to load print templates",
+  "printTemplates.preview": "Preview",
+  "printTemplates.category": "Category",
+  "printTemplates.code": "Code",
+  "printTemplates.documentType": "Document Type"
 }

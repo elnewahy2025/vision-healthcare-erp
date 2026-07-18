@@ -1472,5 +1472,20 @@
   "preferences.search": "البحث",
   "preferences.actions": "الإجراءات",
   "preferences.help": "المساعدة",
-  "preferences.appearanceCategory": "المظهر"
+  "preferences.appearanceCategory": "المظهر",
+  "printTemplates.title": "قوالب الطباعة",
+  "printTemplates.templateCount": "{count} قالب",
+  "printTemplates.newTemplate": "قالب جديد",
+  "printTemplates.searchPlaceholder": "بحث في القوالب...",
+  "printTemplates.all": "الكل",
+  "printTemplates.noTemplates": "لا توجد قوالب طباعة",
+  "printTemplates.type": "النوع",
+  "printTemplates.paper": "الورق",
+  "printTemplates.variables": "متغيرات",
+  "printTemplates.default": "افتراضي",
+  "printTemplates.loadError": "فشل في تحميل قوالب الطباعة",
+  "printTemplates.preview": "معاينة",
+  "printTemplates.category": "الفئة",
+  "printTemplates.code": "الكود",
+  "printTemplates.documentType": "نوع المستند"
 }
