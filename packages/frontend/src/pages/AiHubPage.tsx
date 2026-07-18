@@ -1,144 +1,618 @@
 import { useState, useEffect } from 'react';
-import { Spinner, Badge, Card, CardBody, Button, Input } from '../components/ui';
-import { Bot, Plus, Search, Cpu, DollarSign, Activity } from 'lucide-react';
-import api from '../lib/api';
+import { useTranslation } from 'react-i18next';
+import {
+  aiHubApi,
+  type AiAssistant,
+  type AiProvider,
+  type AiRequest,
+  type AiCostData,
+} from '../lib/api';
+import { sanitizeString, escapeHtml } from '../lib/sanitize';
+import {
+  Modal,
+  Input,
+  Select,
+  Button,
+  Badge,
+  EmptyState,
+  PageLoader,
+} from '../components/ui';
+import {
+  Bot,
+  Plus,
+  Cpu,
+  DollarSign,
+  Activity,
+  AlertTriangle,
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+
+type TabType = 'assistants' | 'providers' | 'requests' | 'costs';
+
+const CATEGORY_OPTIONS = [
+  { value: 'general', label: 'General' },
+  { value: 'clinical', label: 'Clinical' },
+  { value: 'administrative', label: 'Administrative' },
+  { value: 'billing', label: 'Billing' },
+  { value: 'patient', label: 'Patient' },
+];
 
 export default function AiHubPage() {
-  const [tab, setTab] = useState<'assistants' | 'providers' | 'requests' | 'costs'>('assistants');
-  const [assistants, setAssistants] = useState<any[]>([]);
-  const [providers, setProviders] = useState<any[]>([]);
-  const [requests, setRequests] = useState<any[]>([]);
-  const [costData, setCostData] = useState<any>(null);
+  const { t } = useTranslation();
+
+  const [tab, setTab] = useState<TabType>('assistants');
+  const [assistants, setAssistants] = useState<AiAssistant[]>([]);
+  const [providers, setProviders] = useState<AiProvider[]>([]);
+  const [requests, setRequests] = useState<AiRequest[]>([]);
+  const [costData, setCostData] = useState<AiCostData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    Promise.all([
-      api.get('/ai/assistants').then(r => setAssistants(r.data.data)).catch(() => []),
-      api.get('/ai/providers').then(r => setProviders(r.data.data)).catch(() => []),
-      api.get('/ai/requests').then(r => setRequests(r.data.data)).catch(() => []),
-      api.get('/ai/costs').then(r => setCostData(r.data.data)).catch(() => null),
-    ]).finally(() => setLoading(false));
-  }, []);
+  // Modal states
+  const [showAssistantModal, setShowAssistantModal] = useState(false);
+  const [showProviderModal, setShowProviderModal] = useState(false);
+  const [assistantForm, setAssistantForm] = useState({
+    name: '',
+    slug: '',
+    category: 'general',
+    systemPrompt: '',
+    modelId: '',
+  });
+  const [providerForm, setProviderForm] = useState({
+    name: '',
+    provider: '',
+    apiEndpoint: '',
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
 
-  if (loading) return <Spinner size="lg" className="py-16" />;
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [assistantRes, providerRes, requestRes, costRes] =
+          await Promise.allSettled([
+            aiHubApi.listAssistants(),
+            aiHubApi.listProviders(),
+            aiHubApi.listRequests(),
+            aiHubApi.getCosts(),
+          ]);
+        if (cancelled) return;
+        if (assistantRes.status === 'fulfilled') setAssistants(assistantRes.value);
+        if (providerRes.status === 'fulfilled') setProviders(providerRes.value);
+        if (requestRes.status === 'fulfilled') setRequests(requestRes.value);
+        if (costRes.status === 'fulfilled') setCostData(costRes.value);
+        const allFailed =
+          assistantRes.status === 'rejected' &&
+          providerRes.status === 'rejected';
+        if (allFailed) {
+          setError(t('aiHub.loadFailed'));
+        }
+      } catch {
+        if (!cancelled) setError(t('aiHub.loadFailed'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [t]);
+
+  const validateAssistantForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    const name = sanitizeString(assistantForm.name);
+    if (!name) {
+      errors.name = t('common.required');
+    } else if (name.length > 200) {
+      errors.name = t('common.maxLength', { max: 200 });
+    }
+    if (assistantForm.systemPrompt && assistantForm.systemPrompt.length > 10000) {
+      errors.systemPrompt = t('common.maxLength', { max: 10000 });
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateProviderForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    const name = sanitizeString(providerForm.name);
+    const provider = sanitizeString(providerForm.provider);
+    if (!name) {
+      errors.name = t('common.required');
+    }
+    if (!provider) {
+      errors.provider = t('common.required');
+    }
+    if (providerForm.apiEndpoint) {
+      try {
+        new URL(providerForm.apiEndpoint);
+      } catch {
+        errors.apiEndpoint = t('common.invalidUrl');
+      }
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleCreateAssistant = async () => {
+    if (!validateAssistantForm()) return;
+    setSubmitting(true);
+    try {
+      await aiHubApi.createAssistant({
+        name: sanitizeString(assistantForm.name),
+        slug: assistantForm.slug
+          ? sanitizeString(assistantForm.slug)
+          : undefined,
+        category: assistantForm.category,
+        systemPrompt: assistantForm.systemPrompt || undefined,
+        modelId: assistantForm.modelId || undefined,
+      });
+      toast.success(t('common.created'));
+      setShowAssistantModal(false);
+      setAssistantForm({
+        name: '',
+        slug: '',
+        category: 'general',
+        systemPrompt: '',
+        modelId: '',
+      });
+      setFormErrors({});
+      const updated = await aiHubApi.listAssistants();
+      setAssistants(updated);
+    } catch {
+      toast.error(t('common.error'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateProvider = async () => {
+    if (!validateProviderForm()) return;
+    setSubmitting(true);
+    try {
+      await aiHubApi.createProvider({
+        name: sanitizeString(providerForm.name),
+        provider: sanitizeString(providerForm.provider),
+        apiEndpoint: providerForm.apiEndpoint || undefined,
+      });
+      toast.success(t('common.created'));
+      setShowProviderModal(false);
+      setProviderForm({ name: '', provider: '', apiEndpoint: '' });
+      setFormErrors({});
+      const updated = await aiHubApi.listProviders();
+      setProviders(updated);
+    } catch {
+      toast.error(t('common.error'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const filteredAssistants = assistants.filter(
+    (a) =>
+      !search ||
+      a.name.toLowerCase().includes(search.toLowerCase()) ||
+      a.category.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredProviders = providers.filter(
+    (p) =>
+      !search ||
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.provider.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const tabs: { key: TabType; icon: React.ReactNode; label: string; count: number }[] = [
+    { key: 'assistants', icon: <Bot className="w-4 h-4" />, label: t('aiHub.assistants'), count: assistants.length },
+    { key: 'providers', icon: <Cpu className="w-4 h-4" />, label: t('aiHub.providers'), count: providers.length },
+    { key: 'requests', icon: <Activity className="w-4 h-4" />, label: t('aiHub.requests'), count: requests.length },
+    { key: 'costs', icon: <DollarSign className="w-4 h-4" />, label: t('aiHub.costs'), count: 0 },
+  ];
+
+  if (loading) {
+    return <PageLoader message={t('common.loading')} />;
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <EmptyState
+          icon={<AlertTriangle className="w-12 h-12 text-red-400" />}
+          title={t('common.error')}
+          message={error}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="page-header">
-        <div><h1 className="page-title">AI Hub</h1><p className="text-gray-500 mt-1">{assistants.length} assistants · {providers.length} providers</p></div>
-        <Button><Plus className="w-4 h-4" /> New Assistant</Button>
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">{t('aiHub.title')}</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {t('aiHub.assistantCount', { count: assistants.length })} ·{' '}
+            {t('aiHub.providerCount', { count: providers.length })}
+          </p>
+        </div>
+        {tab === 'assistants' && (
+          <Button onClick={() => { setShowAssistantModal(true); setFormErrors({}); }}>
+            <Plus className="w-4 h-4 mr-1" /> {t('aiHub.newAssistant')}
+          </Button>
+        )}
+        {tab === 'providers' && (
+          <Button onClick={() => { setShowProviderModal(true); setFormErrors({}); }}>
+            <Plus className="w-4 h-4 mr-1" /> {t('aiHub.newProvider')}
+          </Button>
+        )}
       </div>
 
+      {/* Tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
-        <Button variant={tab === 'assistants' ? 'primary' : 'secondary'} onClick={() => setTab('assistants')}><Bot className="w-4 h-4" /> Assistants ({assistants.length})</Button>
-        <Button variant={tab === 'providers' ? 'primary' : 'secondary'} onClick={() => setTab('providers')}><Cpu className="w-4 h-4" /> Providers ({providers.length})</Button>
-        <Button variant={tab === 'requests' ? 'primary' : 'secondary'} onClick={() => setTab('requests')}><Activity className="w-4 h-4" /> Requests ({requests.length})</Button>
-        <Button variant={tab === 'costs' ? 'primary' : 'secondary'} onClick={() => setTab('costs')}><DollarSign className="w-4 h-4" /> Costs</Button>
+        {tabs.map((item) => (
+          <Button
+            key={item.key}
+            variant={tab === item.key ? 'primary' : 'secondary'}
+            onClick={() => setTab(item.key)}
+          >
+            {item.icon}
+            <span className="ml-1">{item.label}</span>
+            {item.key !== 'costs' && (
+              <span className="ml-1 text-xs opacity-70">({item.count})</span>
+            )}
+          </Button>
+        ))}
       </div>
 
-      <Card className="mb-6"><CardBody>
-        <Input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-md" />
-      </CardBody></Card>
+      {/* Search */}
+      {tab !== 'costs' && (
+        <div className="mb-4 max-w-md">
+          <Input
+            
+            placeholder={
+              tab === 'assistants'
+                ? t('aiHub.searchPlaceholder')
+                : t('common.search')
+            }
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      )}
 
+      {/* Assistants Tab */}
       {tab === 'assistants' && (
-        <div className="table-container">
-          <table>
-            <thead><tr><th>Name</th><th>Slug</th><th>Category</th><th>Model</th><th>Active</th></tr></thead>
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-gray-50">
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.name')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.slug')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.category')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.model')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.isActive')}</th>
+              </tr>
+            </thead>
             <tbody>
-              {assistants.filter((a: any) => !search || a.name?.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-12 text-gray-500">No AI assistants configured</td></tr>
-              ) : assistants.filter((a: any) => !search || a.name?.toLowerCase().includes(search.toLowerCase())).map((a: any) => (
-                <tr key={a.id} className="hover:bg-gray-50">
-                  <td className="font-medium">{a.name}</td>
-                  <td className="font-mono text-xs">{a.slug}</td>
-                  <td><Badge>{a.category}</Badge></td>
-                  <td className="text-xs">{a.modelName || '-'}</td>
-                  <td><Badge variant={a.isActive ? 'success' : 'gray'}>{a.isActive ? 'Active' : 'Inactive'}</Badge></td>
+              {filteredAssistants.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>
+                    <EmptyState
+                      icon={<Bot className="w-12 h-12 text-gray-300" />}
+                      title={t('aiHub.noAssistants')}
+                      message={t('common.noData')}
+                    />
+                  </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {tab === 'providers' && (
-        <div className="table-container">
-          <table>
-            <thead><tr><th>Name</th><th>Provider</th><th>Endpoint</th><th>Active</th></tr></thead>
-            <tbody>
-              {providers.map((p: any) => (
-                <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="font-medium">{p.name}</td>
-                  <td><Badge>{p.provider}</Badge></td>
-                  <td className="text-xs max-w-xs truncate">{p.apiEndpoint || '-'}</td>
-                  <td><Badge variant={p.isActive ? 'success' : 'gray'}>{p.isActive ? 'Active' : 'Inactive'}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {tab === 'requests' && (
-        <div className="table-container">
-          <table>
-            <thead><tr><th>Source</th><th>Tokens</th><th>Cost</th><th>Latency</th><th>Status</th><th>Date</th></tr></thead>
-            <tbody>
-              {requests.length === 0 ? <tr><td colSpan={6} className="text-center py-12 text-gray-500">No AI requests yet</td></tr> :
-                requests.map((r: any) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
-                    <td><Badge>{r.source || 'chat'}</Badge></td>
-                    <td>{r.promptTokens + r.completionTokens}</td>
-                    <td>{Number(r.cost).toFixed(6)}</td>
-                    <td>{r.latencyMs}ms</td>
-                    <td><Badge variant={r.status === 'completed' ? 'success' : 'danger'}>{r.status}</Badge></td>
-                    <td className="text-xs">{r.createdAt?.split('T')[0]}</td>
+              ) : (
+                filteredAssistants.map((a) => (
+                  <tr key={a.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <td className="p-3 text-sm font-medium">{escapeHtml(a.name)}</td>
+                    <td className="p-3 text-sm font-mono text-gray-500">{escapeHtml(a.slug)}</td>
+                    <td className="p-3"><Badge>{a.category}</Badge></td>
+                    <td className="p-3 text-sm text-gray-500">{a.modelName ?? '-'}</td>
+                    <td className="p-3">
+                      <Badge variant={a.isActive ? 'success' : 'gray'}>
+                        {a.isActive ? t('aiHub.active') : t('aiHub.inactive')}
+                      </Badge>
+                    </td>
                   </tr>
-                ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
       )}
 
+      {/* Providers Tab */}
+      {tab === 'providers' && (
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-gray-50">
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.name')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.provider')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.endpoint')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.isActive')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProviders.length === 0 ? (
+                <tr>
+                  <td colSpan={4}>
+                    <EmptyState
+                      icon={<Cpu className="w-12 h-12 text-gray-300" />}
+                      title={t('aiHub.noProviders')}
+                      message={t('common.noData')}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                filteredProviders.map((p) => (
+                  <tr key={p.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <td className="p-3 text-sm font-medium">{escapeHtml(p.name)}</td>
+                    <td className="p-3"><Badge>{escapeHtml(p.provider)}</Badge></td>
+                    <td className="p-3 text-sm text-gray-500 max-w-xs truncate">
+                      {p.apiEndpoint ?? '-'}
+                    </td>
+                    <td className="p-3">
+                      <Badge variant={p.isActive ? 'success' : 'gray'}>
+                        {p.isActive ? t('aiHub.active') : t('aiHub.inactive')}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Requests Tab */}
+      {tab === 'requests' && (
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-gray-50">
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.source')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.tokens')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.cost')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.latency')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.date')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.length === 0 ? (
+                <tr>
+                  <td colSpan={6}>
+                    <EmptyState
+                      icon={<Activity className="w-12 h-12 text-gray-300" />}
+                      title={t('aiHub.noRequests')}
+                      message={t('common.noData')}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                requests.map((r) => (
+                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <td className="p-3"><Badge>{escapeHtml(r.source || 'chat')}</Badge></td>
+                    <td className="p-3 text-sm">{(r.promptTokens + r.completionTokens).toLocaleString()}</td>
+                    <td className="p-3 text-sm">{Number(r.cost).toFixed(6)}</td>
+                    <td className="p-3 text-sm">{r.latencyMs}ms</td>
+                    <td className="p-3">
+                      <Badge variant={r.status === 'completed' ? 'success' : 'danger'}>
+                        {escapeHtml(r.status)}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-sm text-gray-500">
+                      {r.createdAt?.split('T')[0] ?? '-'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Costs Tab */}
       {tab === 'costs' && (
         <div>
           {costData?.summary ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card><CardBody>
-                <p className="text-sm text-gray-500">Total Cost</p>
-                <p className="text-2xl font-bold">{Number(costData.summary.totalCost).toFixed(4)}</p>
-              </CardBody></Card>
-              <Card><CardBody>
-                <p className="text-sm text-gray-500">Total Tokens</p>
-                <p className="text-2xl font-bold">{costData.summary.totalTokens?.toLocaleString()}</p>
-              </CardBody></Card>
-              <Card><CardBody>
-                <p className="text-sm text-gray-500">Total Requests</p>
-                <p className="text-2xl font-bold">{costData.summary.totalRequests?.toLocaleString()}</p>
-              </CardBody></Card>
+              <div className="bg-white rounded-lg border p-4">
+                <p className="text-sm text-gray-500">{t('aiHub.totalCost')}</p>
+                <p className="text-2xl font-bold mt-1">
+                  {Number(costData.summary.totalCost).toFixed(4)}
+                </p>
+              </div>
+              <div className="bg-white rounded-lg border p-4">
+                <p className="text-sm text-gray-500">{t('aiHub.totalTokens')}</p>
+                <p className="text-2xl font-bold mt-1">
+                  {costData.summary.totalTokens.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white rounded-lg border p-4">
+                <p className="text-sm text-gray-500">{t('aiHub.totalRequests')}</p>
+                <p className="text-2xl font-bold mt-1">
+                  {costData.summary.totalRequests.toLocaleString()}
+                </p>
+              </div>
             </div>
-          ) : <p className="text-gray-500 mb-6">No cost data available</p>}
+          ) : (
+            <div className="mb-6">
+              <EmptyState
+                icon={<DollarSign className="w-12 h-12 text-gray-300" />}
+                title={t('aiHub.noCostData')}
+                message={t('common.noData')}
+              />
+            </div>
+          )}
 
-          <div className="table-container">
-            <table>
-              <thead><tr><th>Date</th><th>Source</th><th>Cost</th><th>Requests</th><th>Tokens</th></tr></thead>
+          <div className="bg-white rounded-lg border overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-gray-50">
+                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.date')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.source')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.cost')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.totalRequests')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.totalTokens')}</th>
+                </tr>
+              </thead>
               <tbody>
-                {(costData?.daily || []).length === 0 ? <tr><td colSpan={5} className="text-center py-8 text-gray-500">No daily cost records</td></tr> :
-                  costData.daily.map((c: any, i: number) => (
-                    <tr key={i} className="hover:bg-gray-50">
-                      <td className="text-xs">{c.date}</td>
-                      <td><Badge>{c.source}</Badge></td>
-                      <td>{Number(c.totalCost).toFixed(4)}</td>
-                      <td>{c.totalRequests}</td>
-                      <td>{c.totalTokens?.toLocaleString()}</td>
+                {(costData?.daily ?? []).length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>
+                      <EmptyState
+                        icon={<DollarSign className="w-12 h-12 text-gray-300" />}
+                        title={t('aiHub.noDailyCosts')}
+                        message={t('common.noData')}
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  costData!.daily.map((c, i) => (
+                    <tr key={i} className="border-b last:border-b-0 hover:bg-gray-50">
+                      <td className="p-3 text-sm text-gray-500">{escapeHtml(c.date)}</td>
+                      <td className="p-3"><Badge>{escapeHtml(c.source)}</Badge></td>
+                      <td className="p-3 text-sm">{Number(c.totalCost).toFixed(4)}</td>
+                      <td className="p-3 text-sm">{c.totalRequests.toLocaleString()}</td>
+                      <td className="p-3 text-sm">{c.totalTokens.toLocaleString()}</td>
                     </tr>
-                  ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
+
+      {/* Create Assistant Modal */}
+      <Modal
+        open={showAssistantModal}
+        onClose={() => { setShowAssistantModal(false); setFormErrors({}); }}
+        title={t('aiHub.newAssistant')}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => { setShowAssistantModal(false); setFormErrors({}); }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleCreateAssistant} loading={submitting}>
+              {t('common.create')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label={t('aiHub.name')}
+            required
+            value={assistantForm.name}
+            onChange={(e) =>
+              setAssistantForm((prev) => ({ ...prev, name: e.target.value }))
+            }
+            error={formErrors.name}
+          />
+          <Input
+            label={t('aiHub.slug')}
+            value={assistantForm.slug}
+            onChange={(e) =>
+              setAssistantForm((prev) => ({ ...prev, slug: e.target.value }))
+            }
+            helpText={t('aiHub.slugHelp')}
+          />
+          <Select
+            label={t('aiHub.category')}
+            value={assistantForm.category}
+            onChange={(e) =>
+              setAssistantForm((prev) => ({ ...prev, category: e.target.value }))
+            }
+            options={CATEGORY_OPTIONS}
+          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t('aiHub.systemPrompt')}
+            </label>
+            <textarea
+              className="w-full border rounded-lg p-2 text-sm min-h-[100px]"
+              value={assistantForm.systemPrompt}
+              onChange={(e) =>
+                setAssistantForm((prev) => ({
+                  ...prev,
+                  systemPrompt: e.target.value,
+                }))
+              }
+            />
+            {formErrors.systemPrompt && (
+              <p className="text-red-500 text-xs mt-1">{formErrors.systemPrompt}</p>
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Create Provider Modal */}
+      <Modal
+        open={showProviderModal}
+        onClose={() => { setShowProviderModal(false); setFormErrors({}); }}
+        title={t('aiHub.newProvider')}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => { setShowProviderModal(false); setFormErrors({}); }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleCreateProvider} loading={submitting}>
+              {t('common.create')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label={t('aiHub.name')}
+            required
+            value={providerForm.name}
+            onChange={(e) =>
+              setProviderForm((prev) => ({ ...prev, name: e.target.value }))
+            }
+            error={formErrors.name}
+          />
+          <Input
+            label={t('aiHub.providerType')}
+            required
+            value={providerForm.provider}
+            onChange={(e) =>
+              setProviderForm((prev) => ({ ...prev, provider: e.target.value }))
+            }
+            error={formErrors.provider}
+            placeholder="openai, anthropic, google..."
+          />
+          <Input
+            label={t('aiHub.endpoint')}
+            value={providerForm.apiEndpoint}
+            onChange={(e) =>
+              setProviderForm((prev) => ({
+                ...prev,
+                apiEndpoint: e.target.value,
+              }))
+            }
+            error={formErrors.apiEndpoint}
+            placeholder="https://api.openai.com/v1"
+          />
+        </div>
+      </Modal>
     </div>
   );
 }

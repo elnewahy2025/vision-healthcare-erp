@@ -351,14 +351,43 @@ export const createBreachLogSchema = z.object({
   status: z.enum(['open', 'investigating', 'resolved', 'closed']).default('open'),
 });
 
+// ── AI Hub ──
+export const createAiProviderSchema = z.object({
+  name: z.string().min(1).max(200),
+  provider: z.string().min(1).max(100),
+  apiEndpoint: z.string().url().optional(),
+  config: z.record(z.unknown()).optional(),
+  isActive: z.boolean().optional(),
+});
 
+export const updateAiProviderSchema = createAiProviderSchema.partial();
 
+export const createAiModelSchema = z.object({
+  providerId: z.string().uuid(),
+  modelName: z.string().min(1).max(200),
+  displayName: z.string().max(200).optional(),
+  capabilities: z.enum(['chat', 'completion', 'embedding', 'image', 'multimodal']).default('chat'),
+  costPer1kInput: z.number().min(0).optional(),
+  costPer1kOutput: z.number().min(0).optional(),
+  maxTokens: z.number().int().min(1).max(1000000).default(4096),
+});
 
+export const createAiAssistantSchema = z.object({
+  name: z.string().min(1).max(200),
+  slug: z.string().max(100).optional(),
+  category: z.enum(['general', 'clinical', 'administrative', 'billing', 'patient']).default('general'),
+  systemPrompt: z.string().max(10000).optional(),
+  tools: z.array(z.string()).optional(),
+  modelId: z.string().uuid().optional(),
+  config: z.record(z.unknown()).optional(),
+  isActive: z.boolean().optional(),
+});
 
+export const updateAiAssistantSchema = createAiAssistantSchema.partial();
 
-
-
-
-
-
-
+export const chatCompletionSchema = z.object({
+  assistantId: z.string().uuid().optional(),
+  modelId: z.string().uuid().optional(),
+  prompt: z.string().min(1).max(50000),
+  source: z.string().max(50).optional(),
+});

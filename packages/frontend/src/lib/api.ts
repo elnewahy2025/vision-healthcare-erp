@@ -806,6 +806,120 @@ export const inventoryApi = {
     api.put(`/inventory/pos/${id}/receive`, { items }).then((r) => r.data.data),
 };
 
+// AI Hub
+export interface AiAssistant {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  systemPrompt?: string;
+  tools: string[];
+  modelId?: string;
+  modelName?: string;
+  config: Record<string, unknown>;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface AiProvider {
+  id: string;
+  name: string;
+  provider: string;
+  apiEndpoint?: string;
+  config: Record<string, unknown>;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface AiModel {
+  id: string;
+  providerId: string;
+  modelName: string;
+  displayName?: string;
+  capabilities: string;
+  costPer1kInput: number;
+  costPer1kOutput: number;
+  maxTokens: number;
+  isActive: boolean;
+}
+
+export interface AiRequest {
+  id: string;
+  assistantId?: string;
+  modelId?: string;
+  prompt?: string;
+  response?: string;
+  promptTokens: number;
+  completionTokens: number;
+  cost: number;
+  latencyMs: number;
+  status: string;
+  error?: string;
+  source: string;
+  createdAt: string;
+}
+
+export interface AiCostDaily {
+  date: string;
+  source: string;
+  totalCost: number;
+  totalRequests: number;
+  totalTokens: number;
+}
+
+export interface AiCostData {
+  daily: AiCostDaily[];
+  summary: {
+    totalCost: number;
+    totalTokens: number;
+    totalRequests: number;
+  };
+}
+
+export interface CreateAiAssistantPayload {
+  name: string;
+  slug?: string;
+  category?: string;
+  systemPrompt?: string;
+  tools?: string[];
+  modelId?: string;
+  config?: Record<string, unknown>;
+  isActive?: boolean;
+}
+
+export interface CreateAiProviderPayload {
+  name: string;
+  provider: string;
+  apiEndpoint?: string;
+  config?: Record<string, unknown>;
+  isActive?: boolean;
+}
+
+export const aiHubApi = {
+  listAssistants: (params?: { category?: string }) =>
+    api.get('/ai/assistants', { params }).then((r) => r.data.data as AiAssistant[]),
+  createAssistant: (data: CreateAiAssistantPayload) =>
+    api.post('/ai/assistants', data).then((r) => r.data.data as AiAssistant),
+  updateAssistant: (id: string, data: Partial<CreateAiAssistantPayload>) =>
+    api.put(`/ai/assistants/${id}`, data).then((r) => r.data.data),
+  listProviders: () =>
+    api.get('/ai/providers').then((r) => r.data.data as AiProvider[]),
+  createProvider: (data: CreateAiProviderPayload) =>
+    api.post('/ai/providers', data).then((r) => r.data.data as AiProvider),
+  updateProvider: (id: string, data: Partial<CreateAiProviderPayload>) =>
+    api.put(`/ai/providers/${id}`, data).then((r) => r.data.data),
+  listModels: () =>
+    api.get('/ai/models').then((r) => r.data.data as AiModel[]),
+  createModel: (data: { providerId: string; modelName: string; displayName?: string; capabilities?: string; costPer1kInput?: number; costPer1kOutput?: number; maxTokens?: number }) =>
+    api.post('/ai/models', data).then((r) => r.data.data as AiModel),
+  listRequests: (params?: { status?: string; source?: string; limit?: number }) =>
+    api.get('/ai/requests', { params }).then((r) => r.data.data as AiRequest[]),
+  getCosts: (params?: { days?: number }) =>
+    api.get('/ai/costs', { params }).then((r) => r.data.data as AiCostData),
+  chat: (data: { assistantId?: string; modelId?: string; prompt: string; source?: string }) =>
+    api.post('/ai/chat', data).then((r) => r.data.data),
+};
+
 // Dashboard
 export const dashboardApi = {
   stats: () => api.get('/dashboard/stats').then((r) => r.data.data),
