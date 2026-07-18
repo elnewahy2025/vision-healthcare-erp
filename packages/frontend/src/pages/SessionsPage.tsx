@@ -1,41 +1,135 @@
-import { useState, useEffect } from 'react';
-import { Spinner, Badge, Card, CardBody, Button } from '../components/ui';
-import { Monitor, Smartphone, Globe, Clock, Shield, LogOut, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
+import { Monitor, Smartphone, Globe, Clock, LogOut, AlertTriangle } from 'lucide-react';
+import {
+  PageLoader, EmptyState, Card, CardBody, Button, Badge,
+} from '../components/ui';
 import api from '../lib/api';
+import { sanitizeString } from '../lib/sanitize';
+
+interface Session {
+  id: string;
+  device: string;
+  ipAddress: string;
+  userAgent: string;
+  location: string | null;
+  isActive?: boolean;
+  lastActivityAt: string;
+  createdAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
+interface SecurityInfo {
+  activeSessions: number;
+  lastLogin: string | null;
+  lastIp: string | null;
+  lastDevice: string | null;
+}
 
 export default function SessionsPage() {
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [securityInfo, setSecurityInfo] = useState<any>(null);
+  const { t } = useTranslation();
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [securityInfo, setSecurityInfo] = useState<SecurityInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [terminatingId, setTerminatingId] = useState<string | null>(null);
+  const [loggingOutOthers, setLoggingOutOthers] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [sR, secR] = await Promise.allSettled([
+          api.get('/sessions'),
+          api.get('/sessions/security-info'),
+        ]);
+        if (cancelled) return;
+        if (sR.status === 'fulfilled') setSessions((sR.value.data?.data ?? []) as Session[]);
+        if (secR.status === 'fulfilled') setSecurityInfo(secR.value.data?.data as SecurityInfo | null);
+      } catch {
+        if (!cancelled) toast.error(t('sessions.loadError'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [t]);
+
+  const handleTerminate = useCallback(async (sessionId: string) => {
+    setTerminatingId(sessionId);
     try {
-      const [sR, secR] = await Promise.all([
-        api.get('/sessions'),
-        api.get('/sessions/security-info'),
-      ]);
-      setSessions(sR.data.data);
-      setSecurityInfo(secR.data.data);
-    } catch {}
-    setLoading(false);
-  };
+      await api.post(`/sessions/${sessionId}/logout`);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      toast.success(t('sessions.terminateSuccess'));
+      const secR = await api.get('/sessions/security-info');
+      setSecurityInfo(secR.data?.data as SecurityInfo | null);
+    } catch {
+      toast.error(t('sessions.terminateError'));
+    } finally {
+      setTerminatingId(null);
+    }
+  }, [t]);
 
-  useEffect(() => { load(); }, []);
+  const handleLogoutOthers = useCallback(async () => {
+    setLoggingOutOthers(true);
+    try {
+      await api.post('/sessions/logout-others');
+      setSessions((prev) => prev.filter((s) => s.isCurrent));
+      toast.success(t('sessions.logoutOthersSuccess'));
+      const secR = await api.get('/sessions/security-info');
+      setSecurityInfo(secR.data?.data as SecurityInfo | null);
+    } catch {
+      toast.error(t('sessions.logoutOthersError'));
+    } finally {
+      setLoggingOutOthers(false);
+    }
+  }, [t]);
 
-  if (loading) return <Spinner size="lg" className="py-16" />;
+  const formatDate = useCallback((dateStr: string) => {
+    if (!dateStr) return t('sessions.na');
+    return sanitizeString(dateStr.split('T')[0]);
+  }, [t]);
+
+  if (loading) return <PageLoader message={t('common.loading')} />;
 
   return (
     <div>
       <div className="page-header">
-        <div><h1 className="page-title">Active Sessions</h1><p className="text-gray-500 mt-1">{sessions.length} active session{sessions.length !== 1 ? 's' : ''}</p></div>
+        <div>
+          <h1 className="page-title">{t('sessions.title')}</h1>
+          <p className="text-gray-500 mt-1">
+            {t('sessions.sessionCount', { count: sessions.length })}
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card><CardBody><p className="text-sm text-gray-500">Active Sessions</p><p className="text-2xl font-bold">{securityInfo?.activeSessions || 0}</p></CardBody></Card>
-        <Card><CardBody><p className="text-sm text-gray-500">Last Login</p><p className="text-sm font-medium">{securityInfo?.lastLogin?.split('T')[0] || 'N/A'}</p></CardBody></Card>
-        <Card><CardBody><p className="text-sm text-gray-500">Last IP</p><p className="text-sm font-mono">{securityInfo?.lastIp || 'N/A'}</p></CardBody></Card>
-        <Card><CardBody><p className="text-sm text-gray-500">Device</p><p className="text-sm font-medium capitalize">{securityInfo?.lastDevice || 'N/A'}</p></CardBody></Card>
+        <Card>
+          <CardBody>
+            <p className="text-sm text-gray-500">{t('sessions.activeSessions')}</p>
+            <p className="text-2xl font-bold">{securityInfo?.activeSessions ?? 0}</p>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <p className="text-sm text-gray-500">{t('sessions.lastLogin')}</p>
+            <p className="text-sm font-medium">{formatDate(securityInfo?.lastLogin ?? '')}</p>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <p className="text-sm text-gray-500">{t('sessions.lastIp')}</p>
+            <p className="text-sm font-mono">{sanitizeString(securityInfo?.lastIp ?? t('sessions.na'))}</p>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <p className="text-sm text-gray-500">{t('sessions.device')}</p>
+            <p className="text-sm font-medium capitalize">{sanitizeString(securityInfo?.lastDevice ?? t('sessions.na'))}</p>
+          </CardBody>
+        </Card>
       </div>
 
       {sessions.length > 1 && (
@@ -43,10 +137,12 @@ export default function SessionsPage() {
           <CardBody className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-yellow-600" />
-              <span className="text-sm text-yellow-800">You have {sessions.length - 1} other active session{sessions.length - 1 !== 1 ? 's' : ''}</span>
+              <span className="text-sm text-yellow-800">
+                {t('sessions.otherSessions', { count: sessions.length - 1 })}
+              </span>
             </div>
-            <Button variant="ghost" size="sm" onClick={async () => { await api.post('/sessions/logout-others'); load(); }}>
-              <LogOut className="w-3 h-3" /> Logout Others
+            <Button variant="ghost" size="sm" onClick={handleLogoutOthers} loading={loggingOutOthers}>
+              <LogOut className="w-3 h-3" /> {t('sessions.logoutOthers')}
             </Button>
           </CardBody>
         </Card>
@@ -54,41 +150,53 @@ export default function SessionsPage() {
 
       <div className="space-y-3">
         {sessions.length === 0 ? (
-          <Card><CardBody className="text-center py-8 text-gray-500">No sessions found</CardBody></Card>
-        ) : sessions.map((s: any) => (
-          <Card key={s.id}>
-            <CardBody>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-gray-100 rounded-lg">
-                    {s.device === 'mobile' ? <Smartphone className="w-5 h-5 text-gray-500" /> : <Monitor className="w-5 h-5 text-gray-500" />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium capitalize">{s.device || 'Unknown device'}</span>
-                      {s.isCurrent && <Badge variant="success">Current</Badge>}
-                      {!s.isActive && <Badge variant="gray">Inactive</Badge>}
+          <EmptyState title={t('sessions.noSessions')} />
+        ) : (
+          sessions.map((s) => (
+            <Card key={s.id}>
+              <CardBody>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-gray-100 rounded-lg">
+                      {s.device === 'mobile' ? (
+                        <Smartphone className="w-5 h-5 text-gray-500" />
+                      ) : (
+                        <Monitor className="w-5 h-5 text-gray-500" />
+                      )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      <Globe className="w-3 h-3 inline mr-1" />
-                      {s.ipAddress} · {s.userAgent?.substring(0, 60) || 'Unknown'}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                      <span><Clock className="w-3 h-3 inline mr-1" />Active: {s.lastActivityAt?.split('T')[0]}</span>
-                      <span>Created: {s.createdAt?.split('T')[0]}</span>
-                      <span>Expires: {s.expiresAt?.split('T')[0]}</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium capitalize">
+                          {sanitizeString(s.device || t('sessions.unknownDevice'))}
+                        </span>
+                        {s.isCurrent && <Badge variant="success">{t('sessions.current')}</Badge>}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        <Globe className="w-3 h-3 inline mr-1" />
+                        {sanitizeString(s.ipAddress)} · {sanitizeString(s.userAgent?.substring(0, 60) ?? '')}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                        <span><Clock className="w-3 h-3 inline mr-1" />{t('sessions.activeLabel')}: {formatDate(s.lastActivityAt)}</span>
+                        <span>{t('sessions.createdLabel')}: {formatDate(s.createdAt)}</span>
+                        <span>{t('sessions.expiresLabel')}: {formatDate(s.expiresAt)}</span>
+                      </div>
                     </div>
                   </div>
+                  {!s.isCurrent && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleTerminate(s.id)}
+                      loading={terminatingId === s.id}
+                    >
+                      <LogOut className="w-3 h-3" /> {t('sessions.terminate')}
+                    </Button>
+                  )}
                 </div>
-                {!s.isCurrent && (
-                  <Button variant="ghost" size="sm" onClick={async () => { await api.post(`/sessions/${s.id}/logout`); load(); }}>
-                    <LogOut className="w-3 h-3" /> Terminate
-                  </Button>
-                )}
-              </div>
-            </CardBody>
-          </Card>
-        ))}
+              </CardBody>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
