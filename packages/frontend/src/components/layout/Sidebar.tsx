@@ -122,7 +122,7 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
         className={`
           fixed top-0 bottom-0 z-50 w-64 bg-white border-gray-200
           transform transition-transform duration-200 ease-in-out
-          lg:translate-x-0 lg:z-auto
+          lg:translate-x-0 lg:z-40
           ${isRtl ? 'right-0 translate-x-full border-l' : 'left-0 -translate-x-full border-r'}
           ${open ? 'translate-x-0' : ''}
         `}
