@@ -12,6 +12,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import multipart from '@fastify/multipart';
 
 import websocket from '@fastify/websocket';
+import jwt from '@fastify/jwt';
 import { getEnv } from '@healthcare/shared/config';
 import { registerAuthModule } from './modules/auth/index.js';
 import { registerPatientModule } from './modules/patient/index.js';
@@ -103,6 +104,7 @@ async function buildApp() {
   await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
   await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
   await app.register(websocket);
+  await app.register(jwt, { secret: env.JWT_SECRET });
 
   await app.register(swagger, {
     openapi: {
