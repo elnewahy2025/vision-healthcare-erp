@@ -446,3 +446,34 @@ export const updateScheduleSchema = createScheduleSchema.partial();
 export const executeReportSchema = z.object({
   format: z.enum(['csv', 'pdf', 'excel']).default('csv'),
 });
+
+// ── Financial Reports ──
+export const createExpenseSchema = z.object({
+  title: z.string().min(1).max(200),
+  amount: z.number().positive(),
+  categoryId: z.string().uuid().optional().nullable(),
+  branchId: z.string().uuid().optional().nullable(),
+  expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  description: z.string().max(2000).optional(),
+  paymentMethod: z.enum(['cash', 'card', 'bank_transfer', 'fawry', 'instapay', 'cheque']).default('cash'),
+  vendorName: z.string().max(200).optional(),
+  vendorTaxId: z.string().max(50).optional(),
+  taxType: z.enum(['none', 'vat_14', 'withholding', 'stamp']).optional(),
+  taxAmount: z.number().min(0).default(0),
+});
+
+export const updateExpenseSchema = createExpenseSchema.partial();
+
+export const createBudgetPlanSchema = z.object({
+  name: z.string().min(1).max(200),
+  period: z.string().max(50),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  projectedRevenue: z.number().min(0).default(0),
+  projectedExpenses: z.number().min(0).default(0),
+});
+
+export const plReportQuerySchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
