@@ -417,3 +417,32 @@ export const createBiWidgetSchema = z.object({
 });
 
 export const updateBiWidgetSchema = createBiWidgetSchema.partial();
+
+// ── Reports ──
+export const createReportSchema = z.object({
+  name: z.string().min(1).max(200),
+  slug: z.string().max(100).optional(),
+  category: z.enum(['clinical', 'financial', 'operational', 'compliance', 'executive', 'custom']).default('clinical'),
+  description: z.string().max(2000).optional(),
+  queryConfig: z.record(z.unknown()).optional(),
+  columns: z.array(z.record(z.unknown())).optional(),
+  filters: z.array(z.record(z.unknown())).optional(),
+  sorting: z.array(z.record(z.unknown())).optional(),
+  exportFormats: z.array(z.enum(['csv', 'pdf', 'excel', 'json'])).default(['csv', 'pdf']),
+});
+
+export const updateReportSchema = createReportSchema.partial();
+
+export const createScheduleSchema = z.object({
+  cron: z.string().max(50).default('0 8 * * 1'),
+  recipients: z.array(z.string().email()).optional(),
+  format: z.enum(['csv', 'pdf', 'excel']).default('pdf'),
+  params: z.record(z.unknown()).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const updateScheduleSchema = createScheduleSchema.partial();
+
+export const executeReportSchema = z.object({
+  format: z.enum(['csv', 'pdf', 'excel']).default('csv'),
+});
