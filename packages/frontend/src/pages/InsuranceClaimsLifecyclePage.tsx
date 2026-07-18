@@ -1,278 +1,674 @@
-import { useState, useEffect } from 'react';
-import { Card, CardBody, Button, Input, Select, Badge, Spinner, Modal, EmptyState } from '../components/ui';
-import { ShieldCheck, FileText, Activity, CheckCircle, XCircle, Clock, AlertCircle, Filter, Search, Plus, Eye } from 'lucide-react';
-import api from '../lib/api';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
+import {
+  ShieldCheck, FileText, Activity, CheckCircle, XCircle, Clock,
+  AlertCircle, Plus,
+} from 'lucide-react';
+import {
+  Card, CardBody, Button, Input, Select, Badge, Table,
+  PageLoader, EmptyState, Modal,
+  type Column,
+} from '../components/ui';
+import api from '../lib/api';
+import { sanitizeString, escapeHtml } from '../lib/sanitize';
 
-const EGP_INSURERS = [
-  'Misr Insurance', 'Allianz Egypt', 'AXA Egypt', 'GIG Egypt', 'Arab Misr Insurance',
-  'CIL (Cairo Insurance)', 'Royal Insurance', 'Egypt Life Takaful', 'Noor Takaful',
-  'Egyptian Health Insurance', 'Cigna Egypt', 'MetLife Egypt',
-];
+/* ── Types ─────────────────────────────────────────────────────────── */
 
-const CLAIM_STATUSES = ['draft', 'submitted', 'pending_review', 'approved', 'partially_approved', 'denied', 'appealed', 'paid'];
+type ClaimsTab = 'claims' | 'new-claim' | 'tracking' | 'analytics';
+type ClaimStatus = 'draft' | 'submitted' | 'pending_review' | 'approved' | 'partially_approved' | 'denied' | 'appealed' | 'paid';
+
+interface InsuranceCompany {
+  id: string;
+  name: string;
+  code: string;
+  contractType: string;
+  discountRate: number;
+}
+
+interface InsuranceClaim {
+  id: string;
+  claimNumber: string;
+  status: ClaimStatus;
+  patientName: string | null;
+  patientMrn: string | null;
+  companyName: string | null;
+  invoiceNumber: string | null;
+  claimedAmount: number;
+  approvedAmount: number;
+  paidAmount: number;
+  submissionDate: string | null;
+  responseDate: string | null;
+  denialReason: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+interface SummaryData {
+  total: number;
+  total_claimed: number;
+  total_approved: number;
+  total_paid: number;
+  draft: number;
+  submitted: number;
+  approved: number;
+  denied: number;
+  paid: number;
+}
+
+/* ── Constants ─────────────────────────────────────────────────────── */
+
+const STATUS_VARIANTS: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'gray'> = {
+  paid: 'success',
+  approved: 'success',
+  partially_approved: 'warning',
+  submitted: 'info',
+  pending_review: 'warning',
+  draft: 'gray',
+  denied: 'danger',
+  appealed: 'warning',
+};
+
+const STATUS_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  draft: FileText,
+  submitted: Clock,
+  pending_review: AlertCircle,
+  approved: CheckCircle,
+  partially_approved: Activity,
+  denied: XCircle,
+  appealed: AlertCircle,
+  paid: CheckCircle,
+};
+
+/* ── Helpers ───────────────────────────────────────────────────────── */
+
+function getStatusVariant(status: string): 'success' | 'warning' | 'danger' | 'info' | 'gray' {
+  return STATUS_VARIANTS[status] ?? 'gray';
+}
+
+function getStatusIcon(status: string): React.ComponentType<{ className?: string }> {
+  return STATUS_ICONS[status] ?? Clock;
+}
+
+/* ── Component ─────────────────────────────────────────────────────── */
 
 export default function InsuranceClaimsLifecyclePage() {
-  const [tab, setTab] = useState<'claims' | 'new-claim' | 'tracking' | 'analytics'>('claims');
-  const [claims, setClaims] = useState<any[]>([]);
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<ClaimsTab>('claims');
   const [loading, setLoading] = useState(true);
+
+  /* ── Claims data ── */
+  const [claims, setClaims] = useState<InsuranceClaim[]>([]);
+  const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [companies, setCompanies] = useState<InsuranceCompany[]>([]);
+
+  /* ── Filters ── */
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [insurerFilter, setInsurerFilter] = useState('');
-  const [showDetail, setShowDetail] = useState<any>(null);
 
-  // New claim form
+  /* ── Detail modal ── */
+  const [showDetail, setShowDetail] = useState<InsuranceClaim | null>(null);
+
+  /* ── New claim form ── */
   const [form, setForm] = useState({
-    patient_id: '', patient_name: '', policy_number: '', insurer: '',
-    claim_type: 'medical', total_amount: '', diagnosis: '', notes: '',
+    patientId: '',
+    invoiceId: '',
+    insuranceId: '',
+    claimedAmount: '',
+    notes: '',
   });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [submitLoading, setSubmitLoading] = useState(false);
 
-  const fetchClaims = async () => {
-    setLoading(true);
+  /* ── Data fetching ── */
+
+  const fetchClaims = useCallback(async (): Promise<void> => {
     try {
-      const params = new URLSearchParams({ limit: '200' });
-      if (search) params.set('search', search);
-      if (statusFilter) params.set('status', statusFilter);
-      if (insurerFilter) params.set('insurer', insurerFilter);
-      const { data } = await api.get(`/insurance-claims?${params}`);
-      setClaims(data.data?.rows || data.data || []);
-    } catch { toast.error('Failed to load claims'); }
-    setLoading(false);
-  };
+      const params: Record<string, string> = { limit: '200' };
+      if (statusFilter) params.status = statusFilter;
+      if (insurerFilter) params.insuranceId = insurerFilter;
+      const { data } = await api.get('/insurance-claims', { params });
+      const rows = (data.data?.rows ?? data.data ?? []) as InsuranceClaim[];
+      setClaims(rows);
+    } catch {
+      toast.error(t('insClaims.loadFailed'));
+    }
+  }, [statusFilter, insurerFilter, t]);
 
-  useEffect(() => { fetchClaims(); }, [search, statusFilter, insurerFilter]);
-
-  const submitClaim = async () => {
+  const fetchSummary = useCallback(async (): Promise<void> => {
     try {
-      await api.post('/insurance-claims', form);
-      toast.success('Claim submitted successfully');
-      setForm({ patient_id: '', patient_name: '', policy_number: '', insurer: '', claim_type: 'medical', total_amount: '', diagnosis: '', notes: '' });
+      const { data } = await api.get('/insurance-claims/summary');
+      setSummary((data.data ?? null) as SummaryData | null);
+    } catch {
+      // Summary is optional, don't show error for non-critical data
+    }
+  }, []);
+
+  const fetchCompanies = useCallback(async (): Promise<void> => {
+    try {
+      const { data } = await api.get('/insurance-companies');
+      setCompanies((data.data ?? []) as InsuranceCompany[]);
+    } catch {
+      toast.error(t('insClaims.loadCompaniesFailed'));
+    }
+  }, [t]);
+
+  /* ── Initial load ── */
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAll = async (): Promise<void> => {
+      setLoading(true);
+      await Promise.allSettled([fetchClaims(), fetchSummary(), fetchCompanies()]);
+      if (!cancelled) setLoading(false);
+    };
+    void loadAll();
+    return () => { cancelled = true; };
+  }, [fetchClaims, fetchSummary, fetchCompanies]);
+
+  /* ── Filtered claims (client-side search) ── */
+
+  const filteredClaims = useMemo(() => {
+    if (!search.trim()) return claims;
+    const q = search.toLowerCase();
+    return claims.filter(
+      (c) =>
+        c.claimNumber?.toLowerCase().includes(q) ||
+        c.patientName?.toLowerCase().includes(q) ||
+        c.companyName?.toLowerCase().includes(q) ||
+        c.invoiceNumber?.toLowerCase().includes(q)
+    );
+  }, [claims, search]);
+
+  /* ── Actions ── */
+
+  const handleBulkSubmit = useCallback(async (): Promise<void> => {
+    const drafts = claims.filter((c) => c.status === 'draft');
+    if (drafts.length === 0) {
+      toast.error(t('insClaims.noDraftClaims'));
+      return;
+    }
+    try {
+      await Promise.allSettled(
+        drafts.map((c) => api.post(`/insurance-claims/${c.id}/submit`))
+      );
+      toast.success(t('insClaims.bulkSubmitSuccess', { count: String(drafts.length) } as Record<string, unknown>));
+      void fetchClaims();
+    } catch {
+      toast.error(t('insClaims.bulkSubmitFailed'));
+    }
+  }, [claims, t, fetchClaims]);
+
+  const handleCreateClaim = useCallback(async (): Promise<void> => {
+    const errors: Record<string, string> = {};
+    if (!form.patientId.trim()) errors.patientId = t('common.required');
+    if (!form.invoiceId.trim()) errors.invoiceId = t('common.required');
+    if (!form.insuranceId) errors.insuranceId = t('common.required');
+    if (!form.claimedAmount || Number(form.claimedAmount) <= 0) errors.claimedAmount = t('common.required');
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    setSubmitLoading(true);
+    try {
+      await api.post('/insurance-claims', {
+        patientId: form.patientId.trim(),
+        invoiceId: form.invoiceId.trim(),
+        insuranceId: form.insuranceId,
+        claimedAmount: Number(form.claimedAmount),
+        notes: sanitizeString(form.notes) || undefined,
+      });
+      toast.success(t('insClaims.claimCreated'));
+      setForm({ patientId: '', invoiceId: '', insuranceId: '', claimedAmount: '', notes: '' });
       setTab('claims');
-      fetchClaims();
-    } catch { toast.error('Failed to submit claim'); }
-  };
+      void fetchClaims();
+    } catch {
+      toast.error(t('insClaims.claimCreateFailed'));
+    } finally {
+      setSubmitLoading(false);
+    }
+  }, [form, t, fetchClaims]);
 
-  const handleBulkSubmit = async () => {
-    const pending = claims.filter(c => c.status === 'draft');
-    if (pending.length === 0) { toast.error('No draft claims to submit'); return; }
-    try {
-      await api.post('/insurance-claims/bulk-submit', { ids: pending.map(c => c.id) });
-      toast.success(`${pending.length} claims submitted`);
-      fetchClaims();
-    } catch { toast.error('Bulk submit failed'); }
-  };
+  /* ── Summary stats (from real data) ── */
 
-  const statusBadge: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'gray'> = {
-    paid: 'success', approved: 'success', partially_approved: 'warning',
-    draft: 'gray', submitted: 'info', pending_review: 'warning',
-    denied: 'danger', appealed: 'warning',
-  };
+  const stats = useMemo(() => {
+    if (summary) {
+      return {
+        total: summary.total,
+        pending: summary.submitted + summary.draft,
+        approved: summary.approved,
+        denied: summary.denied,
+        paid: summary.paid,
+        totalClaimed: summary.total_claimed,
+      };
+    }
+    return {
+      total: claims.length,
+      pending: claims.filter((c) => ['submitted', 'pending_review'].includes(c.status)).length,
+      approved: claims.filter((c) => ['approved', 'partially_approved'].includes(c.status)).length,
+      denied: claims.filter((c) => c.status === 'denied').length,
+      paid: claims.filter((c) => c.status === 'paid').length,
+      totalClaimed: claims.filter((c) => c.status === 'paid').reduce((s, c) => s + c.paidAmount, 0),
+    };
+  }, [summary, claims]);
 
-  const statusIcon: Record<string, any> = {
-    draft: FileText, submitted: Clock, pending_review: AlertCircle,
-    approved: CheckCircle, partially_approved: Activity,
-    denied: XCircle, appealed: AlertCircle, paid: CheckCircle,
-  };
+  /* ── Table columns ── */
 
-  const summaryStats = {
-    total: claims.length,
-    pending: claims.filter(c => ['submitted', 'pending_review'].includes(c.status)).length,
-    approved: claims.filter(c => ['approved', 'partially_approved'].includes(c.status)).length,
-    denied: claims.filter(c => c.status === 'denied').length,
-    paid: claims.filter(c => c.status === 'paid').length,
-    totalAmount: claims.filter(c => c.status === 'paid').reduce((s, c) => s + (Number(c.total_amount) || 0), 0),
-  };
-
-  const tabs = [
-    { key: 'claims', label: 'All Claims', icon: ShieldCheck },
-    { key: 'new-claim', label: 'New Claim', icon: Plus },
-    { key: 'tracking', label: 'Claim Tracking', icon: Activity },
-    { key: 'analytics', label: 'Analytics', icon: FileText },
+  const claimColumns: Column<InsuranceClaim>[] = [
+    {
+      key: 'claimNumber',
+      header: t('insClaims.claimNumber'),
+      render: (item) => (
+        <span className="font-medium text-primary-600">{escapeHtml(item.claimNumber)}</span>
+      ),
+    },
+    {
+      key: 'patientName',
+      header: t('insClaims.patient'),
+      render: (item) => <span>{escapeHtml(item.patientName ?? '-')}</span>,
+    },
+    {
+      key: 'companyName',
+      header: t('insClaims.insurer'),
+      render: (item) => <span>{escapeHtml(item.companyName ?? '-')}</span>,
+    },
+    {
+      key: 'claimedAmount',
+      header: t('insClaims.claimedAmount'),
+      render: (item) => <span>{item.claimedAmount?.toLocaleString('ar-EG')} EGP</span>,
+    },
+    {
+      key: 'approvedAmount',
+      header: t('insClaims.approvedAmount'),
+      render: (item) => <span>{item.approvedAmount?.toLocaleString('ar-EG') || '-'} EGP</span>,
+    },
+    {
+      key: 'status',
+      header: t('insClaims.status'),
+      render: (item) => (
+        <Badge variant={getStatusVariant(item.status)}>
+          {t(`insClaims.${item.status.replace(/ /g, '')}`) || item.status}
+        </Badge>
+      ),
+    },
+    {
+      key: 'createdAt',
+      header: t('insClaims.date'),
+      render: (item) => <span>{escapeHtml(item.createdAt?.split('T')[0] ?? '-')}</span>,
+    },
+    {
+      key: 'id',
+      header: t('insClaims.actions'),
+      render: (item) => (
+        <Button size="sm" variant="ghost" onClick={() => setShowDetail(item)}>
+          {t('insClaims.view')}
+        </Button>
+      ),
+    },
   ];
+
+  /* ── Tabs ── */
+
+  const tabs: Array<{ key: ClaimsTab; icon: React.ReactNode; label: string }> = [
+    { key: 'claims', icon: <ShieldCheck className="w-4 h-4" />, label: t('insClaims.claimsTab') },
+    { key: 'new-claim', icon: <Plus className="w-4 h-4" />, label: t('insClaims.newClaimTab') },
+    { key: 'tracking', icon: <Activity className="w-4 h-4" />, label: t('insClaims.trackingTab') },
+    { key: 'analytics', icon: <FileText className="w-4 h-4" />, label: t('insClaims.analyticsTab') },
+  ];
+
+  /* ── Render ── */
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Insurance Claims Lifecycle</h1>
-          <p className="text-sm text-gray-500 mt-1">End-to-end claims management for Egypt insurers</p>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <ShieldCheck className="w-6 h-6 text-primary-600" />
+            {t('insClaims.title')}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">{t('insClaims.subtitle')}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={handleBulkSubmit}>Bulk Submit Drafts</Button>
-          <Button onClick={() => setTab('new-claim')}><Plus className="w-4 h-4" /> New Claim</Button>
+          <Button variant="secondary" onClick={() => void handleBulkSubmit()}>
+            {t('insClaims.bulkSubmit')}
+          </Button>
+          <Button onClick={() => setTab('new-claim')}>
+            <Plus className="w-4 h-4 mr-1" />
+            {t('insClaims.newClaim')}
+          </Button>
         </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        {[
+          { label: t('insClaims.totalClaims'), value: stats.total, color: 'text-gray-900' },
+          { label: t('insClaims.pendingClaims'), value: stats.pending, color: 'text-yellow-600' },
+          { label: t('insClaims.approvedClaims'), value: stats.approved, color: 'text-green-600' },
+          { label: t('insClaims.deniedClaims'), value: stats.denied, color: 'text-red-600' },
+          { label: t('insClaims.paidClaims'), value: stats.paid, color: 'text-blue-600' },
+          { label: t('insClaims.totalClaimed'), value: `${stats.totalClaimed.toLocaleString('ar-EG')} EGP`, color: 'text-purple-600' },
+        ].map((stat) => (
+          <Card key={stat.label}>
+            <CardBody className="p-4 text-center">
+              <p className="text-xs text-gray-500">{stat.label}</p>
+              <p className={`text-xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+            </CardBody>
+          </Card>
+        ))}
       </div>
 
       {/* Tab Navigation */}
       <div className="flex gap-2 overflow-x-auto pb-2">
-        {tabs.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key as any)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap ${tab === t.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-            <t.icon className="w-4 h-4" /> {t.label}
+        {tabs.map((tabItem) => (
+          <button
+            key={tabItem.key}
+            onClick={() => setTab(tabItem.key)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              tab === tabItem.key
+                ? 'bg-primary-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {tabItem.icon}
+            {tabItem.label}
           </button>
         ))}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        {[
-          { label: 'Total', value: summaryStats.total, color: 'text-blue-600', bg: 'bg-blue-100' },
-          { label: 'Pending', value: summaryStats.pending, color: 'text-yellow-600', bg: 'bg-yellow-100' },
-          { label: 'Approved', value: summaryStats.approved, color: 'text-green-600', bg: 'bg-green-100' },
-          { label: 'Denied', value: summaryStats.denied, color: 'text-red-600', bg: 'bg-red-100' },
-          { label: 'Paid', value: summaryStats.paid, color: 'text-purple-600', bg: 'bg-purple-100' },
-          { label: 'Total Paid', value: `${summaryStats.totalAmount.toLocaleString()} EGP`, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-        ].map((s, i) => (
-          <Card key={i}><CardBody className="p-4 text-center">
-            <p className={`${s.color} text-2xl font-bold`}>{s.value}</p>
-            <p className="text-xs text-gray-500 mt-1">{s.label}</p>
-          </CardBody></Card>
-        ))}
-      </div>
-
-      {/* All Claims Tab */}
-      {tab === 'claims' && (
-        <Card><CardBody className="p-4">
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
-            <div className="flex-1"><Input placeholder="Search claims..." value={search} onChange={(e: any) => setSearch(e.target.value)} /></div>
-            <Select value={statusFilter} onChange={(e: any) => setStatusFilter(e.target.value)} className="w-44" options={[{value:"", label:"All Statuses"}, ...CLAIM_STATUSES.map(s => ({value:s, label:s.replace(/_/g," ").toUpperCase()}))]} />
-            <Select value={insurerFilter} onChange={(e: any) => setInsurerFilter(e.target.value)} className="w-48" options={[{value:"", label:"All Insurers"}, ...EGP_INSURERS.map(ins => ({value:ins, label:ins}))]} />
-          </div>
-          {loading ? <Spinner /> : claims.length === 0 ? (
-            <EmptyState title="No claims found" message="Submit your first insurance claim" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50"><tr>
-                  <th className="px-4 py-3 text-left">Patient</th><th className="px-4 py-3 text-left">Insurer</th>
-                  <th className="px-4 py-3 text-left">Policy #</th><th className="px-4 py-3 text-left">Amount</th>
-                  <th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-left">Date</th>
-                  <th className="px-4 py-3 text-left">Action</th>
-                </tr></thead>
-                <tbody>{claims.map((c: any) => (
-                  <tr key={c.id} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">{c.patient_name}</td>
-                    <td className="px-4 py-3">{c.insurer}</td>
-                    <td className="px-4 py-3 text-gray-600">{c.policy_number}</td>
-                    <td className="px-4 py-3">{Number(c.total_amount || c.claimed_amount || 0).toLocaleString()} EGP</td>
-                    <td className="px-4 py-3"><Badge variant={statusBadge[c.status]}>{c.status?.replace(/_/g, ' ')}</Badge></td>
-                    <td className="px-4 py-3 text-gray-500">{c.created_at?.split('T')[0]}</td>
-                    <td className="px-4 py-3"><Button size="sm" variant="ghost" onClick={() => setShowDetail(c)}><Eye className="w-4 h-4" /></Button></td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
-        </CardBody></Card>
-      )}
-
-      {/* New Claim */}
-      {tab === 'new-claim' && (
-        <Card><CardBody className="p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Submit New Insurance Claim</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Input label="Patient Name *" value={form.patient_name} onChange={(e: any) => setForm({ ...form, patient_name: e.target.value })} />
-            <Input label="Patient ID" value={form.patient_id} onChange={(e: any) => setForm({ ...form, patient_id: e.target.value })} />
-            <Input label="Policy Number *" value={form.policy_number} onChange={(e: any) => setForm({ ...form, policy_number: e.target.value })} />
-            <Select label="Insurance Company *" value={form.insurer} onChange={(e: any) => setForm({ ...form, insurer: e.target.value })} options={[{value:"", label:"Select insurer..."}, ...EGP_INSURERS.map(ins => ({value:ins, label:ins}))]} />
-            <Select label="Claim Type" value={form.claim_type} onChange={(e: any) => setForm({ ...form, claim_type: e.target.value })} options={[{value:"medical",label:"Medical"},{value:"surgical",label:"Surgical"},{value:"pharmacy",label:"Pharmacy"},{value:"lab",label:"Laboratory"},{value:"optical",label:"Optical"},{value:"dental",label:"Dental"}]} />
-            <Input label="Claim Amount (EGP)" type="number" value={form.total_amount} onChange={(e: any) => setForm({ ...form, total_amount: e.target.value })} />
-            <Input label="Diagnosis" value={form.diagnosis} onChange={(e: any) => setForm({ ...form, diagnosis: e.target.value })} className="sm:col-span-2" />
-            <Input label="Notes" value={form.notes} onChange={(e: any) => setForm({ ...form, notes: e.target.value })} className="sm:col-span-3" />
-          </div>
-          <div className="flex justify-end gap-3 mt-6">
-            <Button variant="secondary" onClick={() => setTab('claims')}>Cancel</Button>
-            <Button onClick={submitClaim}>Submit Claim</Button>
-          </div>
-        </CardBody></Card>
-      )}
-
-      {/* Claim Tracking */}
-      {tab === 'tracking' && (
-        <Card><CardBody className="p-4">
-          <h3 className="font-semibold text-gray-900 mb-4">Claim Status Timeline</h3>
-          {claims.filter(c => ['submitted', 'pending_review', 'appealed'].includes(c.status)).length === 0 ? (
-            <EmptyState title="No active claims" message="All claims have been processed" />
-          ) : (
+      {/* Content */}
+      {loading ? (
+        <PageLoader message={t('common.loading')} />
+      ) : (
+        <>
+          {/* ── CLAIMS LIST ── */}
+          {tab === 'claims' && (
             <div className="space-y-4">
-              {claims.filter(c => ['submitted', 'pending_review', 'appealed'].includes(c.status)).map((c: any) => (
-                <div key={c.id} className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="font-medium">{c.patient_name} — {c.insurer}</p>
-                    <Badge variant={statusBadge[c.status]}>{c.status?.replace(/_/g, ' ')}</Badge>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                    <Clock className="w-4 h-4" /> Submitted: {c.created_at?.split('T')[0]} | Amount: {Number(c.total_amount || 0).toLocaleString()} EGP
-                  </div>
-                  {/* Timeline */}
-                  <div className="relative">
-                    <div className="absolute left-2 top-0 bottom-0 w-0.5 bg-gray-200" />
-                    <div className="space-y-3 pl-8">
-                      <div className="relative"><div className="absolute -left-6 mt-1 w-3 h-3 rounded-full bg-blue-500" /><p className="text-sm font-medium">Draft Created</p><p className="text-xs text-gray-500">{c.created_at?.split('T')[0]}</p></div>
-                      <div className="relative">{['submitted', 'pending_review', 'appealed'].includes(c.status) && <div className="absolute -left-6 mt-1 w-3 h-3 rounded-full bg-yellow-500" />}<p className="text-sm font-medium">{c.status === 'draft' ? 'Awaiting Submission' : c.status === 'submitted' ? 'Submitted to Insurer' : c.status === 'pending_review' ? 'Under Review' : 'Appealed'}</p><p className="text-xs text-gray-500">{c.status !== 'draft' ? 'In progress' : 'Action needed'}</p></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              {/* Filters */}
+              <div className="flex flex-wrap gap-3">
+                <Input
+                  placeholder={t('insClaims.search')}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                <Select
+                  label={t('insClaims.filterStatus')}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  options={[
+                    { value: '', label: t('insClaims.filterStatus') },
+                    { value: 'draft', label: t('insClaims.draft') },
+                    { value: 'submitted', label: t('insClaims.submitted') },
+                    { value: 'pending_review', label: t('insClaims.pendingReview') },
+                    { value: 'approved', label: t('insClaims.approved') },
+                    { value: 'denied', label: t('insClaims.denied') },
+                    { value: 'paid', label: t('insClaims.paid') },
+                  ]}
+                />
+                <Select
+                  label={t('insClaims.filterInsurer')}
+                  value={insurerFilter}
+                  onChange={(e) => setInsurerFilter(e.target.value)}
+                  options={[
+                    { value: '', label: t('insClaims.filterInsurer') },
+                    ...companies.map((c) => ({ value: c.id, label: c.name })),
+                  ]}
+                />
+              </div>
+
+              <Card>
+                <CardBody className="p-0">
+                  <Table<InsuranceClaim>
+                    columns={claimColumns}
+                    data={filteredClaims}
+                    loading={false}
+                    emptyMessage={t('insClaims.noClaims')}
+                    onRowClick={(item) => setShowDetail(item)}
+                  />
+                </CardBody>
+              </Card>
             </div>
           )}
-        </CardBody></Card>
-      )}
 
-      {/* Analytics */}
-      {tab === 'analytics' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card><CardBody className="p-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Claims by Insurer</h3>
-            {claims.length === 0 ? <EmptyState title="No data" /> : (
-              <div className="space-y-2">
-                {Object.entries(claims.reduce((acc: Record<string, number>, c: any) => {
-                  acc[c.insurer] = (acc[c.insurer] || 0) + 1;
-                  return acc;
-                }, {} as Record<string, number>)).sort(([, a], [, b]) => b - a).slice(0, 8).map(([insurer, count]) => (
-                  <div key={insurer} className="flex items-center gap-3">
-                    <span className="text-sm flex-1">{insurer}</span>
-                    <div className="flex-1 bg-gray-200 rounded-full h-2">
-                      <div className="bg-primary-500 h-2 rounded-full" style={{ width: `${(count / Math.max(...(Object.values(claims.reduce((acc: Record<string, number>, c: any) => { acc[c.insurer] = (acc[c.insurer] || 0) + 1; return acc; }, {} as Record<string, number>)) as number[]))) * 100}%` }} />
-                    </div>
-                    <span className="text-sm font-medium w-8 text-right">{count}</span>
+          {/* ── NEW CLAIM FORM ── */}
+          {tab === 'new-claim' && (
+            <Card>
+              <CardBody className="p-6">
+                <h3 className="text-lg font-semibold mb-4">{t('insClaims.createClaim')}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+                  <Input
+                    label={t('insClaims.patientId')}
+                    value={form.patientId}
+                    onChange={(e) => setForm((prev) => ({ ...prev, patientId: e.target.value }))}
+                    error={formErrors.patientId}
+                    required
+                  />
+                  <Input
+                    label={t('insClaims.invoiceId')}
+                    value={form.invoiceId}
+                    onChange={(e) => setForm((prev) => ({ ...prev, invoiceId: e.target.value }))}
+                    error={formErrors.invoiceId}
+                    required
+                  />
+                  <Select
+                    label={t('insClaims.insuranceCompany')}
+                    value={form.insuranceId}
+                    onChange={(e) => setForm((prev) => ({ ...prev, insuranceId: e.target.value }))}
+                    options={[
+                      { value: '', label: t('insClaims.selectCompany') },
+                      ...companies.map((c) => ({ value: c.id, label: c.name })),
+                    ]}
+                    error={formErrors.insuranceId}
+                  />
+                  <Input
+                    label={t('insClaims.claimedAmountLabel')}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.claimedAmount}
+                    onChange={(e) => setForm((prev) => ({ ...prev, claimedAmount: e.target.value }))}
+                    error={formErrors.claimedAmount}
+                    required
+                  />
+                  <div className="sm:col-span-2">
+                    <Input
+                      label={t('insClaims.notes')}
+                      value={form.notes}
+                      onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+                      placeholder={t('insClaims.notesPlaceholder')}
+                    />
                   </div>
-                ))}
-              </div>
-            )}
-          </CardBody></Card>
-          <Card><CardBody className="p-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Approval Rate</h3>
-            {claims.length === 0 ? <EmptyState title="No data" /> : (
-              <div className="text-center py-8">
-                <p className="text-5xl font-bold text-green-600">{summaryStats.total > 0 ? Math.round((Number(summaryStats.approved) / Math.max(claims.filter((c: any) => c.status !== 'draft').length, 1)) * 100) : 0}%</p>
-                <p className="text-gray-500 mt-2">
-                  {summaryStats.approved} approved / {claims.filter(c => c.status !== 'draft').length} processed
-                </p>
-                <div className="flex justify-center gap-4 mt-4">
-                  <span className="text-sm text-green-600">▲ {summaryStats.approved} Approved</span>
-                  <span className="text-sm text-red-600">▼ {summaryStats.denied} Denied</span>
                 </div>
-              </div>
-            )}
-          </CardBody></Card>
-        </div>
+                <div className="mt-6">
+                  <Button
+                    onClick={() => void handleCreateClaim()}
+                    loading={submitLoading}
+                    disabled={submitLoading}
+                  >
+                    {t('insClaims.submitClaim')}
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* ── CLAIM TRACKING ── */}
+          {tab === 'tracking' && (
+            <Card>
+              <CardBody className="p-4">
+                <h3 className="font-semibold text-gray-900 mb-4">{t('insClaims.trackingTab')}</h3>
+                {claims.length === 0 ? (
+                  <EmptyState title={t('insClaims.noClaims')} />
+                ) : (
+                  <div className="space-y-4">
+                    {claims.slice(0, 20).map((c) => {
+                      const Icon = getStatusIcon(c.status);
+                      return (
+                        <div key={c.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            c.status === 'paid' ? 'bg-green-100' : c.status === 'denied' ? 'bg-red-100' : 'bg-blue-100'
+                          }`}>
+                            <Icon className={`w-5 h-5 ${
+                              c.status === 'paid' ? 'text-green-600' : c.status === 'denied' ? 'text-red-600' : 'text-blue-600'
+                            }`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm">{escapeHtml(c.claimNumber)}</p>
+                            <p className="text-xs text-gray-500">{escapeHtml(c.patientName ?? '-')} — {escapeHtml(c.companyName ?? '-')}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <Badge variant={getStatusVariant(c.status)}>
+                              {t(`insClaims.${c.status.replace(/ /g, '')}`) || c.status}
+                            </Badge>
+                            <p className="text-xs text-gray-500 mt-1">{c.claimedAmount?.toLocaleString('ar-EG')} EGP</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+          )}
+
+          {/* ── ANALYTICS ── */}
+          {tab === 'analytics' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardBody className="p-4">
+                  <h3 className="font-semibold text-gray-900 mb-3">{t('insClaims.claimsByInsurer')}</h3>
+                  {claims.length === 0 ? (
+                    <EmptyState title={t('insClaims.noData')} />
+                  ) : (
+                    <div className="space-y-2">
+                      {Object.entries(
+                        claims.reduce<Record<string, number>>((acc, c) => {
+                          const name = c.companyName ?? 'Unknown';
+                          acc[name] = (acc[name] ?? 0) + 1;
+                          return acc;
+                        }, {})
+                      )
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 8)
+                        .map(([insurer, count]) => {
+                          const maxCount = Math.max(
+                            ...Object.values(
+                              claims.reduce<Record<string, number>>((acc, c) => {
+                                const name = c.companyName ?? 'Unknown';
+                                acc[name] = (acc[name] ?? 0) + 1;
+                                return acc;
+                              }, {})
+                            )
+                          );
+                          return (
+                            <div key={insurer} className="flex items-center gap-3">
+                              <span className="text-sm flex-1">{escapeHtml(insurer)}</span>
+                              <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-primary-500 h-2 rounded-full"
+                                  style={{ width: `${(count / Math.max(maxCount, 1)) * 100}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium w-8 text-right">{count}</span>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+              <Card>
+                <CardBody className="p-4">
+                  <h3 className="font-semibold text-gray-900 mb-3">{t('insClaims.approvalRate')}</h3>
+                  {claims.length === 0 ? (
+                    <EmptyState title={t('insClaims.noData')} />
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-5xl font-bold text-green-600">
+                        {claims.filter((c) => c.status !== 'draft').length > 0
+                          ? Math.round(
+                              (stats.approved /
+                                Math.max(claims.filter((c) => c.status !== 'draft').length, 1)) *
+                                100
+                            )
+                          : 0}%
+                      </p>
+                      <p className="text-gray-500 mt-2">
+                        {t('insClaims.approvedCount', {
+                          count: String(stats.approved),
+                          total: String(claims.filter((c) => c.status !== 'draft').length),
+                        } as Record<string, unknown>)}
+                      </p>
+                      <div className="flex justify-center gap-4 mt-4">
+                        <span className="text-sm text-green-600">▲ {stats.approved} {t('insClaims.approvedClaims')}</span>
+                        <span className="text-sm text-red-600">▼ {stats.denied} {t('insClaims.deniedClaims')}</span>
+                      </div>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Detail Modal */}
-      <Modal open={!!showDetail} onClose={() => setShowDetail(null)} title="Claim Details">
+      {/* ── Detail Modal ── */}
+      <Modal
+        open={!!showDetail}
+        onClose={() => setShowDetail(null)}
+        title={t('insClaims.claimDetails')}
+        size="lg"
+      >
         {showDetail && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="font-medium">Patient:</span> {showDetail.patient_name}</div>
-              <div><span className="font-medium">Insurer:</span> {showDetail.insurer}</div>
-              <div><span className="font-medium">Policy:</span> {showDetail.policy_number}</div>
-              <div><span className="font-medium">Amount:</span> {Number(showDetail.total_amount || showDetail.claimed_amount || 0).toLocaleString()} EGP</div>
-              <div><span className="font-medium">Status:</span> <Badge variant={statusBadge[showDetail.status]}>{showDetail.status?.replace(/_/g, ' ')}</Badge></div>
-              <div><span className="font-medium">Type:</span> {showDetail.claim_type}</div>
-              <div className="col-span-2"><span className="font-medium">Diagnosis:</span> {showDetail.diagnosis || '-'}</div>
-              <div className="col-span-2"><span className="font-medium">Notes:</span> {showDetail.notes || '-'}</div>
-              <div className="col-span-2"><span className="font-medium">Submitted:</span> {showDetail.created_at}</div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-500">{t('insClaims.patient')}</span>
+                <p className="font-medium">{escapeHtml(showDetail.patientName ?? '-')}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">{t('insClaims.insurer')}</span>
+                <p className="font-medium">{escapeHtml(showDetail.companyName ?? '-')}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">{t('insClaims.invoiceNumber')}</span>
+                <p className="font-medium">{escapeHtml(showDetail.invoiceNumber ?? '-')}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">{t('insClaims.claimedAmount')}</span>
+                <p className="font-medium">{showDetail.claimedAmount?.toLocaleString('ar-EG')} EGP</p>
+              </div>
+              <div>
+                <span className="text-gray-500">{t('insClaims.approvedAmount')}</span>
+                <p className="font-medium">{showDetail.approvedAmount?.toLocaleString('ar-EG') || '-'} EGP</p>
+              </div>
+              <div>
+                <span className="text-gray-500">{t('insClaims.paidBy')}</span>
+                <p className="font-medium">{showDetail.paidAmount?.toLocaleString('ar-EG') || '-'} EGP</p>
+              </div>
+              <div>
+                <span className="text-gray-500">{t('insClaims.status')}</span>
+                <Badge variant={getStatusVariant(showDetail.status)} className="mt-1">
+                  {t(`insClaims.${showDetail.status.replace(/ /g, '')}`) || showDetail.status}
+                </Badge>
+              </div>
+              <div>
+                <span className="text-gray-500">{t('insClaims.date')}</span>
+                <p className="font-medium">{escapeHtml(showDetail.createdAt?.split('T')[0] ?? '-')}</p>
+              </div>
+              {showDetail.denialReason && (
+                <div className="col-span-2">
+                  <span className="text-gray-500">{t('insClaims.diagnosis')}</span>
+                  <p className="font-medium text-red-600">{escapeHtml(showDetail.denialReason)}</p>
+                </div>
+              )}
+              {showDetail.notes && (
+                <div className="col-span-2">
+                  <span className="text-gray-500">{t('insClaims.notes')}</span>
+                  <p className="font-medium">{escapeHtml(showDetail.notes)}</p>
+                </div>
+              )}
             </div>
           </div>
         )}
