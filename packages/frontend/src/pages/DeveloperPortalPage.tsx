@@ -1,246 +1,559 @@
-import { useState, useEffect } from 'react';
-import { Card, CardBody, Button, Input, Select, Badge, Spinner, Modal } from '../components/ui';
-import { Key, Code, Webhook, Shield, Copy, Plus, Eye, EyeOff, Trash2, CheckCircle, Book, Play, Clock } from 'lucide-react';
-import api from '../lib/api';
+import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
+import {
+  Key, Code, Webhook, Shield, Copy, Plus, Trash2,
+} from 'lucide-react';
+import {
+  Card, CardBody, Button, Input, Select, Badge, Table,
+  PageLoader, Modal,
+  type Column,
+} from '../components/ui';
+import api from '../lib/api';
+import { sanitizeString, escapeHtml } from '../lib/sanitize';
 
-const API_ENDPOINTS = [
+/* ── Types ─────────────────────────────────────────────────────────── */
+
+type DevTab = 'keys' | 'docs' | 'webhooks' | 'rate-limits';
+
+interface ApiKey {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  permissions: string;
+  allowedIps: string[];
+  rateLimit: { requests: number; period: string };
+  expiresAt: string | null;
+  isActive: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+interface WebhookConfig {
+  id: string;
+  url: string;
+  events: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface ApiEndpoint {
+  method: string;
+  path: string;
+  description: string;
+  category: string;
+}
+
+interface RateLimitTier {
+  tier: string;
+  requests: string;
+  burst: string;
+  description: string;
+}
+
+/* ── Constants ─────────────────────────────────────────────────────── */
+
+const API_ENDPOINTS: ApiEndpoint[] = [
   { method: 'GET', path: '/api/v1/patients', description: 'List all patients', category: 'Patients' },
   { method: 'POST', path: '/api/v1/patients', description: 'Create a patient', category: 'Patients' },
   { method: 'GET', path: '/api/v1/patients/:id', description: 'Get patient by ID', category: 'Patients' },
   { method: 'PUT', path: '/api/v1/patients/:id', description: 'Update patient', category: 'Patients' },
   { method: 'GET', path: '/api/v1/appointments', description: 'List appointments', category: 'Appointments' },
   { method: 'POST', path: '/api/v1/appointments', description: 'Book appointment', category: 'Appointments' },
-  { method: 'GET', path: '/api/v1/billing/invoices', description: 'List invoices', category: 'Billing' },
-  { method: 'POST', path: '/api/v1/billing/invoices', description: 'Create invoice', category: 'Billing' },
-  { method: 'GET', path: '/api/v1/laboratory/results', description: 'List lab results', category: 'Laboratory' },
-  { method: 'POST', path: '/api/v1/laboratory/orders', description: 'Create lab order', category: 'Laboratory' },
+  { method: 'GET', path: '/api/v1/invoices', description: 'List invoices', category: 'Billing' },
+  { method: 'POST', path: '/api/v1/invoices', description: 'Create invoice', category: 'Billing' },
+  { method: 'GET', path: '/api/v1/lab/orders', description: 'List lab orders', category: 'Laboratory' },
+  { method: 'POST', path: '/api/v1/lab/orders', description: 'Create lab order', category: 'Laboratory' },
   { method: 'GET', path: '/api/v1/pharmacy/prescriptions', description: 'List prescriptions', category: 'Pharmacy' },
   { method: 'GET', path: '/api/v1/insurance-claims', description: 'List insurance claims', category: 'Insurance' },
   { method: 'POST', path: '/api/v1/insurance-claims', description: 'Submit claim', category: 'Insurance' },
-  { method: 'GET', path: '/api/v1/branches', description: 'List branches', category: 'Branches' },
-  { method: 'GET', path: '/api/v1/reports/financial', description: 'Financial reports', category: 'Reports' },
-  { method: 'POST', path: '/api/v1/whatsapp/send', description: 'Send WhatsApp message', category: 'Communications' },
-  { method: 'POST', path: '/api/v1/voice/call', description: 'Initiate voice call', category: 'Communications' },
-  { method: 'GET', path: '/api/v1/notifications', description: 'List notifications', category: 'Notifications' },
-  { method: 'GET', path: '/api/v1/analytics/dashboard', description: 'Analytics dashboard data', category: 'Analytics' },
+  { method: 'GET', path: '/api/v1/reports', description: 'List report definitions', category: 'Reports' },
   { method: 'GET', path: '/api/v1/health', description: 'Health check', category: 'System' },
 ];
 
-const methodColors: Record<string, string> = {
-  GET: 'bg-green-100 text-green-700', POST: 'bg-blue-100 text-blue-700',
-  PUT: 'bg-yellow-100 text-yellow-700', DELETE: 'bg-red-100 text-red-700',
+const METHOD_COLORS: Record<string, string> = {
+  GET: 'bg-green-100 text-green-700',
+  POST: 'bg-blue-100 text-blue-700',
+  PUT: 'bg-yellow-100 text-yellow-700',
+  DELETE: 'bg-red-100 text-red-700',
   PATCH: 'bg-purple-100 text-purple-700',
 };
 
+const RATE_LIMITS: RateLimitTier[] = [
+  { tier: 'Free', requests: '100', burst: '10/min', description: 'For testing and evaluation' },
+  { tier: 'Basic', requests: '1,000', burst: '50/min', description: 'Small clinics and practices' },
+  { tier: 'Pro', requests: '10,000', burst: '200/min', description: 'Growing healthcare organizations' },
+  { tier: 'Enterprise', requests: '100,000', burst: '1,000/min', description: 'Large hospital networks' },
+];
+
+/* ── Component ─────────────────────────────────────────────────────── */
+
 export default function DeveloperPortalPage() {
-  const [tab, setTab] = useState<'keys' | 'docs' | 'webhooks' | 'rate-limits'>('keys');
-  const [apiKeys, setApiKeys] = useState<any[]>([]);
-  const [webhooks, setWebhooks] = useState<any[]>([]);
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<DevTab>('keys');
   const [loading, setLoading] = useState(true);
+
+  /* ── API Keys ── */
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [showNewKey, setShowNewKey] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
-  const [newKeyScopes, setNewKeyScopes] = useState('read');
+  const [newKeyPermissions, setNewKeyPermissions] = useState('read');
+  const [createLoading, setCreateLoading] = useState(false);
   const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
+  const [showRevokeConfirm, setShowRevokeConfirm] = useState<string | null>(null);
+
+  /* ── Webhooks ── */
+  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
+  const [showNewWebhook, setShowNewWebhook] = useState(false);
+  const [webhookForm, setWebhookForm] = useState({ url: '', events: '', secret: '' });
+  const [webhookLoading, setWebhookLoading] = useState(false);
+
+  /* ── Docs ── */
   const [searchEndpoint, setSearchEndpoint] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [showNewWebhook, setShowNewWebhook] = useState(false);
-  const [webhookForm, setWebhookForm] = useState({ url: '', events: 'appointment.created,patient.created', secret: '' });
 
-  const fetchKeys = async () => {
-    setLoading(true);
-    try { const { data } = await api.get('/api-gateway/keys'); setApiKeys(data.data?.rows || data.data || []); } catch {}
-    setLoading(false);
-  };
+  /* ── Derived ── */
 
-  const fetchWebhooks = async () => {
-    try { const { data } = await api.get('/api-gateway/webhooks'); setWebhooks(data.data?.rows || data.data || []); } catch {}
-  };
+  const categories = [...new Set(API_ENDPOINTS.map((e) => e.category))];
 
-  useEffect(() => { fetchKeys(); fetchWebhooks(); }, []);
-
-  const createKey = async () => {
-    try {
-      const { data } = await api.post('/api-gateway/keys', { name: newKeyName, scopes: newKeyScopes });
-      setApiKeys(prev => [...prev, data.data]);
-      toast.success('API key created');
-      setShowNewWebhook(false); setNewKeyName('');
-    } catch { toast.error('Failed to create key'); }
-    setShowNewKey(false);
-  };
-
-  const revokeKey = async (id: string) => {
-    if (!confirm('Revoke this API key?')) return;
-    try { await api.delete(`/api-gateway/keys/${id}`); setApiKeys(prev => prev.filter(k => k.id !== id)); toast.success('Key revoked'); }
-    catch { toast.error('Failed to revoke key'); }
-  };
-
-  const toggleReveal = (id: string) => {
-    setRevealedKeys(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
-  };
-
-  const copyToClipboard = (text: string) => { navigator.clipboard.writeText(text); toast.success('Copied to clipboard'); };
-
-  const filteredEndpoints = API_ENDPOINTS.filter(e => {
-    if (searchEndpoint && !e.path.toLowerCase().includes(searchEndpoint.toLowerCase()) && !e.description.toLowerCase().includes(searchEndpoint.toLowerCase())) return false;
-    if (categoryFilter && e.category !== categoryFilter) return false;
-    return true;
+  const filteredEndpoints = API_ENDPOINTS.filter((ep) => {
+    const matchesSearch = !searchEndpoint ||
+      ep.path.toLowerCase().includes(searchEndpoint.toLowerCase()) ||
+      ep.description.toLowerCase().includes(searchEndpoint.toLowerCase());
+    const matchesCategory = !categoryFilter || ep.category === categoryFilter;
+    return matchesSearch && matchesCategory;
   });
 
-  const categories = [...new Set(API_ENDPOINTS.map(e => e.category))];
+  /* ── Data fetching ── */
 
-  const rateLimits = [
-    { tier: 'Free', requests: '100/hour', burst: '10/min', description: 'For testing and development' },
-    { tier: 'Basic', requests: '1,000/hour', burst: '50/min', description: 'Small clinics, up to 5 users' },
-    { tier: 'Professional', requests: '10,000/hour', burst: '200/min', description: 'Multi-branch clinics, unlimited users' },
-    { tier: 'Enterprise', requests: 'Unlimited', burst: '1,000/min', description: 'Hospital networks, SLA guaranteed' },
+  const fetchKeys = useCallback(async (): Promise<void> => {
+    try {
+      const { data } = await api.get('/api-keys');
+      setApiKeys((data.data ?? []) as ApiKey[]);
+    } catch {
+      toast.error(t('devPortal.loadKeysFailed'));
+    }
+  }, [t]);
+
+  const fetchWebhooks = useCallback(async (): Promise<void> => {
+    try {
+      const { data } = await api.get('/integrations/webhooks');
+      setWebhooks((data.data ?? []) as WebhookConfig[]);
+    } catch {
+      toast.error(t('devPortal.loadWebhooksFailed'));
+    }
+  }, [t]);
+
+  /* ── Initial load ── */
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAll = async (): Promise<void> => {
+      setLoading(true);
+      await Promise.allSettled([fetchKeys(), fetchWebhooks()]);
+      if (!cancelled) setLoading(false);
+    };
+    void loadAll();
+    return () => { cancelled = true; };
+  }, [fetchKeys, fetchWebhooks]);
+
+  /* ── API Key actions ── */
+
+  const handleCreateKey = useCallback(async (): Promise<void> => {
+    if (!newKeyName.trim()) {
+      toast.error(t('devPortal.keyName') + ' is required');
+      return;
+    }
+    setCreateLoading(true);
+    try {
+      const { data } = await api.post('/api-keys', {
+        name: sanitizeString(newKeyName),
+        permissions: newKeyPermissions,
+      });
+      const newKey = (data.data ?? null) as ApiKey | null;
+      if (newKey) setApiKeys((prev) => [newKey, ...prev]);
+      toast.success(t('devPortal.keyCreated'));
+      setShowNewKey(false);
+      setNewKeyName('');
+    } catch {
+      toast.error(t('devPortal.keyCreateFailed'));
+    } finally {
+      setCreateLoading(false);
+    }
+  }, [newKeyName, newKeyPermissions, t]);
+
+  const handleRevokeKey = useCallback(async (): Promise<void> => {
+    if (!showRevokeConfirm) return;
+    try {
+      await api.delete(`/api-keys/${showRevokeConfirm}`);
+      setApiKeys((prev) => prev.filter((k) => k.id !== showRevokeConfirm));
+      toast.success(t('devPortal.keyRevoked'));
+    } catch {
+      toast.error(t('devPortal.keyRevokeFailed'));
+    } finally {
+      setShowRevokeConfirm(null);
+    }
+  }, [showRevokeConfirm, t]);
+
+  const toggleReveal = useCallback((id: string): void => {
+    setRevealedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const copyToClipboard = useCallback((text: string): void => {
+    void navigator.clipboard.writeText(text);
+    toast.success(t('devPortal.copied'));
+  }, [t]);
+
+  /* ── Webhook actions ── */
+
+  const handleCreateWebhook = useCallback(async (): Promise<void> => {
+    if (!webhookForm.url.trim()) {
+      toast.error(t('devPortal.webhookUrl') + ' is required');
+      return;
+    }
+    setWebhookLoading(true);
+    try {
+      const { data } = await api.post('/integrations/webhooks', {
+        url: sanitizeString(webhookForm.url),
+        events: webhookForm.events.split(',').map((e) => e.trim()).filter(Boolean),
+        secret: webhookForm.secret || undefined,
+      });
+      const newWh = (data.data ?? null) as WebhookConfig | null;
+      if (newWh) setWebhooks((prev) => [newWh, ...prev]);
+      toast.success(t('devPortal.webhookAdded'));
+      setShowNewWebhook(false);
+      setWebhookForm({ url: '', events: '', secret: '' });
+    } catch {
+      toast.error(t('devPortal.webhookAddFailed'));
+    } finally {
+      setWebhookLoading(false);
+    }
+  }, [webhookForm, t]);
+
+  /* ── Table columns ── */
+
+  const keyColumns: Column<ApiKey>[] = [
+    {
+      key: 'name',
+      header: t('devPortal.keyName'),
+      render: (item) => (
+        <div>
+          <p className="font-medium">{escapeHtml(item.name)}</p>
+          <p className="text-xs text-gray-500 font-mono">{escapeHtml(item.keyPrefix)}...</p>
+        </div>
+      ),
+    },
+    {
+      key: 'permissions',
+      header: t('devPortal.permissions'),
+      render: (item) => (
+        <Badge variant={item.permissions === 'admin' ? 'danger' : item.permissions === 'read_write' ? 'warning' : 'info'}>
+          {item.permissions}
+        </Badge>
+      ),
+    },
+    {
+      key: 'lastUsedAt',
+      header: t('devPortal.lastUsed'),
+      render: (item) => <span>{escapeHtml(item.lastUsedAt?.split('T')[0] ?? '-')}</span>,
+    },
+    {
+      key: 'isActive',
+      header: t('devPortal.status'),
+      render: (item) => (
+        <Badge variant={item.isActive ? 'success' : 'danger'}>
+          {item.isActive ? t('devPortal.active') : t('devPortal.inactive')}
+        </Badge>
+      ),
+    },
+    {
+      key: 'id',
+      header: t('devPortal.actions'),
+      render: (item) => (
+        <div className="flex gap-2">
+          <Button size="sm" variant="ghost" onClick={() => toggleReveal(item.id)}>
+            {revealedKeys.has(item.id) ? t('devPortal.hide') : t('devPortal.reveal')}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => copyToClipboard(item.keyPrefix)}>
+            <Copy className="w-3.5 h-3.5" />
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setShowRevokeConfirm(item.id)}>
+            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+          </Button>
+        </div>
+      ),
+    },
   ];
+
+  const webhookColumns: Column<WebhookConfig>[] = [
+    {
+      key: 'url',
+      header: t('devPortal.webhookUrl'),
+      render: (item) => <span className="font-mono text-sm">{escapeHtml(item.url)}</span>,
+    },
+    {
+      key: 'events',
+      header: t('devPortal.webhookEvents'),
+      render: (item) => <span className="text-sm text-gray-500">{escapeHtml(item.events)}</span>,
+    },
+    {
+      key: 'isActive',
+      header: t('devPortal.status'),
+      render: (item) => (
+        <Badge variant={item.isActive ? 'success' : 'danger'}>
+          {item.isActive ? t('devPortal.webhookActive') : t('devPortal.webhookInactive')}
+        </Badge>
+      ),
+    },
+  ];
+
+  /* ── Tabs ── */
+
+  const tabs: Array<{ key: DevTab; icon: React.ReactNode; label: string }> = [
+    { key: 'keys', icon: <Key className="w-4 h-4" />, label: t('devPortal.keysTab') },
+    { key: 'docs', icon: <Code className="w-4 h-4" />, label: t('devPortal.docsTab') },
+    { key: 'webhooks', icon: <Webhook className="w-4 h-4" />, label: t('devPortal.webhooksTab') },
+    { key: 'rate-limits', icon: <Shield className="w-4 h-4" />, label: t('devPortal.rateLimitsTab') },
+  ];
+
+  /* ── Render ── */
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Developer API Portal</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage API keys, explore documentation, configure webhooks</p>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <Code className="w-6 h-6 text-primary-600" />
+          {t('devPortal.title')}
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">{t('devPortal.subtitle')}</p>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {[
-          { key: 'keys', label: 'API Keys', icon: Key },
-          { key: 'docs', label: 'API Documentation', icon: Book },
-          { key: 'webhooks', label: `Webhooks (${webhooks.length})`, icon: Webhook },
-          { key: 'rate-limits', label: 'Rate Limits', icon: Shield },
-        ].map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key as any)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap ${tab === t.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-            <t.icon className="w-4 h-4" /> {t.label}
+      {/* Tab Navigation */}
+      <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-2">
+        {tabs.map((tabItem) => (
+          <button
+            key={tabItem.key}
+            onClick={() => setTab(tabItem.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === tabItem.key
+                ? 'bg-primary-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {tabItem.icon}
+            {tabItem.label}
           </button>
         ))}
       </div>
 
-      {/* API Keys */}
-      {tab === 'keys' && (
-        <Card><CardBody className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">API Keys</h3>
-            <Button onClick={() => setShowNewKey(true)}><Plus className="w-4 h-4" /> Create Key</Button>
-          </div>
-          {loading ? <Spinner /> : apiKeys.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No API keys yet. Create one to get started.</div>
-          ) : (
-            <div className="space-y-3">
-              {apiKeys.map((key: any) => (
-                <div key={key.id} className="flex items-center gap-4 p-4 border rounded-lg">
-                  <Key className="w-5 h-5 text-gray-400" />
-                  <div className="flex-1">
-                    <p className="font-medium">{key.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">
-                        {revealedKeys.has(key.id) ? (key.key || key.api_key || 'sk-****') : 'sk-****-****-****-****'}
-                      </code>
-                      <button onClick={() => toggleReveal(key.id)} className="text-gray-400 hover:text-gray-600">
-                        {revealedKeys.has(key.id) ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                      <button onClick={() => copyToClipboard(key.key || key.api_key || '')} className="text-gray-400 hover:text-gray-600"><Copy className="w-3.5 h-3.5" /></button>
-                    </div>
-                  </div>
-                  <Badge variant={key.is_active !== false ? 'success' : 'danger'}>{key.is_active !== false ? 'Active' : 'Revoked'}</Badge>
-                  <Badge>{key.scopes || 'read'}</Badge>
-                  <Button size="sm" variant="danger" onClick={() => revokeKey(key.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardBody></Card>
-      )}
-
-      {/* API Documentation */}
-      {tab === 'docs' && (
-        <Card><CardBody className="p-4">
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
-            <div className="flex-1"><Input placeholder="Search endpoints..." value={searchEndpoint} onChange={(e: any) => setSearchEndpoint(e.target.value)} /></div>
-            <Select value={categoryFilter} onChange={(e: any) => setCategoryFilter(e.target.value)} className="w-48" options={[{value:"", label:"All Categories"}, ...categories.map(c => ({value:c, label:c}))]} />
-          </div>
-          <div className="space-y-2">
-            {filteredEndpoints.map((ep, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-gray-50">
-                <span className={`text-xs font-bold px-2 py-1 rounded ${methodColors[ep.method]}`}>{ep.method}</span>
-                <code className="text-sm font-mono flex-1">{ep.path}</code>
-                <span className="text-sm text-gray-500 hidden sm:block">{ep.description}</span>
-                <Badge>{ep.category}</Badge>
+      {/* Content */}
+      {loading ? (
+        <PageLoader message={t('common.loading')} />
+      ) : (
+        <>
+          {/* ── API KEYS ── */}
+          {tab === 'keys' && (
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button onClick={() => setShowNewKey(true)}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  {t('devPortal.createNewKey')}
+                </Button>
               </div>
-            ))}
-          </div>
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium text-gray-900 mb-2">Quick Start</h4>
-            <pre className="text-xs bg-gray-800 text-green-400 p-3 rounded-lg overflow-x-auto">{`curl -H "Authorization: Bearer YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  https://api.visionhealthcare.com/api/v1/patients`}</pre>
-          </div>
-        </CardBody></Card>
-      )}
+              <Card>
+                <CardBody className="p-0">
+                  <Table<ApiKey>
+                    columns={keyColumns}
+                    data={apiKeys}
+                    loading={false}
+                    emptyMessage={t('devPortal.noKeys')}
+                  />
+                </CardBody>
+              </Card>
+            </div>
+          )}
 
-      {/* Webhooks */}
-      {tab === 'webhooks' && (
-        <Card><CardBody className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">Webhooks</h3>
-            <Button onClick={() => setShowNewWebhook(true)}><Plus className="w-4 h-4" /> Add Webhook</Button>
-          </div>
-          {webhooks.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No webhooks configured</div>
-          ) : (
-            <div className="space-y-3">
-              {webhooks.map((wh: any) => (
-                <div key={wh.id} className="flex items-center gap-4 p-4 border rounded-lg">
-                  <Webhook className="w-5 h-5 text-gray-400" />
-                  <div className="flex-1">
-                    <p className="font-medium font-mono text-sm">{wh.url}</p>
-                    <p className="text-xs text-gray-500 mt-1">Events: {wh.events}</p>
-                  </div>
-                  <Badge variant={wh.is_active !== false ? 'success' : 'danger'}>{wh.is_active !== false ? 'Active' : 'Inactive'}</Badge>
-                  <Button size="sm" variant="danger"><Trash2 className="w-3.5 h-3.5" /></Button>
+          {/* ── API DOCS ── */}
+          {tab === 'docs' && (
+            <Card>
+              <CardBody className="p-4">
+                <h3 className="font-semibold text-gray-900 mb-3">{t('devPortal.apiEndpoints')}</h3>
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <Input
+                    placeholder={t('devPortal.searchEndpoints')}
+                    value={searchEndpoint}
+                    onChange={(e) => setSearchEndpoint(e.target.value)}
+                  />
+                  <Select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    options={[
+                      { value: '', label: t('devPortal.allCategories') },
+                      ...categories.map((c) => ({ value: c, label: c })),
+                    ]}
+                  />
                 </div>
+                <div className="space-y-2">
+                  {filteredEndpoints.map((ep, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50">
+                      <span className={`text-xs font-bold px-2 py-1 rounded ${METHOD_COLORS[ep.method] ?? ''}`}>
+                        {ep.method}
+                      </span>
+                      <code className="text-sm font-mono flex-1">{ep.path}</code>
+                      <span className="text-sm text-gray-500 hidden sm:block">{ep.description}</span>
+                      <Badge>{ep.category}</Badge>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-2">{t('devPortal.quickStart')}</h4>
+                  <pre className="text-xs bg-gray-800 text-green-400 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">
+{`curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  https://api.visionhealthcare.com/api/v1/patients`}
+                  </pre>
+                </div>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* ── WEBHOOKS ── */}
+          {tab === 'webhooks' && (
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button onClick={() => setShowNewWebhook(true)}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  {t('devPortal.addWebhook')}
+                </Button>
+              </div>
+              <Card>
+                <CardBody className="p-0">
+                  <Table<WebhookConfig>
+                    columns={webhookColumns}
+                    data={webhooks}
+                    loading={false}
+                    emptyMessage={t('devPortal.noWebhooks')}
+                  />
+                </CardBody>
+              </Card>
+            </div>
+          )}
+
+          {/* ── RATE LIMITS ── */}
+          {tab === 'rate-limits' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {RATE_LIMITS.map((rl) => (
+                <Card key={rl.tier}>
+                  <CardBody className="p-5 text-center">
+                    <h3 className="font-bold text-lg text-gray-900 mb-2">{rl.tier}</h3>
+                    <p className="text-2xl font-bold text-primary-600 mb-1">{rl.requests}</p>
+                    <p className="text-sm text-gray-500">{t('devPortal.burst')}: {rl.burst}</p>
+                    <p className="text-xs text-gray-400 mt-3">{rl.description}</p>
+                  </CardBody>
+                </Card>
               ))}
             </div>
           )}
-        </CardBody></Card>
+        </>
       )}
 
-      {/* Rate Limits */}
-      {tab === 'rate-limits' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {rateLimits.map((rl) => (
-            <Card key={rl.tier}><CardBody className="p-5 text-center">
-              <h3 className="font-bold text-lg text-gray-900 mb-2">{rl.tier}</h3>
-              <p className="text-2xl font-bold text-primary-600 mb-1">{rl.requests}</p>
-              <p className="text-sm text-gray-500">Burst: {rl.burst}</p>
-              <p className="text-xs text-gray-400 mt-3">{rl.description}</p>
-            </CardBody></Card>
-          ))}
-        </div>
-      )}
-
-      {/* Modals */}
-      <Modal open={showNewKey} onClose={() => setShowNewKey(false)} title="Create API Key">
-        <div className="space-y-4">
-          <Input label="Key Name" value={newKeyName} onChange={(e: any) => setNewKeyName(e.target.value)} placeholder="e.g., Production Server" />
-          <Select label="Scopes" value={newKeyScopes} onChange={(e: any) => setNewKeyScopes(e.target.value)} options={[{value:"read",label:"Read Only"},{value:"read_write",label:"Read & Write"},{value:"admin",label:"Admin"}]} />
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button variant="secondary" onClick={() => setShowNewKey(false)}>Cancel</Button>
-            <Button onClick={createKey}>Create Key</Button>
+      {/* ── Create Key Modal ── */}
+      <Modal
+        open={showNewKey}
+        onClose={() => setShowNewKey(false)}
+        title={t('devPortal.createNewKey')}
+        size="sm"
+        footer={
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" onClick={() => setShowNewKey(false)}>
+              {t('devPortal.cancel')}
+            </Button>
+            <Button onClick={() => void handleCreateKey()} loading={createLoading} disabled={createLoading}>
+              {t('devPortal.createKey')}
+            </Button>
           </div>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label={t('devPortal.keyName')}
+            value={newKeyName}
+            onChange={(e) => setNewKeyName(e.target.value)}
+            placeholder={t('devPortal.keyNamePlaceholder')}
+          />
+          <Select
+            label={t('devPortal.scopes')}
+            value={newKeyPermissions}
+            onChange={(e) => setNewKeyPermissions(e.target.value)}
+            options={[
+              { value: 'read', label: t('devPortal.readOnly') },
+              { value: 'read_write', label: t('devPortal.readWrite') },
+              { value: 'admin', label: t('devPortal.admin') },
+            ]}
+          />
         </div>
       </Modal>
 
-      <Modal open={showNewWebhook} onClose={() => setShowNewWebhook(false)} title="Add Webhook">
-        <div className="space-y-4">
-          <Input label="Webhook URL" value={webhookForm.url} onChange={(e: any) => setWebhookForm({ ...webhookForm, url: e.target.value })} placeholder="https://your-server.com/webhook" />
-          <Input label="Events" value={webhookForm.events} onChange={(e: any) => setWebhookForm({ ...webhookForm, events: e.target.value })} placeholder="appointment.created,patient.created" />
-          <Input label="Secret (optional)" value={webhookForm.secret} onChange={(e: any) => setWebhookForm({ ...webhookForm, secret: e.target.value })} />
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button variant="secondary" onClick={() => setShowNewWebhook(false)}>Cancel</Button>
-            <Button onClick={() => { toast.success('Webhook added'); setShowNewWebhook(false); }}>Add Webhook</Button>
+      {/* ── Revoke Confirmation Modal ── */}
+      <Modal
+        open={!!showRevokeConfirm}
+        onClose={() => setShowRevokeConfirm(null)}
+        title={t('devPortal.revokeConfirm')}
+        size="sm"
+        footer={
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" onClick={() => setShowRevokeConfirm(null)}>
+              {t('devPortal.cancel')}
+            </Button>
+            <Button variant="danger" onClick={() => void handleRevokeKey()}>
+              {t('devPortal.revoke')}
+            </Button>
           </div>
+        }
+      >
+        <p className="text-sm text-gray-600">{t('devPortal.revokeConfirm')}</p>
+      </Modal>
+
+      {/* ── Add Webhook Modal ── */}
+      <Modal
+        open={showNewWebhook}
+        onClose={() => setShowNewWebhook(false)}
+        title={t('devPortal.addWebhook')}
+        size="md"
+        footer={
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" onClick={() => setShowNewWebhook(false)}>
+              {t('devPortal.cancel')}
+            </Button>
+            <Button onClick={() => void handleCreateWebhook()} loading={webhookLoading} disabled={webhookLoading}>
+              {t('devPortal.addWebhook')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label={t('devPortal.webhookUrl')}
+            value={webhookForm.url}
+            onChange={(e) => setWebhookForm((prev) => ({ ...prev, url: e.target.value }))}
+            placeholder={t('devPortal.webhookUrlPlaceholder')}
+          />
+          <Input
+            label={t('devPortal.webhookEvents')}
+            value={webhookForm.events}
+            onChange={(e) => setWebhookForm((prev) => ({ ...prev, events: e.target.value }))}
+            placeholder={t('devPortal.webhookEventsPlaceholder')}
+          />
+          <Input
+            label={t('devPortal.webhookSecret')}
+            value={webhookForm.secret}
+            onChange={(e) => setWebhookForm((prev) => ({ ...prev, secret: e.target.value }))}
+          />
         </div>
       </Modal>
     </div>
