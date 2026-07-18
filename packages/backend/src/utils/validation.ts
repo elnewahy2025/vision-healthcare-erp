@@ -559,4 +559,20 @@ export const trackUsageSchema = z.object({
   metric: z.string().min(1).max(100),
   quantity: z.number().int().min(1).default(1),
   recordDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});\n\n\n// ── White-Label ──
+export const updateBrandingSchema = z.object({
+  brandName: z.string().max(200).optional(),
+  logoUrl: z.string().url().optional().nullable(),
+  faviconUrl: z.string().url().optional().nullable(),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  fontFamily: z.string().max(100).optional(),
+  customCss: z.string().max(50000).optional().nullable(),
+  customJs: z.string().max(50000).optional().nullable(),
+});
+
+export const addDomainSchema = z.object({
+  domain: z.string().min(3).max(253).regex(/^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)*\.[a-z]{2,}$/i),
+  isPrimary: z.boolean().optional().default(false),
 });\n
