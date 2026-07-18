@@ -575,4 +575,55 @@ export const updateBrandingSchema = z.object({
 export const addDomainSchema = z.object({
   domain: z.string().min(3).max(253).regex(/^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)*\.[a-z]{2,}$/i),
   isPrimary: z.boolean().optional().default(false),
+});\n\n\n// ── Compliance Reports ──
+export const createComplianceReportSchema = z.object({
+  title: z.string().min(1).max(200),
+  type: z.enum(['internal', 'external', 'regulatory', 'hipaa', 'gdpr']).default('internal'),
+  periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  data: z.record(z.unknown()).optional(),
+  format: z.enum(['pdf', 'csv', 'json']).default('pdf'),
+});
+
+export const updateComplianceReportSchema = z.object({
+  status: z.enum(['draft', 'generated', 'reviewed', 'archived']).optional(),
+  findings: z.string().max(10000).optional(),
+  recommendations: z.string().max(10000).optional(),
+});
+
+export const hipaaAuditQuerySchema = z.object({
+  entity: z.string().max(100).optional(),
+  days: z.coerce.number().int().min(1).max(365).default(90),
+  userId: z.string().uuid().optional(),
+});
+
+export const createRetentionPolicySchema = z.object({
+  entity: z.string().min(1).max(100),
+  retentionDays: z.number().int().min(1).max(3650).default(365),
+  action: z.enum(['archive', 'delete', 'anonymize', 'notify']).default('archive'),
+  isActive: z.boolean().optional(),
+});
+
+export const updateRetentionPolicySchema = z.object({
+  retentionDays: z.number().int().min(1).max(3650).optional(),
+  action: z.enum(['archive', 'delete', 'anonymize', 'notify']).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const createBaaSchema = z.object({
+  organizationName: z.string().min(1).max(200),
+  contactName: z.string().max(200).optional(),
+  contactEmail: z.string().email().optional(),
+  scope: z.string().max(2000).optional(),
+  executedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  status: z.enum(['draft', 'executed', 'expired', 'terminated']).default('draft'),
+  terms: z.string().max(50000).optional(),
+});
+
+export const updateBaaSchema = z.object({
+  status: z.enum(['draft', 'executed', 'expired', 'terminated']).optional(),
+  scope: z.string().max(2000).optional(),
+  terms: z.string().max(50000).optional(),
+  expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });\n

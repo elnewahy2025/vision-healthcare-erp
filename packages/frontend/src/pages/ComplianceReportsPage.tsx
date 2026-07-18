@@ -1,148 +1,440 @@
 import { useState, useEffect } from 'react';
-import { Spinner, Badge, Card, CardBody, Button, Input, Modal } from '../components/ui';
-import { ScrollText, Plus, Search, Shield, FileText, UserCheck, Clock } from 'lucide-react';
-import api from '../lib/api';
+import { useTranslation } from 'react-i18next';
+import {
+  complianceApi,
+  type ComplianceReport,
+  type HipaaSummary,
+  type HipaaAuditLog,
+  type RetentionPolicy,
+  type Baa,
+} from '../lib/api';
+import { escapeHtml } from '../lib/sanitize';
+import {
+  Modal,
+  Button,
+  Badge,
+  EmptyState,
+  PageLoader,
+} from '../components/ui';
+import {
+  ScrollText,
+  Shield,
+  FileText,
+  UserCheck,
+  Clock,
+  AlertTriangle,
+} from 'lucide-react';
+
+
+type TabType = 'reports' | 'hipaa' | 'retention' | 'baa';
+
+const STATUS_VARIANT: Record<string, 'success' | 'danger' | 'warning' | 'gray'> = {
+  generated: 'success',
+  executed: 'success',
+  active: 'success',
+  draft: 'warning',
+  pending: 'warning',
+  expired: 'danger',
+  inactive: 'gray',
+  archived: 'gray',
+};
 
 export default function ComplianceReportsPage() {
-  const [tab, setTab] = useState<'reports' | 'hipaa' | 'retention' | 'baa'>('reports');
-  const [reports, setReports] = useState<any[]>([]);
-  const [hipaaSummary, setHipaaSummary] = useState<any>(null);
-  const [hipaaLogs, setHipaaLogs] = useState<any[]>([]);
-  const [policies, setPolicies] = useState<any[]>([]);
-  const [baas, setBaas] = useState<any[]>([]);
+  const { t } = useTranslation();
+
+  const [tab, setTab] = useState<TabType>('reports');
   const [loading, setLoading] = useState(true);
-  const [selectedReport, setSelectedReport] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [reports, setReports] = useState<ComplianceReport[]>([]);
+  const [hipaaSummary, setHipaaSummary] = useState<HipaaSummary | null>(null);
+  const [hipaaLogs, setHipaaLogs] = useState<HipaaAuditLog[]>([]);
+  const [policies, setPolicies] = useState<RetentionPolicy[]>([]);
+  const [baas, setBaas] = useState<Baa[]>([]);
+
+  // Modal state for report detail
+  const [selectedReport, setSelectedReport] = useState<ComplianceReport | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      api.get('/compliance/reports').then(r => setReports(r.data.data)).catch(() => []),
-      api.get('/compliance/hipaa-summary').then(r => setHipaaSummary(r.data.data)).catch(() => null),
-      api.get('/compliance/hipaa-audit').then(r => setHipaaLogs(r.data.data)).catch(() => []),
-      api.get('/compliance/retention-policies').then(r => setPolicies(r.data.data)).catch(() => []),
-      api.get('/compliance/baa').then(r => setBaas(r.data.data)).catch(() => []),
-    ]).finally(() => setLoading(false));
-  }, []);
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [repRes, hipaaRes, logsRes, polRes, baaRes] =
+          await Promise.allSettled([
+            complianceApi.listReports(),
+            complianceApi.hipaaSummary(),
+            complianceApi.hipaaAudit(),
+            complianceApi.listRetentionPolicies(),
+            complianceApi.listBaas(),
+          ]);
+        if (cancelled) return;
+        if (repRes.status === 'fulfilled') setReports(repRes.value);
+        if (hipaaRes.status === 'fulfilled') setHipaaSummary(hipaaRes.value);
+        if (logsRes.status === 'fulfilled') setHipaaLogs(logsRes.value);
+        if (polRes.status === 'fulfilled') setPolicies(polRes.value);
+        if (baaRes.status === 'fulfilled') setBaas(baaRes.value);
+        if (repRes.status === 'rejected') {
+          setError(t('compRep.loadFailed'));
+        }
+      } catch {
+        if (!cancelled) setError(t('compRep.loadFailed'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void run();
+    return () => { cancelled = true; };
+  }, [t]);
 
-  if (loading) return <Spinner size="lg" className="py-16" />;
+  if (loading) {
+    return <PageLoader message={t('common.loading')} />;
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <EmptyState
+          icon={<AlertTriangle className="w-12 h-12 text-red-400" />}
+          title={t('common.error')}
+          message={error}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="page-header">
-        <div><h1 className="page-title">Compliance & Audit</h1><p className="text-gray-500 mt-1">{reports.length} reports · {baas.length} BAAs</p></div>
-        <Button><Plus className="w-4 h-4" /> New Report</Button>
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <ScrollText className="w-6 h-6" /> {t('compRep.title')}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {t('compRep.reportCount', { count: reports.length })} ·{' '}
+            {t('compRep.baaCount', { count: baas.length })}
+          </p>
+        </div>
       </div>
 
+      {/* Tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
-        <Button variant={tab === 'reports' ? 'primary' : 'secondary'} onClick={() => setTab('reports')}><FileText className="w-4 h-4" /> Reports ({reports.length})</Button>
-        <Button variant={tab === 'hipaa' ? 'primary' : 'secondary'} onClick={() => setTab('hipaa')}><Shield className="w-4 h-4" /> HIPAA Audit</Button>
-        <Button variant={tab === 'retention' ? 'primary' : 'secondary'} onClick={() => setTab('retention')}><Clock className="w-4 h-4" /> Retention ({policies.length})</Button>
-        <Button variant={tab === 'baa' ? 'primary' : 'secondary'} onClick={() => setTab('baa')}><UserCheck className="w-4 h-4" /> BAA ({baas.length})</Button>
+        <Button
+          variant={tab === 'reports' ? 'primary' : 'secondary'}
+          onClick={() => setTab('reports')}
+        >
+          <FileText className="w-4 h-4" />
+          <span className="ml-1">{t('compRep.reports')} ({reports.length})</span>
+        </Button>
+        <Button
+          variant={tab === 'hipaa' ? 'primary' : 'secondary'}
+          onClick={() => setTab('hipaa')}
+        >
+          <Shield className="w-4 h-4" /> {t('compRep.hipaa')}
+        </Button>
+        <Button
+          variant={tab === 'retention' ? 'primary' : 'secondary'}
+          onClick={() => setTab('retention')}
+        >
+          <Clock className="w-4 h-4" />
+          <span className="ml-1">{t('compRep.retention')} ({policies.length})</span>
+        </Button>
+        <Button
+          variant={tab === 'baa' ? 'primary' : 'secondary'}
+          onClick={() => setTab('baa')}
+        >
+          <UserCheck className="w-4 h-4" />
+          <span className="ml-1">{t('compRep.baa')} ({baas.length})</span>
+        </Button>
       </div>
 
+      {/* Reports Tab */}
       {tab === 'reports' && (
-        <div className="table-container">
-          <table>
-            <thead><tr><th>Title</th><th>Type</th><th>Period</th><th>Status</th><th>Generated</th><th>Actions</th></tr></thead>
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-gray-50">
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.title2')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.type')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.period')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.generated')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.actions')}</th>
+              </tr>
+            </thead>
             <tbody>
-              {reports.length === 0 ? <tr><td colSpan={6} className="text-center py-12 text-gray-500">No compliance reports</td></tr> :
-                reports.map((r: any) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="font-medium">{r.title}</td>
-                    <td><Badge>{r.type}</Badge></td>
-                    <td className="text-xs">{r.periodStart} → {r.periodEnd}</td>
-                    <td><Badge variant={r.status === 'generated' ? 'success' : r.status === 'draft' ? 'warning' : 'gray'}>{r.status}</Badge></td>
-                    <td className="text-xs">{r.generatedAt?.split('T')[0] || '-'}</td>
-                    <td><Button variant="ghost" size="sm" onClick={() => setSelectedReport(r)}>View</Button></td>
+              {reports.length === 0 ? (
+                <tr>
+                  <td colSpan={6}>
+                    <EmptyState
+                      icon={<FileText className="w-12 h-12 text-gray-300" />}
+                      title={t('compRep.noReports')}
+                      message={t('common.noData')}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                reports.map((r) => (
+                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <td className="p-3 text-sm font-medium">{escapeHtml(r.title)}</td>
+                    <td className="p-3"><Badge>{escapeHtml(r.type)}</Badge></td>
+                    <td className="p-3 text-xs">
+                      {escapeHtml(r.periodStart)} → {escapeHtml(r.periodEnd)}
+                    </td>
+                    <td className="p-3">
+                      <Badge variant={STATUS_VARIANT[r.status] ?? 'gray'}>
+                        {escapeHtml(r.status)}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-xs">
+                      {r.generatedAt?.split('T')[0] ?? '-'}
+                    </td>
+                    <td className="p-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedReport(r)}
+                      >
+                        {t('common.view')}
+                      </Button>
+                    </td>
                   </tr>
-                ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
       )}
 
+      {/* HIPAA Audit Tab */}
       {tab === 'hipaa' && (
         <div>
+          {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card><CardBody><p className="text-sm text-gray-500">Events (90d)</p><p className="text-2xl font-bold">{hipaaSummary?.totalEvents || 0}</p></CardBody></Card>
-            <Card><CardBody><p className="text-sm text-gray-500">Unique Users</p><p className="text-2xl font-bold">{hipaaSummary?.uniqueUsers || 0}</p></CardBody></Card>
-            <Card><CardBody><p className="text-sm text-gray-500">Top Action</p><p className="text-lg font-bold">{hipaaSummary?.byAction?.[0]?.action || '-'}</p></CardBody></Card>
-            <Card><CardBody><p className="text-sm text-gray-500">Top Entity</p><p className="text-lg font-bold">{hipaaSummary?.byEntity?.[0]?.entity || '-'}</p></CardBody></Card>
+            <div className="bg-white rounded-lg border p-4">
+              <p className="text-sm text-gray-500">{t('compRep.events90d')}</p>
+              <p className="text-2xl font-bold">{hipaaSummary?.totalEvents ?? 0}</p>
+            </div>
+            <div className="bg-white rounded-lg border p-4">
+              <p className="text-sm text-gray-500">{t('compRep.uniqueUsers')}</p>
+              <p className="text-2xl font-bold">{hipaaSummary?.uniqueUsers ?? 0}</p>
+            </div>
+            <div className="bg-white rounded-lg border p-4">
+              <p className="text-sm text-gray-500">{t('compRep.topAction')}</p>
+              <p className="text-lg font-bold">
+                {hipaaSummary?.byAction?.[0]?.action ?? '-'}
+              </p>
+            </div>
+            <div className="bg-white rounded-lg border p-4">
+              <p className="text-sm text-gray-500">{t('compRep.topEntity')}</p>
+              <p className="text-lg font-bold">
+                {hipaaSummary?.byEntity?.[0]?.entity ?? '-'}
+              </p>
+            </div>
           </div>
 
-          <Card className="mb-4"><CardBody><h3 className="font-semibold mb-2">Actions Breakdown</h3>
+          {/* Actions Breakdown */}
+          <div className="bg-white rounded-lg border p-4 mb-4">
+            <h3 className="font-semibold mb-2">{t('compRep.actionsBreakdown')}</h3>
             <div className="flex gap-2 flex-wrap">
-              {(hipaaSummary?.byAction || []).map((a: any) => <Badge key={a.action}>{a.action}: {a.count}</Badge>)}
-              {!hipaaSummary?.byAction?.length && <p className="text-sm text-gray-500">No data</p>}
+              {(hipaaSummary?.byAction ?? []).length > 0 ? (
+                hipaaSummary!.byAction.map((a) => (
+                  <Badge key={a.action}>{escapeHtml(a.action)}: {a.count}</Badge>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">{t('common.noData')}</p>
+              )}
             </div>
-          </CardBody></Card>
+          </div>
 
-          <div className="table-container">
-            <table><thead><tr><th>Action</th><th>Entity</th><th>Entity ID</th><th>User</th><th>IP</th><th>Timestamp</th></tr></thead>
+          {/* Audit Logs Table */}
+          <div className="bg-white rounded-lg border overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-gray-50">
+                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.action')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.entity')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.entityId')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.user')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.ip')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.timestamp')}</th>
+                </tr>
+              </thead>
               <tbody>
-                {hipaaLogs.length === 0 ? <tr><td colSpan={6} className="text-center py-8 text-gray-500">No audit logs</td></tr> :
-                  hipaaLogs.slice(0, 50).map((l: any) => (
-                    <tr key={l.id} className="hover:bg-gray-50">
-                      <td><Badge>{l.action}</Badge></td>
-                      <td className="text-xs">{l.entity}</td>
-                      <td className="font-mono text-xs">{l.entityId?.slice(0, 8) || '-'}</td>
-                      <td className="text-xs">{l.userId?.slice(0, 8) || '-'}</td>
-                      <td className="text-xs">{l.ip || '-'}</td>
-                      <td className="text-xs">{l.timestamp?.split('T')[0]}</td>
+                {hipaaLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>
+                      <EmptyState
+                        icon={<Shield className="w-12 h-12 text-gray-300" />}
+                        title={t('compRep.noAuditLogs')}
+                        message={t('common.noData')}
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  hipaaLogs.slice(0, 50).map((l) => (
+                    <tr key={l.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                      <td className="p-3"><Badge>{escapeHtml(l.action)}</Badge></td>
+                      <td className="p-3 text-xs">{escapeHtml(l.entity)}</td>
+                      <td className="p-3 font-mono text-xs">
+                        {l.entityId ? escapeHtml(l.entityId.slice(0, 8)) : '-'}
+                      </td>
+                      <td className="p-3 text-xs">
+                        {l.userId ? escapeHtml(l.userId.slice(0, 8)) : '-'}
+                      </td>
+                      <td className="p-3 text-xs">{escapeHtml(l.ip || '-')}</td>
+                      <td className="p-3 text-xs">
+                        {l.timestamp?.split('T')[0] ?? '-'}
+                      </td>
                     </tr>
-                  ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
+      {/* Retention Tab */}
       {tab === 'retention' && (
-        <div className="table-container">
-          <table><thead><tr><th>Entity</th><th>Retention</th><th>Action</th><th>Active</th><th>Last Cleanup</th></tr></thead>
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-gray-50">
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.entity')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.retentionDays')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.action')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.lastCleanup')}</th>
+              </tr>
+            </thead>
             <tbody>
-              {policies.length === 0 ? <tr><td colSpan={5} className="text-center py-12 text-gray-500">No retention policies</td></tr> :
-                policies.map((p: any) => (
-                  <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="font-medium">{p.entity}</td>
-                    <td>{p.retentionDays} days</td>
-                    <td><Badge>{p.action}</Badge></td>
-                    <td><Badge variant={p.isActive ? 'success' : 'gray'}>{p.isActive ? 'Active' : 'Inactive'}</Badge></td>
-                    <td className="text-xs">{p.lastCleanupAt?.split('T')[0] || 'Never'}</td>
+              {policies.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>
+                    <EmptyState
+                      icon={<Clock className="w-12 h-12 text-gray-300" />}
+                      title={t('compRep.noRetention')}
+                      message={t('common.noData')}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                policies.map((p) => (
+                  <tr key={p.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <td className="p-3 text-sm font-medium">{escapeHtml(p.entity)}</td>
+                    <td className="p-3">
+                      {p.retentionDays} {t('compRep.days')}
+                    </td>
+                    <td className="p-3"><Badge>{escapeHtml(p.action)}</Badge></td>
+                    <td className="p-3">
+                      <Badge variant={p.isActive ? 'success' : 'gray'}>
+                        {p.isActive ? t('compRep.active') : t('compRep.inactive')}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-xs">
+                      {p.lastCleanupAt?.split('T')[0] ?? t('compRep.never')}
+                    </td>
                   </tr>
-                ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
       )}
 
+      {/* BAA Tab */}
       {tab === 'baa' && (
-        <div className="table-container">
-          <table><thead><tr><th>Organization</th><th>Contact</th><th>Executed</th><th>Expiry</th><th>Status</th></tr></thead>
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-gray-50">
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.organization')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.contact')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.executed')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.expiry')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.status')}</th>
+              </tr>
+            </thead>
             <tbody>
-              {baas.length === 0 ? <tr><td colSpan={5} className="text-center py-12 text-gray-500">No Business Associate Agreements</td></tr> :
-                baas.map((b: any) => (
-                  <tr key={b.id} className="hover:bg-gray-50">
-                    <td className="font-medium">{b.organizationName}</td>
-                    <td className="text-xs">{b.contactName || '-'} {b.contactEmail ? `<${b.contactEmail}>` : ''}</td>
-                    <td className="text-xs">{b.executedDate || '-'}</td>
-                    <td className="text-xs">{b.expiryDate || '-'}</td>
-                    <td><Badge variant={b.status === 'executed' ? 'success' : b.status === 'expired' ? 'danger' : 'warning'}>{b.status}</Badge></td>
+              {baas.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>
+                    <EmptyState
+                      icon={<UserCheck className="w-12 h-12 text-gray-300" />}
+                      title={t('compRep.noBaa')}
+                      message={t('common.noData')}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                baas.map((b) => (
+                  <tr key={b.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <td className="p-3 text-sm font-medium">{escapeHtml(b.organizationName)}</td>
+                    <td className="p-3 text-xs">
+                      {b.contactName ? escapeHtml(b.contactName) : '-'}
+                      {b.contactEmail ? ` <${escapeHtml(b.contactEmail)}>` : ''}
+                    </td>
+                    <td className="p-3 text-xs">{b.executedDate ?? '-'}</td>
+                    <td className="p-3 text-xs">{b.expiryDate ?? '-'}</td>
+                    <td className="p-3">
+                      <Badge variant={STATUS_VARIANT[b.status] ?? 'gray'}>
+                        {escapeHtml(b.status)}
+                      </Badge>
+                    </td>
                   </tr>
-                ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
       )}
 
-      {selectedReport && <Modal open={!!selectedReport} onClose={() => setSelectedReport(null)} title={selectedReport.title} size="md">
-        <div className="space-y-2 text-sm">
-          <p><strong>Type:</strong> {selectedReport.type}</p>
-          <p><strong>Period:</strong> {selectedReport.periodStart} → {selectedReport.periodEnd}</p>
-          <p><strong>Status:</strong> {selectedReport.status}</p>
-          {selectedReport.findings && <div><strong>Findings:</strong><p className="mt-1 p-2 bg-gray-50 rounded text-xs">{selectedReport.findings}</p></div>}
-          {selectedReport.recommendations && <div><strong>Recommendations:</strong><p className="mt-1 p-2 bg-gray-50 rounded text-xs">{selectedReport.recommendations}</p></div>}
-        </div>
-      </Modal>}
+      {/* Report Detail Modal */}
+      <Modal
+        open={!!selectedReport}
+        onClose={() => setSelectedReport(null)}
+        title={selectedReport?.title ?? ''}
+        size="md"
+      >
+        {selectedReport && (
+          <div className="space-y-2 text-sm">
+            <p>
+              <strong>{t('compRep.type')}:</strong>{' '}
+              {escapeHtml(selectedReport.type)}
+            </p>
+            <p>
+              <strong>{t('compRep.period')}:</strong>{' '}
+              {escapeHtml(selectedReport.periodStart)} →{' '}
+              {escapeHtml(selectedReport.periodEnd)}
+            </p>
+            <p>
+              <strong>{t('compRep.status')}:</strong>{' '}
+              <Badge variant={STATUS_VARIANT[selectedReport.status] ?? 'gray'}>
+                {escapeHtml(selectedReport.status)}
+              </Badge>
+            </p>
+            {selectedReport.findings && (
+              <div>
+                <strong>{t('compRep.findings')}:</strong>
+                <p className="mt-1 p-2 bg-gray-50 rounded text-xs">
+                  {escapeHtml(selectedReport.findings)}
+                </p>
+              </div>
+            )}
+            {selectedReport.recommendations && (
+              <div>
+                <strong>{t('compRep.recommendations')}:</strong>
+                <p className="mt-1 p-2 bg-gray-50 rounded text-xs">
+                  {escapeHtml(selectedReport.recommendations)}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
