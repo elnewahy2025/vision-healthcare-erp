@@ -507,4 +507,38 @@ export const insuranceClaimsListSchema = z.object({
   status: z.string().optional(),
   insuranceId: z.string().uuid().optional(),
   patientId: z.string().uuid().optional(),
+});\n\n// ── Integrations ──
+export const createIntegrationConnectionSchema = z.object({
+  definitionId: z.string().uuid(),
+  name: z.string().min(1).max(200),
+  credentials: z.record(z.unknown()).optional(),
+  config: z.record(z.unknown()).optional(),
+  isActive: z.boolean().optional(),
 });
+
+export const updateIntegrationConnectionSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  credentials: z.record(z.unknown()).optional(),
+  config: z.record(z.unknown()).optional(),
+  isActive: z.boolean().optional(),
+  status: z.enum(['connected', 'disconnected', 'error', 'pending']).optional(),
+});
+
+export const createWebhookSchema = z.object({
+  integrationId: z.string().uuid().optional().nullable(),
+  name: z.string().min(1).max(200),
+  url: z.string().url(),
+  events: z.array(z.string().max(100)).default(['*']),
+  headers: z.record(z.string()).optional(),
+  retryCount: z.number().int().min(0).max(10).default(3),
+  timeoutSeconds: z.number().int().min(1).max(300).default(30),
+});
+
+export const updateWebhookSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  url: z.string().url().optional(),
+  events: z.array(z.string().max(100)).optional(),
+  headers: z.record(z.string()).optional(),
+  status: z.enum(['active', 'disabled', 'paused']).optional(),
+  retryCount: z.number().int().min(0).max(10).optional(),
+});\n

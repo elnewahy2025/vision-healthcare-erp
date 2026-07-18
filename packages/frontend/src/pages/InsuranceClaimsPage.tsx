@@ -103,8 +103,15 @@ export default function InsuranceClaimsPage() {
     try {
       await claimsApi.submit(id);
       toast.success(t('insClaims.submittedSuccess'));
-      void loadClaims();
-      void loadSummary();
+      const [claimsRes, summaryRes] = await Promise.allSettled([
+        claimsApi.list({ page, limit: 15, status: statusFilter || undefined }),
+        claimsApi.summary(),
+      ]);
+      if (claimsRes.status === 'fulfilled') {
+        setClaims(claimsRes.value.data);
+        setPagination(claimsRes.value.pagination);
+      }
+      if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
     } catch {
       toast.error(t('insClaims.submitFailed'));
     }
@@ -131,8 +138,15 @@ export default function InsuranceClaimsPage() {
       toast.success(t('insClaims.statusUpdated'));
       setShowStatusModal(false);
       setSelectedClaim(null);
-      void loadClaims();
-      void loadSummary();
+      const [claimsRes, summaryRes] = await Promise.allSettled([
+        claimsApi.list({ page, limit: 15, status: statusFilter || undefined }),
+        claimsApi.summary(),
+      ]);
+      if (claimsRes.status === 'fulfilled') {
+        setClaims(claimsRes.value.data);
+        setPagination(claimsRes.value.pagination);
+      }
+      if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
     } catch {
       toast.error(t('insClaims.statusFailed'));
     } finally {
