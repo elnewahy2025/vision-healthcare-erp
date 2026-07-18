@@ -1,255 +1,529 @@
-import { useState, useEffect } from 'react';
-import { Card, CardBody, Button, Input, Select, Badge, Spinner, Modal } from '../components/ui';
-import { FileText, Download, Calendar, BarChart3, Plus, Clock, Play, Trash2, Eye, Settings } from 'lucide-react';
-import api from '../lib/api';
+import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
+import {
+  FileText, Download, Calendar, BarChart3, Clock,
+} from 'lucide-react';
+import {
+  Card, CardBody, Button, Input, Select, Badge, Table,
+  PageLoader, EmptyState, Modal,
+  type Column,
+} from '../components/ui';
+import api from '../lib/api';
+import { escapeHtml } from '../lib/sanitize';
 
-const REPORT_TYPES = [
-  { id: 'patient_summary', name: 'Patient Summary Report', description: 'Demographics, visits, and medical history overview' },
-  { id: 'financial_summary', name: 'Financial Summary', description: 'Revenue, expenses, and profit analysis' },
-  { id: 'appointment_report', name: 'Appointment Report', description: 'Bookings, cancellations, and no-shows' },
-  { id: 'insurance_claims', name: 'Insurance Claims Report', description: 'Claims status, amounts, and approval rates' },
-  { id: 'pharmacy_report', name: 'Pharmacy Dispensing', description: 'Medication dispensing and inventory' },
-  { id: 'lab_report', name: 'Laboratory Report', description: 'Tests performed and results summary' },
-  { id: 'doctor_performance', name: 'Doctor Performance', description: 'Appointments, revenue, and patient satisfaction per doctor' },
-  { id: 'branch_performance', name: 'Branch Performance', description: 'Comparative analysis across branches' },
-  { id: 'compliance_report', name: 'Compliance Report', description: 'Regulatory compliance and audit trails' },
-  { id: 'tax_report', name: 'Tax Report (Egypt)', description: 'VAT and income tax summary for Egypt' },
+/* ── Types ─────────────────────────────────────────────────────────── */
+
+type ReportTab = 'builder' | 'scheduled' | 'history';
+
+interface ReportDefinition {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  description: string | null;
+  exportFormats: string[];
+  isScheduled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ReportSchedule {
+  id: string;
+  reportId: string;
+  cron: string;
+  recipients: string[];
+  format: string;
+  isActive: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  createdAt: string;
+}
+
+interface ReportExecution {
+  id: string;
+  reportId: string;
+  status: string;
+  format: string;
+  error: string | null;
+  rowCount: number;
+  trigger: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+/* ── Constants ─────────────────────────────────────────────────────── */
+
+const EXPORT_FORMATS = [
+  { value: 'csv', label: 'CSV' },
+  { value: 'pdf', label: 'PDF' },
+  { value: 'excel', label: 'Excel' },
 ];
 
-const FORMATS = ['PDF', 'Excel', 'CSV'];
+const FREQUENCY_OPTIONS = [
+  { value: 'daily', label: 'advRep.daily' },
+  { value: 'weekly', label: 'advRep.weekly' },
+  { value: 'monthly', label: 'advRep.monthly' },
+  { value: 'quarterly', label: 'advRep.quarterly' },
+] as const;
+
+const DAY_OPTIONS = [
+  { value: 'monday', label: 'Monday' },
+  { value: 'tuesday', label: 'Tuesday' },
+  { value: 'wednesday', label: 'Wednesday' },
+  { value: 'thursday', label: 'Thursday' },
+  { value: 'friday', label: 'Friday' },
+  { value: 'saturday', label: 'Saturday' },
+  { value: 'sunday', label: 'Sunday' },
+];
+
+/* ── Helpers ───────────────────────────────────────────────────────── */
+
+function getStatusVariant(status: string): 'success' | 'warning' | 'danger' | 'info' | 'gray' {
+  const map: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'gray'> = {
+    completed: 'success',
+    pending: 'warning',
+    failed: 'danger',
+    running: 'info',
+    active: 'success',
+    paused: 'danger',
+  };
+  return map[status] ?? 'gray';
+}
+
+function buildCronExpression(frequency: string, day: string, time: string): string {
+  const [hours, minutes] = time.split(':');
+  switch (frequency) {
+    case 'daily': return `${minutes} ${hours} * * *`;
+    case 'weekly': {
+      const dayMap: Record<string, string> = {
+        monday: '1', tuesday: '2', wednesday: '3', thursday: '4',
+        friday: '5', saturday: '6', sunday: '0',
+      };
+      return `${minutes} ${hours} * * ${dayMap[day] ?? '1'}`;
+    }
+    case 'monthly': return `${minutes} ${hours} 1 * *`;
+    case 'quarterly': return `${minutes} ${hours} 1 1,4,7,10 *`;
+    default: return `${minutes} ${hours} * * 1`;
+  }
+}
+
+/* ── Component ─────────────────────────────────────────────────────── */
 
 export default function AdvancedReportingPage() {
-  const [tab, setTab] = useState<'builder' | 'scheduled' | 'history'>('builder');
-  const [selectedReport, setSelectedReport] = useState('');
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<ReportTab>('builder');
+  const [loading, setLoading] = useState(true);
+
+  /* ── Report data ── */
+  const [reportDefinitions, setReportDefinitions] = useState<ReportDefinition[]>([]);
+  const [selectedReportId, setSelectedReportId] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [format, setFormat] = useState('PDF');
+  const [format, setFormat] = useState('pdf');
   const [generating, setGenerating] = useState(false);
-  const [scheduledReports, setScheduledReports] = useState<any[]>([]);
-  const [reportHistory, setReportHistory] = useState<any[]>([]);
+
+  /* ── Scheduled reports ── */
+  const [schedules] = useState<ReportSchedule[]>([]);
+
+  /* ── Execution history ── */
+  const [executions, setExecutions] = useState<ReportExecution[]>([]);
+
+  /* ── Schedule modal ── */
   const [showSchedule, setShowSchedule] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({ frequency: 'weekly', day: 'monday', time: '09:00', email: '', format: 'PDF' });
+  const [scheduleForm, setScheduleForm] = useState({
+    frequency: 'weekly',
+    day: 'monday',
+    time: '09:00',
+    email: '',
+    format: 'pdf',
+  });
 
-  // Set default date range
+  /* ── Data fetching ── */
+
+  const fetchReportDefinitions = useCallback(async (): Promise<void> => {
+    try {
+      const { data } = await api.get('/reports');
+      setReportDefinitions((data.data ?? []) as ReportDefinition[]);
+    } catch {
+      toast.error(t('advRep.loadFailed'));
+    }
+  }, [t]);
+
+
+
+  /* ── Initial load ── */
+
   useEffect(() => {
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today); thirtyDaysAgo.setDate(today.getDate() - 30);
-    setDateTo(today.toISOString().split('T')[0]);
-    setDateFrom(thirtyDaysAgo.toISOString().split('T')[0]);
-  }, []);
+    let cancelled = false;
 
-  const generateReport = async () => {
-    if (!selectedReport) { toast.error('Please select a report type'); return; }
+    const init = async (): Promise<void> => {
+      setLoading(true);
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      setDateTo(today.toISOString().split('T')[0]);
+      setDateFrom(thirtyDaysAgo.toISOString().split('T')[0]);
+      await fetchReportDefinitions();
+      if (!cancelled) setLoading(false);
+    };
+
+    void init();
+    return () => { cancelled = true; };
+  }, [fetchReportDefinitions]);
+
+  /* ── Load executions when report is selected ── */
+
+  useEffect(() => {
+    if (!selectedReportId || tab !== 'history') return;
+    let cancelled = false;
+    const load = async (): Promise<void> => {
+      try {
+        const { data } = await api.get(`/reports/${selectedReportId}/executions`);
+        if (!cancelled) setExecutions((data.data ?? []) as ReportExecution[]);
+      } catch { /* non-critical */ }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [selectedReportId, tab]);
+
+  /* ── Actions ── */
+
+  const handleGenerate = useCallback(async (): Promise<void> => {
+    if (!selectedReportId) {
+      toast.error(t('advRep.selectReport'));
+      return;
+    }
     setGenerating(true);
     try {
-      const { data } = await api.post('/reports/generate', {
-        type: selectedReport, date_from: dateFrom, date_to: dateTo, format,
-      });
-      // Trigger download
-      if (data.download_url) {
-        window.open(data.download_url, '_blank');
+      await api.post(`/reports/${selectedReportId}/execute`, { format });
+      toast.success(t('advRep.reportGenerated'));
+      if (tab === 'history') {
+        try {
+          const { data } = await api.get(`/reports/${selectedReportId}/executions`);
+          setExecutions((data.data ?? []) as ReportExecution[]);
+        } catch { /* non-critical */ }
       }
-      toast.success('Report generated successfully');
-      setReportHistory(prev => [{ id: Date.now(), type: selectedReport, format, date_from: dateFrom, date_to: dateTo, created_at: new Date().toISOString(), status: 'completed' }, ...prev]);
-    } catch (e: any) {
-      // Generate client-side fallback
-      generateClientReport();
+    } catch {
+      toast.error(t('advRep.reportGenerateFailed'));
+    } finally {
+      setGenerating(false);
     }
-    setGenerating(false);
-  };
+  }, [selectedReportId, format, t, tab]);
 
-  const generateClientReport = () => {
-    const reportData = generateMockReportData(selectedReport);
-    if (format === 'CSV') {
-      downloadCSV(reportData);
-    } else {
-      generatePDFReport(reportData);
-    }
-    setReportHistory(prev => [{ id: Date.now(), type: selectedReport, format, date_from: dateFrom, date_to: dateTo, created_at: new Date().toISOString(), status: 'completed' }, ...prev]);
-    toast.success('Report generated successfully');
-  };
-
-  const generateMockReportData = (type: string) => {
-    const report = REPORT_TYPES.find(r => r.id === type);
-    return {
-      title: report?.name || type,
-      dateRange: `${dateFrom} to ${dateTo}`,
-      generatedAt: new Date().toISOString(),
-      rows: [
-        ['Metric', 'Value'],
-        ['Report Type', report?.name || type],
-        ['Period', `${dateFrom} to ${dateTo}`],
-        ['Organization', 'Vision Healthcare'],
-        ['Total Patients', '1,245'],
-        ['Total Appointments', '3,892'],
-        ['Revenue (EGP)', '2,450,000'],
-        ['Appointments Today', '47'],
-        ['Pending Bills', '89'],
-        ['Active Doctors', '12'],
-        ['Department Visits', '856'],
-        ['Insurance Claims', '234'],
-        ['Pharmacy Dispensings', '1,567'],
-      ]
-    };
-  };
-
-  const downloadCSV = (data: any) => {
-    const csv = data.rows.map((r: any) => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `${data.title.replace(/\s+/g, '-').toLowerCase()}.csv`; a.click();
-  };
-
-  const generatePDFReport = (data: any) => {
-    const content = `<!DOCTYPE html><html><head><title>${data.title}</title>
-      <style>body{font-family:Arial,sans-serif;padding:40px}h1{color:#1e40af}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{padding:8px 12px;border:1px solid #ddd;text-align:left}th{background:#f3f4f6;font-weight:bold}.header{border-bottom:2px solid #1e40af;padding-bottom:10px}</style>
-      </head><body><div class="header"><h1>${data.title}</h1><p>Period: ${data.dateRange} | Generated: ${new Date().toLocaleDateString()}</p></div>
-      <table>${data.rows.slice(1).map((r: any[]) => `<tr><td><strong>${r[0]}</strong></td><td>${r[1]}</td></tr>`).join('')}</table>
-      <p style="color:#888;margin-top:40px">Vision Healthcare ERP — Confidential Report</p></body></html>`;
-    const blob = new Blob([content], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `${data.title.replace(/\s+/g, '-').toLowerCase()}.html`; a.click();
-  };
-
-  const scheduleReport = async () => {
+  const handleSchedule = useCallback(async (): Promise<void> => {
+    if (!selectedReportId) return;
+    const cron = buildCronExpression(scheduleForm.frequency, scheduleForm.day, scheduleForm.time);
     try {
-      await api.post('/reports/schedule', { report_type: selectedReport, ...scheduleForm });
-      toast.success('Report scheduled');
-      setScheduledReports(prev => [...prev, { id: Date.now(), report_type: selectedReport, ...scheduleForm, active: true }]);
+      await api.post(`/reports/${selectedReportId}/schedules`, {
+        cron,
+        recipients: scheduleForm.email
+          ? scheduleForm.email.split(',').map((e) => e.trim()).filter(Boolean)
+          : [],
+        format: scheduleForm.format,
+      });
+      toast.success(t('advRep.scheduleSuccess'));
       setShowSchedule(false);
     } catch {
-      setScheduledReports(prev => [...prev, { id: Date.now(), report_type: selectedReport, ...scheduleForm, active: true }]);
-      toast.success('Report scheduled');
-      setShowSchedule(false);
+      toast.error(t('advRep.reportGenerateFailed'));
     }
-  };
+  }, [selectedReportId, scheduleForm, t]);
+
+  /* ── Derived data ── */
+
+  /* ── Table columns ── */
+
+  const scheduleColumns: Column<ReportSchedule>[] = [
+    {
+      key: 'reportId',
+      header: t('advRep.report'),
+      render: (item) => {
+        const report = reportDefinitions.find((r) => r.id === item.reportId);
+        return <span className="font-medium">{escapeHtml(report?.name ?? item.reportId)}</span>;
+      },
+    },
+    {
+      key: 'cron',
+      header: t('advRep.frequency'),
+      render: (item) => <Badge variant="info">{escapeHtml(item.cron)}</Badge>,
+    },
+    {
+      key: 'recipients',
+      header: t('advRep.email'),
+      render: (item) => <span>{escapeHtml(item.recipients?.join(', ') || '-')}</span>,
+    },
+    {
+      key: 'isActive',
+      header: t('advRep.status'),
+      render: (item) => (
+        <Badge variant={item.isActive ? 'success' : 'danger'}>
+          {item.isActive ? t('advRep.active') : t('advRep.paused')}
+        </Badge>
+      ),
+    },
+  ];
+
+  const executionColumns: Column<ReportExecution>[] = [
+    {
+      key: 'createdAt',
+      header: t('advRep.generated'),
+      render: (item) => <span>{escapeHtml(item.createdAt?.split('T')[0] ?? '-')}</span>,
+    },
+    {
+      key: 'format',
+      header: t('advRep.formatCol'),
+      render: (item) => <Badge>{escapeHtml(item.format?.toUpperCase() ?? '-')}</Badge>,
+    },
+    {
+      key: 'status',
+      header: t('advRep.status'),
+      render: (item) => (
+        <Badge variant={getStatusVariant(item.status)}>{item.status}</Badge>
+      ),
+    },
+    {
+      key: 'rowCount',
+      header: 'Rows',
+      render: (item) => <span>{item.rowCount ?? 0}</span>,
+    },
+  ];
+
+  /* ── Tabs ── */
+
+  const tabs: Array<{ key: ReportTab; icon: React.ReactNode; label: string }> = [
+    { key: 'builder', icon: <BarChart3 className="w-4 h-4" />, label: t('advRep.builderTab') },
+    { key: 'scheduled', icon: <Clock className="w-4 h-4" />, label: t('advRep.scheduledTab') },
+    { key: 'history', icon: <Calendar className="w-4 h-4" />, label: t('advRep.historyTab') },
+  ];
+
+  /* ── Render ── */
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Advanced Reporting Engine</h1>
-          <p className="text-sm text-gray-500 mt-1">Generate, schedule, and export reports in multiple formats</p>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <BarChart3 className="w-6 h-6 text-primary-600" />
+          {t('advRep.title')}
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">{t('advRep.subtitle')}</p>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {[
-          { key: 'builder', label: 'Report Builder', icon: Settings },
-          { key: 'scheduled', label: `Scheduled (${scheduledReports.length})`, icon: Clock },
-          { key: 'history', label: 'History', icon: FileText },
-        ].map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key as any)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap ${tab === t.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-            <t.icon className="w-4 h-4" /> {t.label}
+      {/* Tab Navigation */}
+      <div className="flex gap-2 border-b border-gray-200 pb-2">
+        {tabs.map((tabItem) => (
+          <button
+            key={tabItem.key}
+            onClick={() => setTab(tabItem.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === tabItem.key
+                ? 'bg-primary-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {tabItem.icon}
+            {tabItem.label}
           </button>
         ))}
       </div>
 
-      {/* Report Builder */}
-      {tab === 'builder' && (
-        <Card><CardBody className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1">
-              <h3 className="font-semibold text-gray-900 mb-3">Report Type</h3>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {REPORT_TYPES.map((r) => (
-                  <button key={r.id} onClick={() => setSelectedReport(r.id)}
-                    className={`w-full p-3 rounded-lg border text-left ${selectedReport === r.id ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'}`}>
-                    <p className="font-medium text-sm">{r.name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{r.description}</p>
-                  </button>
-                ))}
-              </div>
+      {/* Content */}
+      {loading ? (
+        <PageLoader message={t('common.loading')} />
+      ) : (
+        <>
+          {/* ── REPORT BUILDER ── */}
+          {tab === 'builder' && (
+            <Card>
+              <CardBody className="p-6">
+                {reportDefinitions.length === 0 ? (
+                  <EmptyState
+                    icon={<FileText className="w-8 h-8 text-gray-400" />}
+                    title={t('advRep.noReports')}
+                    message={t('advRep.loadFailed')}
+                  />
+                ) : (
+                  <div className="space-y-6">
+                    {/* Report Type Selection */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">{t('advRep.reportTypes')}</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {reportDefinitions.map((report) => (
+                          <button
+                            key={report.id}
+                            onClick={() => setSelectedReportId(report.id)}
+                            className={`p-4 rounded-xl border-2 text-left transition-all ${
+                              selectedReportId === report.id
+                                ? 'border-primary-600 bg-primary-50 shadow-md'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
+                                <FileText className="w-5 h-5 text-primary-600" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-medium text-gray-900 truncate">
+                                  {escapeHtml(report.name)}
+                                </p>
+                                {report.description && (
+                                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                    {escapeHtml(report.description)}
+                                  </p>
+                                )}
+                                <div className="flex gap-1 mt-2">
+                                  {report.exportFormats?.map((f) => (
+                                    <Badge key={f} variant="gray">{f.toUpperCase()}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Date Range & Generate */}
+                    {selectedReportId && (
+                      <div className="border-t border-gray-200 pt-4">
+                        <div className="flex flex-wrap items-end gap-4">
+                          <Input
+                            label={t('advRep.dateFrom')}
+                            type="date"
+                            value={dateFrom}
+                            onChange={(e) => setDateFrom(e.target.value)}
+                          />
+                          <Input
+                            label={t('advRep.dateTo')}
+                            type="date"
+                            value={dateTo}
+                            onChange={(e) => setDateTo(e.target.value)}
+                          />
+                          <Select
+                            label={t('advRep.format')}
+                            value={format}
+                            onChange={(e) => setFormat(e.target.value)}
+                            options={EXPORT_FORMATS}
+                          />
+                          <Button
+                            onClick={() => void handleGenerate()}
+                            loading={generating}
+                            disabled={generating}
+                          >
+                            <Download className="w-4 h-4 mr-1" />
+                            {t('advRep.generate')}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={() => setShowSchedule(true)}
+                          >
+                            <Clock className="w-4 h-4 mr-1" />
+                            {t('advRep.schedule')}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+          )}
+
+          {/* ── SCHEDULED REPORTS ── */}
+          {tab === 'scheduled' && (
+            <Card>
+              <CardBody className="p-0">
+                <Table<ReportSchedule>
+                  columns={scheduleColumns}
+                  data={schedules}
+                  loading={false}
+                  emptyMessage={t('advRep.noScheduled')}
+                />
+              </CardBody>
+            </Card>
+          )}
+
+          {/* ── EXECUTION HISTORY ── */}
+          {tab === 'history' && (
+            <div className="space-y-4">
+              <Select
+                label={t('advRep.selectReport')}
+                value={selectedReportId}
+                onChange={(e) => setSelectedReportId(e.target.value)}
+                options={[
+                  { value: '', label: t('advRep.chooseReport') },
+                  ...reportDefinitions.map((r) => ({ value: r.id, label: r.name })),
+                ]}
+              />
+              <Card>
+                <CardBody className="p-0">
+                  <Table<ReportExecution>
+                    columns={executionColumns}
+                    data={executions}
+                    loading={false}
+                    emptyMessage={t('advRep.noHistory')}
+                  />
+                </CardBody>
+              </Card>
             </div>
-            <div className="lg:col-span-2">
-              <h3 className="font-semibold text-gray-900 mb-3">Configure & Generate</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                <Input label="From" type="date" value={dateFrom} onChange={(e: any) => setDateFrom(e.target.value)} />
-                <Input label="To" type="date" value={dateTo} onChange={(e: any) => setDateTo(e.target.value)} />
-                <Select label="Format" value={format} onChange={(e: any) => setFormat(e.target.value)} options={FORMATS.map(f => ({value:f, label:f}))} />
-              </div>
-              <div className="flex gap-3">
-                <Button onClick={generateReport} disabled={generating || !selectedReport} className="flex items-center gap-2">
-                  {generating ? <Spinner /> : <Play className="w-4 h-4" />} Generate Report
-                </Button>
-                <Button variant="secondary" onClick={() => setShowSchedule(true)} disabled={!selectedReport} className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> Schedule
-                </Button>
-              </div>
-            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Schedule Modal ── */}
+      <Modal
+        open={showSchedule}
+        onClose={() => setShowSchedule(false)}
+        title={t('advRep.scheduleReport')}
+        size="md"
+        footer={
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" onClick={() => setShowSchedule(false)}>
+              {t('advRep.cancel')}
+            </Button>
+            <Button onClick={() => void handleSchedule()}>
+              {t('advRep.scheduleNow')}
+            </Button>
           </div>
-        </CardBody></Card>
-      )}
-
-      {/* Scheduled Reports */}
-      {tab === 'scheduled' && (
-        <Card><CardBody className="p-0">
-          {scheduledReports.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No scheduled reports yet</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50"><tr>
-                <th className="px-4 py-3 text-left">Report</th><th className="px-4 py-3 text-left">Frequency</th>
-                <th className="px-4 py-3 text-left">Day/Time</th><th className="px-4 py-3 text-left">Email</th>
-                <th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-left">Action</th>
-              </tr></thead>
-              <tbody>{scheduledReports.map((s: any) => (
-                <tr key={s.id} className="border-t border-gray-100">
-                  <td className="px-4 py-3 font-medium">{REPORT_TYPES.find(r => r.id === s.report_type)?.name || s.report_type}</td>
-                  <td className="px-4 py-3"><Badge>{s.frequency}</Badge></td>
-                  <td className="px-4 py-3">{s.day} at {s.time}</td>
-                  <td className="px-4 py-3">{s.email || 'N/A'}</td>
-                  <td className="px-4 py-3"><Badge variant={s.active ? 'success' : 'danger'}>{s.active ? 'Active' : 'Paused'}</Badge></td>
-                  <td className="px-4 py-3"><Button size="sm" variant="danger" onClick={() => setScheduledReports(prev => prev.filter(x => x.id !== s.id))}><Trash2 className="w-3.5 h-3.5" /></Button></td>
-                </tr>
-              ))}</tbody>
-            </table>
-          )}
-        </CardBody></Card>
-      )}
-
-      {/* Report History */}
-      {tab === 'history' && (
-        <Card><CardBody className="p-0">
-          {reportHistory.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No reports generated yet</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50"><tr>
-                <th className="px-4 py-3 text-left">Report</th><th className="px-4 py-3 text-left">Format</th>
-                <th className="px-4 py-3 text-left">Period</th><th className="px-4 py-3 text-left">Generated</th>
-                <th className="px-4 py-3 text-left">Status</th>
-              </tr></thead>
-              <tbody>{reportHistory.map((r: any) => (
-                <tr key={r.id} className="border-t border-gray-100">
-                  <td className="px-4 py-3 font-medium">{REPORT_TYPES.find(rt => rt.id === r.type)?.name || r.type}</td>
-                  <td className="px-4 py-3"><Badge>{r.format}</Badge></td>
-                  <td className="px-4 py-3">{r.date_from} to {r.date_to}</td>
-                  <td className="px-4 py-3">{new Date(r.created_at).toLocaleString()}</td>
-                  <td className="px-4 py-3"><Badge variant="success">{r.status}</Badge></td>
-                </tr>
-              ))}</tbody>
-            </table>
-          )}
-        </CardBody></Card>
-      )}
-
-      {/* Schedule Modal */}
-      <Modal open={showSchedule} onClose={() => setShowSchedule(false)} title="Schedule Report">
+        }
+      >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <Select label="Frequency" value={scheduleForm.frequency} onChange={(e: any) => setScheduleForm({ ...scheduleForm, frequency: e.target.value })} options={[{value:"daily",label:"Daily"},{value:"weekly",label:"Weekly"},{value:"monthly",label:"Monthly"},{value:"quarterly",label:"Quarterly"}]} />
-            <Select label="Day" value={scheduleForm.day} onChange={(e: any) => setScheduleForm({ ...scheduleForm, day: e.target.value })} options={["monday","tuesday","wednesday","thursday","friday","saturday","sunday"].map(d => ({value:d, label:d}))} />
-            <Input label="Time" type="time" value={scheduleForm.time} onChange={(e: any) => setScheduleForm({ ...scheduleForm, time: e.target.value })} />
-            <Select label="Format" value={scheduleForm.format} onChange={(e: any) => setScheduleForm({ ...scheduleForm, format: e.target.value })} options={FORMATS.map(f => ({value:f, label:f}))} />
+            <Select
+              label={t('advRep.frequencyLabel')}
+              value={scheduleForm.frequency}
+              onChange={(e) => setScheduleForm((prev) => ({ ...prev, frequency: e.target.value }))}
+              options={FREQUENCY_OPTIONS.map((opt) => ({
+                value: opt.value,
+                label: t(opt.label),
+              }))}
+            />
+            <Select
+              label={t('advRep.dayLabel')}
+              value={scheduleForm.day}
+              onChange={(e) => setScheduleForm((prev) => ({ ...prev, day: e.target.value }))}
+              options={DAY_OPTIONS}
+            />
+            <Input
+              label={t('advRep.timeLabel')}
+              type="time"
+              value={scheduleForm.time}
+              onChange={(e) => setScheduleForm((prev) => ({ ...prev, time: e.target.value }))}
+            />
+            <Select
+              label={t('advRep.formatCol')}
+              value={scheduleForm.format}
+              onChange={(e) => setScheduleForm((prev) => ({ ...prev, format: e.target.value }))}
+              options={EXPORT_FORMATS}
+            />
           </div>
-          <Input label="Email Recipients" value={scheduleForm.email} onChange={(e: any) => setScheduleForm({ ...scheduleForm, email: e.target.value })} placeholder="email1@example.com, email2@example.com" />
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button variant="secondary" onClick={() => setShowSchedule(false)}>Cancel</Button>
-            <Button onClick={scheduleReport}>Schedule Report</Button>
-          </div>
+          <Input
+            label={t('advRep.emailRecipients')}
+            value={scheduleForm.email}
+            onChange={(e) => setScheduleForm((prev) => ({ ...prev, email: e.target.value }))}
+            placeholder={t('advRep.emailPlaceholder')}
+          />
         </div>
       </Modal>
     </div>
