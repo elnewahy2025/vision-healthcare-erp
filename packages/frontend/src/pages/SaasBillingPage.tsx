@@ -1,156 +1,389 @@
 import { useState, useEffect } from 'react';
-import { Spinner, Badge, Card, CardBody, Button, Input, Modal } from '../components/ui';
-import { CreditCard, Plus, Search, BarChart3, Clock, DollarSign } from 'lucide-react';
-import api from '../lib/api';
+import { useTranslation } from 'react-i18next';
+import {
+  saasApi,
+  type SubscriptionPlan,
+  type TenantSubscription,
+  type SaasInvoice,
+  type SaasUsageData,
+} from '../lib/api';
+import { escapeHtml } from '../lib/sanitize';
+import {
+  Button,
+  Badge,
+  EmptyState,
+  PageLoader,
+} from '../components/ui';
+import {
+  CreditCard,
+  BarChart3,
+  Clock,
+  DollarSign,
+  AlertTriangle,
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+
+type TabType = 'subscription' | 'plans' | 'invoices' | 'usage';
+
+const STATUS_VARIANT: Record<string, 'success' | 'danger' | 'warning' | 'gray'> = {
+  active: 'success',
+  paid: 'success',
+  cancelled: 'danger',
+  failed: 'danger',
+  pending: 'warning',
+  trial: 'warning',
+  past_due: 'warning',
+};
 
 export default function SaasBillingPage() {
-  const [tab, setTab] = useState<'subscription' | 'plans' | 'invoices' | 'usage'>('subscription');
-  const [subscription, setSubscription] = useState<any>(null);
-  const [plans, setPlans] = useState<any[]>([]);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [usage, setUsage] = useState<any>(null);
+  const { t } = useTranslation();
+
+  const [tab, setTab] = useState<TabType>('subscription');
+  const [subscription, setSubscription] = useState<TenantSubscription | null>(null);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [invoices, setInvoices] = useState<SaasInvoice[]>([]);
+  const [usage, setUsage] = useState<SaasUsageData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [subscribing, setSubscribing] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      api.get('/saas/subscription').then(r => setSubscription(r.data.data)).catch(() => null),
-      api.get('/saas/plans').then(r => setPlans(r.data.data)).catch(() => []),
-      api.get('/saas/invoices').then(r => setInvoices(r.data.data)).catch(() => []),
-      api.get('/saas/usage').then(r => setUsage(r.data.data)).catch(() => null),
-    ]).finally(() => setLoading(false));
-  }, []);
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [subRes, plansRes, invRes, usageRes] = await Promise.allSettled([
+          saasApi.getSubscription(),
+          saasApi.listPlans(),
+          saasApi.listInvoices(),
+          saasApi.getUsage(),
+        ]);
+        if (cancelled) return;
+        if (subRes.status === 'fulfilled') setSubscription(subRes.value);
+        if (plansRes.status === 'fulfilled') setPlans(plansRes.value);
+        if (invRes.status === 'fulfilled') setInvoices(invRes.value);
+        if (usageRes.status === 'fulfilled') setUsage(usageRes.value);
+        if (plansRes.status === 'rejected') {
+          setError(t('saas.loadFailed'));
+        }
+      } catch {
+        if (!cancelled) setError(t('saas.loadFailed'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void run();
+    return () => { cancelled = true; };
+  }, [t]);
 
-  if (loading) return <Spinner size="lg" className="py-16" />;
+  const handleSubscribe = async (planId: string) => {
+    setSubscribing(planId);
+    try {
+      await saasApi.createSubscription({ planId });
+      toast.success(t('saas.subscribeSuccess'));
+      const updated = await saasApi.getSubscription();
+      setSubscription(updated);
+    } catch {
+      toast.error(t('common.error'));
+    } finally {
+      setSubscribing(null);
+    }
+  };
+
+  if (loading) {
+    return <PageLoader message={t('common.loading')} />;
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <EmptyState
+          icon={<AlertTriangle className="w-12 h-12 text-red-400" />}
+          title={t('common.error')}
+          message={error}
+        />
+      </div>
+    );
+  }
+
+  const yearlySaving = (plan: SubscriptionPlan): number => {
+    if (!plan.priceYearly || !plan.priceMonthly) return 0;
+    return Math.round((1 - plan.priceYearly / (plan.priceMonthly * 12)) * 100);
+  };
 
   return (
-    <div>
-      <div className="page-header">
-        <div><h1 className="page-title">SaaS Billing</h1></div>
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <CreditCard className="w-6 h-6" /> {t('saas.title')}
+        </h1>
       </div>
 
+      {/* Tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
-        <Button variant={tab === 'subscription' ? 'primary' : 'secondary'} onClick={() => setTab('subscription')}><CreditCard className="w-4 h-4" /> Subscription</Button>
-        <Button variant={tab === 'plans' ? 'primary' : 'secondary'} onClick={() => setTab('plans')}><BarChart3 className="w-4 h-4" /> Plans ({plans.length})</Button>
-        <Button variant={tab === 'invoices' ? 'primary' : 'secondary'} onClick={() => setTab('invoices')}><DollarSign className="w-4 h-4" /> Invoices ({invoices.length})</Button>
-        <Button variant={tab === 'usage' ? 'primary' : 'secondary'} onClick={() => setTab('usage')}><Clock className="w-4 h-4" /> Usage</Button>
+        <Button
+          variant={tab === 'subscription' ? 'primary' : 'secondary'}
+          onClick={() => setTab('subscription')}
+        >
+          <CreditCard className="w-4 h-4" /> {t('saas.subscription')}
+        </Button>
+        <Button
+          variant={tab === 'plans' ? 'primary' : 'secondary'}
+          onClick={() => setTab('plans')}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span className="ml-1">{t('saas.plans')} ({plans.length})</span>
+        </Button>
+        <Button
+          variant={tab === 'invoices' ? 'primary' : 'secondary'}
+          onClick={() => setTab('invoices')}
+        >
+          <DollarSign className="w-4 h-4" />
+          <span className="ml-1">{t('saas.invoices')} ({invoices.length})</span>
+        </Button>
+        <Button
+          variant={tab === 'usage' ? 'primary' : 'secondary'}
+          onClick={() => setTab('usage')}
+        >
+          <Clock className="w-4 h-4" /> {t('saas.usage')}
+        </Button>
       </div>
 
+      {/* Subscription Tab */}
       {tab === 'subscription' && (
         <div>
           {subscription ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card><CardBody>
-                <p className="text-sm text-gray-500">Current Plan</p>
-                <p className="text-xl font-bold">{subscription.planName}</p>
-                <Badge>{subscription.status}</Badge>
-              </CardBody></Card>
-              <Card><CardBody>
-                <p className="text-sm text-gray-500">Amount</p>
-                <p className="text-xl font-bold">{Number(subscription.amount).toFixed(2)} EGP</p>
-                <p className="text-xs text-gray-400">{subscription.billingCycle}</p>
-              </CardBody></Card>
-              <Card><CardBody>
-                <p className="text-sm text-gray-500">Period</p>
-                <p className="text-sm font-medium">{subscription.currentPeriodStart?.split('T')[0]} → {subscription.currentPeriodEnd?.split('T')[0]}</p>
-                {subscription.trialEndsAt && <p className="text-xs text-orange-500">Trial until {subscription.trialEndsAt?.split('T')[0]}</p>}
-              </CardBody></Card>
+              <div className="bg-white rounded-lg border p-4">
+                <p className="text-sm text-gray-500">{t('saas.currentPlan')}</p>
+                <p className="text-xl font-bold">{escapeHtml(subscription.planName)}</p>
+                <Badge variant={STATUS_VARIANT[subscription.status] ?? 'gray'}>
+                  {escapeHtml(subscription.status)}
+                </Badge>
+              </div>
+              <div className="bg-white rounded-lg border p-4">
+                <p className="text-sm text-gray-500">{t('saas.amount')}</p>
+                <p className="text-xl font-bold">
+                  {Number(subscription.amount).toFixed(2)} EGP
+                </p>
+                <p className="text-xs text-gray-400">
+                  {escapeHtml(subscription.billingCycle)}
+                </p>
+              </div>
+              <div className="bg-white rounded-lg border p-4">
+                <p className="text-sm text-gray-500">{t('saas.period')}</p>
+                <p className="text-sm font-medium">
+                  {subscription.currentPeriodStart?.split('T')[0]} →{' '}
+                  {subscription.currentPeriodEnd?.split('T')[0]}
+                </p>
+                {subscription.trialEndsAt && (
+                  <p className="text-xs text-orange-500">
+                    {t('saas.trialUntil')} {subscription.trialEndsAt?.split('T')[0]}
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
-            <Card className="mb-6"><CardBody>
-              <p className="text-gray-500">No active subscription. Browse plans to subscribe.</p>
-            </CardBody></Card>
+            <div className="bg-white rounded-lg border p-4 mb-6">
+              <p className="text-gray-500">{t('saas.noSubscription')}</p>
+            </div>
           )}
 
-          <Card><CardBody>
-            <h3 className="font-semibold mb-3">Plan Details</h3>
+          {/* Plan Details */}
+          <div className="bg-white rounded-lg border p-4">
+            <h3 className="font-semibold mb-3">{t('saas.planDetails')}</h3>
             {subscription ? (
               <div className="text-sm space-y-2">
-                <p><strong>Category:</strong> {subscription.planCategory}</p>
-                <p><strong>Max Users:</strong> {subscription.maxUsers} · <strong>Max Branches:</strong> {subscription.maxBranches} · <strong>Storage:</strong> {subscription.maxStorageGb}GB</p>
-                <p><strong>Features:</strong> {(subscription.planFeatures || []).join(', ') || 'None'}</p>
+                <p>
+                  <strong>{t('saas.category')}:</strong>{' '}
+                  {escapeHtml(subscription.planCategory)}
+                </p>
+                <p>
+                  <strong>{t('saas.maxUsers')}:</strong> {subscription.maxUsers} ·{' '}
+                  <strong>{t('saas.maxBranches')}:</strong> {subscription.maxBranches} ·{' '}
+                  <strong>{t('saas.storage')}:</strong> {subscription.maxStorageGb}GB
+                </p>
+                <p>
+                  <strong>{t('saas.features')}:</strong>{' '}
+                  {(subscription.planFeatures ?? []).join(', ') || '-'}
+                </p>
               </div>
-            ) : <p className="text-sm text-gray-500">Select a plan to see details</p>}
-          </CardBody></Card>
+            ) : (
+              <p className="text-sm text-gray-500">{t('saas.selectPlan')}</p>
+            )}
+          </div>
         </div>
       )}
 
+      {/* Plans Tab */}
       {tab === 'plans' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {plans.map((p: any) => (
-            <Card key={p.id} className={`border-2 ${subscription?.planId === p.id ? 'border-primary-500' : 'border-gray-200'}`}>
-              <CardBody>
+          {plans.length === 0 ? (
+            <EmptyState
+              icon={<BarChart3 className="w-12 h-12 text-gray-300" />}
+              title={t('saas.plans')}
+              message={t('common.noData')}
+            />
+          ) : (
+            plans.map((p) => (
+              <div
+                key={p.id}
+                className={`bg-white rounded-lg border-2 p-4 ${
+                  subscription?.planId === p.id
+                    ? 'border-blue-500'
+                    : 'border-gray-200'
+                }`}
+              >
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-lg">{p.name}</h3>
-                  <Badge>{p.category}</Badge>
+                  <h3 className="font-bold text-lg">{escapeHtml(p.name)}</h3>
+                  <Badge>{escapeHtml(p.category)}</Badge>
                 </div>
-                <p className="text-3xl font-bold mb-1">{p.priceMonthly} <span className="text-sm font-normal text-gray-500">EGP/mo</span></p>
-                {p.priceYearly > 0 && <p className="text-sm text-gray-500 mb-4">{p.priceYearly} EGP/yr (save {Math.round((1 - p.priceYearly / (p.priceMonthly * 12)) * 100)}%)</p>}
+                <p className="text-3xl font-bold mb-1">
+                  {p.priceMonthly}{' '}
+                  <span className="text-sm font-normal text-gray-500">
+                    EGP{t('saas.monthly')}
+                  </span>
+                </p>
+                {p.priceYearly > 0 && (
+                  <p className="text-sm text-gray-500 mb-4">
+                    {p.priceYearly} EGP{t('saas.yearly')} ({t('saas.save')}{' '}
+                    {yearlySaving(p)}%)
+                  </p>
+                )}
                 <div className="text-sm space-y-2 mb-4">
-                  <p>👤 {p.maxUsers} users · 🏥 {p.maxBranches} branches · 💾 {p.maxStorageGb}GB</p>
-                  <p className="font-medium">Modules: {(p.modules || []).join(', ')}</p>
+                  <p>
+                    {p.maxUsers} {t('saas.users')} · {p.maxBranches} {t('saas.branches')} ·{' '}
+                    {p.maxStorageGb}GB
+                  </p>
+                  <p className="font-medium">
+                    {t('saas.modules')}: {(p.modules ?? []).join(', ')}
+                  </p>
                 </div>
                 <div className="flex flex-wrap gap-1 mb-4">
-                  {(p.features || []).map((f: string) => <Badge key={f} variant="gray">{f}</Badge>)}
+                  {(p.features ?? []).map((f) => (
+                    <Badge key={f} variant="gray">{escapeHtml(f)}</Badge>
+                  ))}
                 </div>
-                {subscription?.planId !== p.id && (
-                  <Button className="w-full" onClick={async () => {
-                    await api.post('/saas/subscription', { planId: p.id });
-                    const r = await api.get('/saas/subscription'); setSubscription(r.data.data);
-                  }}>Subscribe</Button>
+                {subscription?.planId !== p.id ? (
+                  <Button
+                    className="w-full"
+                    onClick={() => void handleSubscribe(p.id)}
+                    loading={subscribing === p.id}
+                  >
+                    {t('saas.subscribe')}
+                  </Button>
+                ) : (
+                  <Button className="w-full" variant="secondary" disabled>
+                    {t('saas.current')}
+                  </Button>
                 )}
-                {subscription?.planId === p.id && <Button className="w-full" variant="secondary" disabled>Current Plan</Button>}
-              </CardBody>
-            </Card>
-          ))}
+              </div>
+            ))
+          )}
         </div>
       )}
 
+      {/* Invoices Tab */}
       {tab === 'invoices' && (
-        <div className="table-container">
-          <table>
-            <thead><tr><th>Invoice #</th><th>Period</th><th>Amount</th><th>Tax</th><th>Total</th><th>Status</th><th>Paid</th></tr></thead>
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-gray-50">
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.invoiceNumber')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.periodRange')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.amount')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.tax')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.total')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.paid')}</th>
+              </tr>
+            </thead>
             <tbody>
-              {invoices.length === 0 ? <tr><td colSpan={7} className="text-center py-12 text-gray-500">No invoices</td></tr> :
-                invoices.map((i: any) => (
-                  <tr key={i.id} className="hover:bg-gray-50">
-                    <td className="font-mono text-xs">{i.invoiceNumber}</td>
-                    <td className="text-xs">{i.periodStart} → {i.periodEnd}</td>
-                    <td>{Number(i.amount).toFixed(2)}</td>
-                    <td>{Number(i.tax).toFixed(2)}</td>
-                    <td className="font-medium">{Number(i.total).toFixed(2)} EGP</td>
-                    <td><Badge variant={i.status === 'paid' ? 'success' : i.status === 'failed' ? 'danger' : 'warning'}>{i.status}</Badge></td>
-                    <td className="text-xs">{i.paidAt?.split('T')[0] || '-'}</td>
+              {invoices.length === 0 ? (
+                <tr>
+                  <td colSpan={7}>
+                    <EmptyState
+                      icon={<DollarSign className="w-12 h-12 text-gray-300" />}
+                      title={t('saas.noInvoices')}
+                      message={t('common.noData')}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                invoices.map((i) => (
+                  <tr key={i.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <td className="p-3 font-mono text-xs">{escapeHtml(i.invoiceNumber)}</td>
+                    <td className="p-3 text-xs">
+                      {escapeHtml(i.periodStart)} → {escapeHtml(i.periodEnd)}
+                    </td>
+                    <td className="p-3">{Number(i.amount).toFixed(2)}</td>
+                    <td className="p-3">{Number(i.tax).toFixed(2)}</td>
+                    <td className="p-3 font-medium">
+                      {Number(i.total).toFixed(2)} EGP
+                    </td>
+                    <td className="p-3">
+                      <Badge variant={STATUS_VARIANT[i.status] ?? 'gray'}>
+                        {escapeHtml(i.status)}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-xs">
+                      {i.paidAt?.split('T')[0] ?? '-'}
+                    </td>
                   </tr>
-                ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
       )}
 
+      {/* Usage Tab */}
       {tab === 'usage' && (
         <div>
-          <p className="text-sm text-gray-500 mb-4">Usage metrics for the last 30 days</p>
-          {usage?.totals?.length > 0 ? (
+          <p className="text-sm text-gray-500 mb-4">{t('saas.last30Days')}</p>
+          {(usage?.totals ?? []).length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              {usage.totals.map((t: any) => (
-                <Card key={t.metric}><CardBody>
-                  <p className="text-sm text-gray-500 capitalize">{t.metric.replace(/_/g, ' ')}</p>
-                  <p className="text-2xl font-bold">{t.total?.toLocaleString()}</p>
-                </CardBody></Card>
+              {usage!.totals.map((item) => (
+                <div key={item.metric} className="bg-white rounded-lg border p-4">
+                  <p className="text-sm text-gray-500 capitalize">
+                    {escapeHtml(item.metric.replace(/_/g, ' '))}
+                  </p>
+                  <p className="text-2xl font-bold">{item.total.toLocaleString()}</p>
+                </div>
               ))}
             </div>
-          ) : <p className="text-gray-500 mb-4">No usage data yet</p>}
+          ) : (
+            <div className="mb-6">
+              <EmptyState
+                icon={<Clock className="w-12 h-12 text-gray-300" />}
+                title={t('saas.noUsage')}
+                message={t('common.noData')}
+              />
+            </div>
+          )}
 
-          {usage?.records?.length > 0 && (
-            <div className="table-container">
-              <table>
-                <thead><tr><th>Metric</th><th>Quantity</th><th>Date</th></tr></thead>
+          {(usage?.records ?? []).length > 0 && (
+            <div className="bg-white rounded-lg border overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-gray-50">
+                    <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.metric')}</th>
+                    <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.quantity')}</th>
+                    <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.date')}</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {usage.records.slice(0, 20).map((r: any) => (
-                    <tr key={r.id} className="hover:bg-gray-50">
-                      <td><Badge>{r.metric}</Badge></td>
-                      <td className="font-medium">{r.quantity}</td>
-                      <td className="text-xs">{r.recordDate}</td>
+                  {usage!.records.slice(0, 20).map((r) => (
+                    <tr key={r.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                      <td className="p-3">
+                        <Badge>{escapeHtml(r.metric)}</Badge>
+                      </td>
+                      <td className="p-3 font-medium">{r.quantity.toLocaleString()}</td>
+                      <td className="p-3 text-xs text-gray-500">
+                        {escapeHtml(r.recordDate)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

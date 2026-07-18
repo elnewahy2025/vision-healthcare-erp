@@ -541,4 +541,22 @@ export const updateWebhookSchema = z.object({
   headers: z.record(z.string()).optional(),
   status: z.enum(['active', 'disabled', 'paused']).optional(),
   retryCount: z.number().int().min(0).max(10).optional(),
+});\n\n\n// ── SaaS Billing ──
+export const createSubscriptionSchema = z.object({
+  planId: z.string().uuid(),
+  billingCycle: z.enum(['monthly', 'yearly']).default('monthly'),
+  addons: z.array(z.string().max(100)).optional(),
+  discounts: z.array(z.string().max(100)).optional(),
+});
+
+export const changePlanSchema = z.object({
+  planId: z.string().uuid(),
+  billingCycle: z.enum(['monthly', 'yearly']).optional(),
+});
+
+export const trackUsageSchema = z.object({
+  subscriptionId: z.string().uuid().optional().nullable(),
+  metric: z.string().min(1).max(100),
+  quantity: z.number().int().min(1).default(1),
+  recordDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });\n
