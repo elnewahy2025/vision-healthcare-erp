@@ -626,4 +626,34 @@ export const updateBaaSchema = z.object({
   scope: z.string().max(2000).optional(),
   terms: z.string().max(50000).optional(),
   expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});\n\n\n// ── DR Backup ──
+export const createBackupConfigSchema = z.object({
+  name: z.string().min(1).max(200),
+  type: z.enum(['full', 'incremental', 'differential']).default('full'),
+  schedule: z.string().max(50).default('0 2 * * *'),
+  retentionDays: z.number().int().min(1).max(3650).default(30),
+  storageLocation: z.string().max(500).default('minio://backups'),
+  includeSchemas: z.array(z.string().max(100)).default(['public']),
+  excludeTables: z.array(z.string().max(200)).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const updateBackupConfigSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  schedule: z.string().max(50).optional(),
+  retentionDays: z.number().int().min(1).max(3650).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const runBackupSchema = z.object({
+  configId: z.string().uuid().optional().nullable(),
+  type: z.enum(['full', 'incremental', 'differential']).default('full'),
+});
+
+export const updateDrConfigSchema = z.object({
+  failoverStrategy: z.enum(['manual', 'automatic', 'hybrid']).optional(),
+  rpoMinutes: z.number().int().min(1).max(1440).optional(),
+  rtoMinutes: z.number().int().min(1).max(1440).optional(),
+  crossRegionReplication: z.boolean().optional(),
+  secondaryRegion: z.string().max(100).optional().nullable(),
 });\n
