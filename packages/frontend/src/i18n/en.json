@@ -1296,5 +1296,22 @@
   "booking.invalidOrg": "Please enter your organization code",
   "booking.invalidName": "Please enter your full name",
   "booking.invalidPhone": "Please enter a valid phone number",
-  "booking.selectSlot": "Please select a time slot"
+  "booking.selectSlot": "Please select a time slot",
+  "messages.title": "Patient Messages",
+  "messages.conversations": "Conversations",
+  "messages.conversationCount": "{count} conversations",
+  "messages.noConversations": "No conversations",
+  "messages.selectConversation": "Select a conversation to view messages",
+  "messages.noMessages": "No messages in this conversation",
+  "messages.typePlaceholder": "Type your message...",
+  "messages.send": "Send",
+  "messages.patient": "Patient",
+  "messages.staff": "Staff",
+  "messages.new": "New",
+  "messages.messages": "messages",
+  "messages.last": "Last",
+  "messages.loadError": "Failed to load messages",
+  "messages.sendSuccess": "Message sent",
+  "messages.sendError": "Failed to send message",
+  "messages.emptyMessage": "Please type a message"
 }

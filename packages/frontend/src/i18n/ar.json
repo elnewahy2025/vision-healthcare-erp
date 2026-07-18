@@ -1294,5 +1294,22 @@
   "booking.invalidOrg": "يرجى إدخال كود المنظمة",
   "booking.invalidName": "يرجى إدخال الاسم الكامل",
   "booking.invalidPhone": "يرجى إدخال رقم هاتف صحيح",
-  "booking.selectSlot": "يرجى اختيار وقت"
+  "booking.selectSlot": "يرجى اختيار وقت",
+  "messages.title": "رسائل المرضى",
+  "messages.conversations": "المحادثات",
+  "messages.conversationCount": "{count} محادثة",
+  "messages.noConversations": "لا توجد محادثات",
+  "messages.selectConversation": "اختر محادثة لعرض الرسائل",
+  "messages.noMessages": "لا توجد رسائل في هذه المحادثة",
+  "messages.typePlaceholder": "اكتب رسالتك...",
+  "messages.send": "إرسال",
+  "messages.patient": "المريض",
+  "messages.staff": "الطاقم",
+  "messages.new": "جديد",
+  "messages.messages": "رسالة",
+  "messages.last": "آخر",
+  "messages.loadError": "فشل في تحميل الرسائل",
+  "messages.sendSuccess": "تم إرسال الرسالة",
+  "messages.sendError": "فشل في إرسال الرسالة",
+  "messages.emptyMessage": "يرجى كتابة رسالة"
 }
