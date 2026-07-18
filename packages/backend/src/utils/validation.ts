@@ -477,3 +477,34 @@ export const plReportQuerySchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
+
+// ── Insurance Claims ──
+export const createInsuranceCompanySchema = z.object({
+  name: z.string().min(2).max(200),
+  code: z.string().min(2).max(50),
+  contractType: z.enum(['network', 'non_network', 'corporate']).default('network'),
+  discountRate: z.number().min(0).max(100).default(0),
+});
+
+export const createInsuranceClaimSchema = z.object({
+  patientId: z.string().uuid(),
+  invoiceId: z.string().uuid(),
+  insuranceId: z.string().uuid(),
+  claimedAmount: z.number().positive(),
+  notes: z.string().max(2000).optional(),
+});
+
+export const updateClaimStatusSchema = z.object({
+  status: z.enum(['acknowledged', 'in_review', 'approved', 'denied', 'paid']),
+  approvedAmount: z.number().min(0).optional(),
+  paidAmount: z.number().min(0).optional(),
+  denialReason: z.string().max(2000).optional(),
+});
+
+export const insuranceClaimsListSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  status: z.string().optional(),
+  insuranceId: z.string().uuid().optional(),
+  patientId: z.string().uuid().optional(),
+});

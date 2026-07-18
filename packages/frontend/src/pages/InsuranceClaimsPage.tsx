@@ -1,111 +1,351 @@
 import { useState, useEffect } from 'react';
-import { claimsApi } from '../lib/api';
-import { ShieldCheck, Plus, Loader2, ChevronLeft, ChevronRight, Send, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import {
+  claimsApi,
+  type InsuranceClaimListItem,
+  type InsuranceClaimsSummary,
+} from '../lib/api';
+import { escapeHtml } from '../lib/sanitize';
+import {
+  Modal,
+  Select,
+  Button,
+  Badge,
+  EmptyState,
+  PageLoader,
+} from '../components/ui';
+import {
+  ShieldCheck,
+  Send,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  AlertTriangle,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const STATUS_OPTIONS = [
+  { value: '', label: 'All Status' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'acknowledged', label: 'Acknowledged' },
+  { value: 'in_review', label: 'In Review' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'denied', label: 'Denied' },
+  { value: 'paid', label: 'Paid' },
+];
+
+const STATUS_CHANGE_OPTIONS = [
+  { value: 'acknowledged', label: 'Acknowledged' },
+  { value: 'in_review', label: 'In Review' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'denied', label: 'Denied' },
+  { value: 'paid', label: 'Paid' },
+];
+
+const STATUS_VARIANT: Record<string, 'success' | 'danger' | 'warning' | 'info' | 'gray'> = {
+  draft: 'gray',
+  submitted: 'info',
+  acknowledged: 'info',
+  in_review: 'warning',
+  approved: 'success',
+  denied: 'danger',
+  paid: 'success',
+};
+
 export default function InsuranceClaimsPage() {
-  const [claims, setClaims] = useState<any[]>([]);
+  const { t } = useTranslation();
+
+  const [claims, setClaims] = useState<InsuranceClaimListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });
-  const [summary, setSummary] = useState<any>(null);
+  const [summary, setSummary] = useState<InsuranceClaimsSummary | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
 
-  useEffect(() => { loadClaims(); loadSummary(); }, [page, statusFilter]);
+  // Modal state for status change
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedClaim, setSelectedClaim] = useState<InsuranceClaimListItem | null>(null);
+  const [newStatus, setNewStatus] = useState('acknowledged');
+  const [statusFormErrors, setStatusFormErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
 
-  const loadClaims = async () => {
-    setLoading(true);
-    try {
-      const data = await claimsApi.list({ page, limit: 15, status: statusFilter || undefined });
-      setClaims(data.data); setPagination(data.pagination);
-    } catch { toast.error('Failed to load claims'); }
-    finally { setLoading(false); }
-  };
-
-  const loadSummary = async () => {
-    try { setSummary(await claimsApi.summary()); } catch {}
-  };
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [claimsRes, summaryRes] = await Promise.allSettled([
+          claimsApi.list({ page, limit: 15, status: statusFilter || undefined }),
+          claimsApi.summary(),
+        ]);
+        if (cancelled) return;
+        if (claimsRes.status === 'fulfilled') {
+          setClaims(claimsRes.value.data);
+          setPagination(claimsRes.value.pagination);
+        } else {
+          setError(t('insClaims.loadFailed'));
+        }
+        if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
+      } catch {
+        if (!cancelled) setError(t('insClaims.loadFailed'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void run();
+    return () => { cancelled = true; };
+  }, [page, statusFilter, t]);
 
   const handleSubmit = async (id: string) => {
-    try { await claimsApi.submit(id); toast.success('Claim submitted!'); loadClaims(); loadSummary(); }
-    catch { toast.error('Failed to submit'); }
+    try {
+      await claimsApi.submit(id);
+      toast.success(t('insClaims.submittedSuccess'));
+      void loadClaims();
+      void loadSummary();
+    } catch {
+      toast.error(t('insClaims.submitFailed'));
+    }
   };
 
-  const handleStatus = async (id: string) => {
-    const status = prompt('New status (acknowledged/in_review/approved/denied):');
-    if (!status) return;
-    try { await claimsApi.updateStatus(id, { status }); toast.success(`Status: ${status}`); loadClaims(); loadSummary(); }
-    catch { toast.error('Failed to update'); }
+  const handleOpenStatusModal = (claim: InsuranceClaimListItem) => {
+    setSelectedClaim(claim);
+    setNewStatus('acknowledged');
+    setStatusFormErrors({});
+    setShowStatusModal(true);
   };
 
-  const statusBadge = (s: string) => {
-    const map: Record<string, string> = { draft: 'badge-gray', submitted: 'badge-info', acknowledged: 'badge-info', in_review: 'badge-warning', approved: 'badge-success', denied: 'badge-danger', paid: 'badge-success' };
-    return map[s] || 'badge-gray';
+  const handleStatusChange = async () => {
+    if (!selectedClaim) return;
+    if (!newStatus) {
+      setStatusFormErrors({ status: t('common.required') });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await claimsApi.updateStatus(selectedClaim.id, {
+        status: newStatus as 'acknowledged' | 'in_review' | 'approved' | 'denied' | 'paid',
+      });
+      toast.success(t('insClaims.statusUpdated'));
+      setShowStatusModal(false);
+      setSelectedClaim(null);
+      void loadClaims();
+      void loadSummary();
+    } catch {
+      toast.error(t('insClaims.statusFailed'));
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading && claims.length === 0) {
+    return <PageLoader message={t('common.loading')} />;
+  }
+
+  if (error && claims.length === 0) {
+    return (
+      <div className="p-6">
+        <EmptyState
+          icon={<AlertTriangle className="w-12 h-12 text-red-400" />}
+          title={t('common.error')}
+          message={error}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="page-header">
-        <div><h1 className="page-title flex items-center gap-2"><ShieldCheck className="w-6 h-6" /> Insurance Claims</h1></div>
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <ShieldCheck className="w-6 h-6" /> {t('insClaims.title')}
+        </h1>
       </div>
 
       {/* Summary Cards */}
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-          <div className="card p-3 text-center"><p className="text-lg font-bold">{summary.total}</p><p className="text-xs text-gray-500">Total</p></div>
-          <div className="card p-3 text-center"><p className="text-lg font-bold text-yellow-600">{summary.draft}</p><p className="text-xs text-gray-500">Draft</p></div>
-          <div className="card p-3 text-center"><p className="text-lg font-bold text-blue-600">{summary.submitted}</p><p className="text-xs text-gray-500">Submitted</p></div>
-          <div className="card p-3 text-center"><p className="text-lg font-bold text-green-600">{summary.approved}</p><p className="text-xs text-gray-500">Approved</p></div>
-          <div className="card p-3 text-center"><p className="text-lg font-bold text-red-600">{summary.denied}</p><p className="text-xs text-gray-500">Denied</p></div>
-          <div className="card p-3 col-span-2 sm:col-span-3 lg:col-span-5"><p className="text-sm">Claimed: <strong>{Number(summary.total_claimed || 0).toLocaleString()} EGP</strong> | Approved: <strong>{Number(summary.total_approved || 0).toLocaleString()} EGP</strong> | Paid: <strong className="text-green-600">{Number(summary.total_paid || 0).toLocaleString()} EGP</strong></p></div>
+          <div className="bg-white rounded-lg border p-3 text-center">
+            <p className="text-lg font-bold">{summary.total}</p>
+            <p className="text-xs text-gray-500">{t('insClaims.total')}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3 text-center">
+            <p className="text-lg font-bold text-yellow-600">{summary.draft}</p>
+            <p className="text-xs text-gray-500">{t('insClaims.draft')}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3 text-center">
+            <p className="text-lg font-bold text-blue-600">{summary.submitted}</p>
+            <p className="text-xs text-gray-500">{t('insClaims.submitted')}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3 text-center">
+            <p className="text-lg font-bold text-green-600">{summary.approved}</p>
+            <p className="text-xs text-gray-500">{t('insClaims.approved')}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3 text-center">
+            <p className="text-lg font-bold text-red-600">{summary.denied}</p>
+            <p className="text-xs text-gray-500">{t('insClaims.denied')}</p>
+          </div>
+          <div className="bg-white rounded-lg border p-3 col-span-2 sm:col-span-3 lg:col-span-5">
+            <p className="text-sm">
+              {t('insClaims.claimed')}: <strong>{Number(summary.totalClaimed).toLocaleString()} EGP</strong>
+              {' | '}
+              {t('insClaims.approved')}: <strong>{Number(summary.totalApproved).toLocaleString()} EGP</strong>
+              {' | '}
+              {t('insClaims.totalPaid')}: <strong className="text-green-600">{Number(summary.totalPaid).toLocaleString()} EGP</strong>
+            </p>
+          </div>
         </div>
       )}
 
       {/* Filter */}
-      <div className="mb-4"><select className="input sm:w-48" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
-        <option value="">All Status</option>
-        <option value="draft">Draft</option><option value="submitted">Submitted</option>
-        <option value="acknowledged">Acknowledged</option><option value="in_review">In Review</option>
-        <option value="approved">Approved</option><option value="denied">Denied</option><option value="paid">Paid</option>
-      </select></div>
+      <div className="mb-4 max-w-xs">
+        <Select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          options={STATUS_OPTIONS.map((opt) => ({
+            value: opt.value,
+            label: t(`insClaims.${opt.value || 'allStatus'}`, opt.label),
+          }))}
+        />
+      </div>
 
       {/* Claims Table */}
-      <div className="table-container">
-        <table>
-          <thead><tr><th>Claim #</th><th>Patient</th><th>Company</th><th>Invoice</th><th>Claimed</th><th>Approved</th><th>Status</th><th>Actions</th></tr></thead>
+      <div className="bg-white rounded-lg border overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b bg-gray-50">
+              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.claimNumber')}</th>
+              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.patient')}</th>
+              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.company')}</th>
+              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.invoice')}</th>
+              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.claimedAmount')}</th>
+              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.approvedAmount')}</th>
+              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.status')}</th>
+              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.actions')}</th>
+            </tr>
+          </thead>
           <tbody>
-            {loading ? <tr><td colSpan={8} className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary-600" /></td></tr>
-            : claims.length === 0 ? <tr><td colSpan={8} className="text-center py-12 text-gray-500">No claims</td></tr>
-            : claims.map((c: any) => (
-              <tr key={c.id} className="hover:bg-gray-50">
-                <td className="font-mono text-xs font-medium">{c.claimNumber}</td>
-                <td className="text-sm">{c.patientName || '-'}<br/>{c.patientMrn && <span className="text-xs text-gray-400">{c.patientMrn}</span>}</td>
-                <td className="text-sm">{c.companyName || '-'}</td>
-                <td className="font-mono text-xs">{c.invoiceNumber || '-'}</td>
-                <td className="font-semibold">{Number(c.claimedAmount || 0).toLocaleString()}</td>
-                <td>{Number(c.approvedAmount || 0).toLocaleString()}</td>
-                <td><span className={`badge ${statusBadge(c.status)}`}>{c.status}</span></td>
-                <td>
-                  <div className="flex gap-1">
-                    {c.status === 'draft' && <button onClick={() => handleSubmit(c.id)} className="btn-ghost btn-sm"><Send className="w-3 h-3" /> Submit</button>}
-                    <button onClick={() => handleStatus(c.id)} className="btn-ghost btn-sm"><AlertCircle className="w-3 h-3" /> Status</button>
-                  </div>
+            {claims.length === 0 ? (
+              <tr>
+                <td colSpan={8}>
+                  <EmptyState
+                    icon={<ShieldCheck className="w-12 h-12 text-gray-300" />}
+                    title={t('insClaims.noClaims')}
+                    message={t('common.noData')}
+                  />
                 </td>
               </tr>
-            ))}
+            ) : (
+              claims.map((c) => (
+                <tr key={c.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <td className="p-3 font-mono text-xs font-medium">{escapeHtml(c.claimNumber)}</td>
+                  <td className="p-3 text-sm">
+                    {c.patientName ? escapeHtml(c.patientName) : '-'}
+                    {c.patientMrn && (
+                      <br />
+                    )}
+                    {c.patientMrn && (
+                      <span className="text-xs text-gray-400">{escapeHtml(c.patientMrn)}</span>
+                    )}
+                  </td>
+                  <td className="p-3 text-sm">{c.companyName ? escapeHtml(c.companyName) : '-'}</td>
+                  <td className="p-3 font-mono text-xs">{c.invoiceNumber ? escapeHtml(c.invoiceNumber) : '-'}</td>
+                  <td className="p-3 font-semibold">{Number(c.claimedAmount).toLocaleString()} EGP</td>
+                  <td className="p-3">{Number(c.approvedAmount).toLocaleString()} EGP</td>
+                  <td className="p-3">
+                    <Badge variant={STATUS_VARIANT[c.status] ?? 'gray'}>
+                      {escapeHtml(c.status)}
+                    </Badge>
+                  </td>
+                  <td className="p-3">
+                    <div className="flex gap-1">
+                      {c.status === 'draft' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void handleSubmit(c.id)}
+                        >
+                          <Send className="w-3 h-3 mr-1" /> {t('insClaims.submit')}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenStatusModal(c)}
+                      >
+                        <AlertCircle className="w-3 h-3 mr-1" /> {t('insClaims.changeStatus')}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
+      {/* Pagination */}
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
-          <p className="text-sm text-gray-500">Page {page} of {pagination.totalPages}</p>
+          <p className="text-sm text-gray-500">
+            Page {page} of {pagination.totalPages}
+          </p>
           <div className="flex gap-2">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary btn-sm"><ChevronLeft className="w-4 h-4" /></button>
-            <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page === pagination.totalPages} className="btn-secondary btn-sm"><ChevronRight className="w-4 h-4" /></button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page === pagination.totalPages}
+              onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       )}
+
+      {/* Status Change Modal */}
+      <Modal
+        open={showStatusModal}
+        onClose={() => { setShowStatusModal(false); setSelectedClaim(null); }}
+        title={`${t('insClaims.changeStatus')} — ${selectedClaim?.claimNumber ?? ''}`}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => { setShowStatusModal(false); setSelectedClaim(null); }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleStatusChange} loading={submitting}>
+              {t('common.save')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Select
+            label={t('insClaims.status')}
+            value={newStatus}
+            onChange={(e) => setNewStatus(e.target.value)}
+            options={STATUS_CHANGE_OPTIONS}
+            error={statusFormErrors.status}
+          />
+        </div>
+      </Modal>
     </div>
   );
 }

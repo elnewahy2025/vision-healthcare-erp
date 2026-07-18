@@ -359,14 +359,74 @@ export const insuranceApi = {
   updateClaim: (id: string, data: UpdateClaimPayload) => api.put(`/insurance/claims/${id}`, data).then((r) => r.data.data),
 };
 
+export interface InsuranceClaimsListParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  insuranceId?: string;
+  patientId?: string;
+}
+
+export interface InsuranceClaimListItem {
+  id: string;
+  claimNumber: string;
+  status: string;
+  patientName: string | null;
+  patientMrn: string | null;
+  companyName: string | null;
+  invoiceNumber: string | null;
+  claimedAmount: number;
+  approvedAmount: number;
+  paidAmount: number;
+  submissionDate: string | null;
+  responseDate: string | null;
+  denialReason: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface InsuranceClaimsSummary {
+  total: number;
+  totalClaimed: number;
+  totalApproved: number;
+  totalPaid: number;
+  draft: number;
+  submitted: number;
+  approved: number;
+  denied: number;
+  paid: number;
+}
+
+export interface CreateInsuranceClaimPayload {
+  patientId: string;
+  invoiceId: string;
+  insuranceId: string;
+  claimedAmount: number;
+  notes?: string;
+}
+
+export interface UpdateClaimStatusPayload {
+  status: 'acknowledged' | 'in_review' | 'approved' | 'denied' | 'paid';
+  approvedAmount?: number;
+  paidAmount?: number;
+  denialReason?: string;
+}
+
 export const claimsApi = {
-  companies: () => api.get('/insurance-companies').then(r => r.data.data),
-  createCompany: (data: any) => api.post('/insurance-companies', data).then(r => r.data.data),
-  list: (params?: any) => api.get('/insurance-claims', { params }).then(r => r.data),
-  create: (data: any) => api.post('/insurance-claims', data).then(r => r.data.data),
-  submit: (id: string) => api.post(`/insurance-claims/${id}/submit`).then(r => r.data.data),
-  updateStatus: (id: string, data: any) => api.patch(`/insurance-claims/${id}/status`, data).then(r => r.data.data),
-  summary: () => api.get('/insurance-claims/summary').then(r => r.data.data),
+  companies: () =>
+    api.get('/insurance-companies').then((r) => r.data.data as InsuranceCompany[]),
+  createCompany: (data: CreateCompanyPayload) =>
+    api.post('/insurance-companies', data).then((r) => r.data.data),
+  list: (params?: InsuranceClaimsListParams) =>
+    api.get('/insurance-claims', { params }).then((r) => r.data as { data: InsuranceClaimListItem[]; pagination: { total: number; totalPages: number; page: number; limit: number } }),
+  create: (data: CreateInsuranceClaimPayload) =>
+    api.post('/insurance-claims', data).then((r) => r.data.data),
+  submit: (id: string) =>
+    api.post(`/insurance-claims/${id}/submit`).then((r) => r.data.data),
+  updateStatus: (id: string, data: UpdateClaimStatusPayload) =>
+    api.patch(`/insurance-claims/${id}/status`, data).then((r) => r.data.data),
+  summary: () =>
+    api.get('/insurance-claims/summary').then((r) => r.data.data as InsuranceClaimsSummary),
 };
 
 // Payment
