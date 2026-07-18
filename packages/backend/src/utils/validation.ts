@@ -391,3 +391,29 @@ export const chatCompletionSchema = z.object({
   prompt: z.string().min(1).max(50000),
   source: z.string().max(50).optional(),
 });
+
+// ── BI Dashboards ──
+export const createBiDashboardSchema = z.object({
+  name: z.string().min(1).max(200),
+  slug: z.string().max(100).optional(),
+  category: z.enum(['executive', 'clinical', 'financial', 'operational', 'custom']).default('executive'),
+  description: z.string().max(2000).optional(),
+  layout: z.array(z.record(z.unknown())).optional(),
+  refreshInterval: z.string().max(20).default('5m'),
+});
+
+export const updateBiDashboardSchema = createBiDashboardSchema.partial();
+
+export const createBiWidgetSchema = z.object({
+  title: z.string().min(1).max(200),
+  widgetType: z.enum(['kpi', 'chart', 'table', 'gauge', 'map', 'text', 'iframe']).default('kpi'),
+  dataSource: z.string().max(100).default('appointments'),
+  config: z.record(z.unknown()).optional(),
+  query: z.record(z.unknown()).optional(),
+  width: z.number().int().min(1).max(12).default(4),
+  height: z.number().int().min(1).max(12).default(2),
+  positionX: z.number().int().min(0).default(0),
+  positionY: z.number().int().min(0).default(0),
+});
+
+export const updateBiWidgetSchema = createBiWidgetSchema.partial();

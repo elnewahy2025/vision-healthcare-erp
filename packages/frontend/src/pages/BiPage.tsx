@@ -1,140 +1,644 @@
 import { useState, useEffect } from 'react';
-import { Spinner, Badge, Card, CardBody, Button, Input } from '../components/ui';
-import { BarChart3, Plus, Search, LayoutDashboard, TrendingUp, Users, DollarSign, Activity } from 'lucide-react';
-import api from '../lib/api';
+import { useTranslation } from 'react-i18next';
+import {
+  biApi,
+  type BiDashboard,
+  type BiWidget,
+  type BiKpiAppointments,
+  type BiKpiRevenue,
+  type BiKpiPatients,
+  type BiKpiClinical,
+} from '../lib/api';
+import { escapeHtml, sanitizeString } from '../lib/sanitize';
+import {
+  Modal,
+  Input,
+  Select,
+  Button,
+  Badge,
+  EmptyState,
+  PageLoader,
+} from '../components/ui';
+import {
+  BarChart3,
+  Plus,
+  LayoutDashboard,
+  TrendingUp,
+  Users,
+  DollarSign,
+  Activity,
+  AlertTriangle,
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+
+type TabType = 'dashboards' | 'kpi';
+
+const CATEGORY_OPTIONS = [
+  { value: 'executive', label: 'Executive' },
+  { value: 'clinical', label: 'Clinical' },
+  { value: 'financial', label: 'Financial' },
+  { value: 'operational', label: 'Operational' },
+  { value: 'custom', label: 'Custom' },
+];
+
+const REFRESH_OPTIONS = [
+  { value: '1m', label: '1 minute' },
+  { value: '5m', label: '5 minutes' },
+  { value: '15m', label: '15 minutes' },
+  { value: '30m', label: '30 minutes' },
+  { value: '1h', label: '1 hour' },
+];
 
 export default function BiPage() {
-  const [tab, setTab] = useState<'dashboards' | 'kpi'>('dashboards');
-  const [dashboards, setDashboards] = useState<any[]>([]);
-  const [widgets, setWidgets] = useState<any[]>([]);
-  const [selectedDashboard, setSelectedDashboard] = useState<any>(null);
-  const [kpiData, setKpiData] = useState<any>({});
+  const { t } = useTranslation();
+
+  const [tab, setTab] = useState<TabType>('dashboards');
+  const [dashboards, setDashboards] = useState<BiDashboard[]>([]);
+  const [widgets, setWidgets] = useState<BiWidget[]>([]);
+  const [selectedDashboard, setSelectedDashboard] = useState<BiDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    Promise.all([
-      api.get('/bi/dashboards').then(r => setDashboards(r.data.data)).catch(() => []),
-      api.get('/bi/kpi/appointments').then(r => setKpiData((d: any) => ({ ...d, appointments: r.data.data }))).catch(() => {}),
-      api.get('/bi/kpi/revenue').then(r => setKpiData((d: any) => ({ ...d, revenue: r.data.data }))).catch(() => {}),
-      api.get('/bi/kpi/patients').then(r => setKpiData((d: any) => ({ ...d, patients: r.data.data }))).catch(() => {}),
-      api.get('/bi/kpi/clinical').then(r => setKpiData((d: any) => ({ ...d, clinical: r.data.data }))).catch(() => {}),
-    ]).finally(() => setLoading(false));
-  }, []);
+  // KPI data
+  const [kpiAppointments, setKpiAppointments] = useState<BiKpiAppointments | null>(null);
+  const [kpiRevenue, setKpiRevenue] = useState<BiKpiRevenue | null>(null);
+  const [kpiPatients, setKpiPatients] = useState<BiKpiPatients | null>(null);
+  const [kpiClinical, setKpiClinical] = useState<BiKpiClinical | null>(null);
 
-  const loadWidgets = async (dashId: string) => {
+  // Modal states
+  const [showDashboardModal, setShowDashboardModal] = useState(false);
+  const [showWidgetModal, setShowWidgetModal] = useState(false);
+  const [dashboardForm, setDashboardForm] = useState({
+    name: '',
+    description: '',
+    category: 'executive',
+    refreshInterval: '5m',
+  });
+  const [widgetForm, setWidgetForm] = useState({
+    title: '',
+    widgetType: 'kpi',
+    dataSource: 'appointments',
+    width: 4,
+    height: 2,
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [dashRes, appointRes, revRes, patRes, clinRes] =
+          await Promise.allSettled([
+            biApi.listDashboards(),
+            biApi.kpiAppointments(),
+            biApi.kpiRevenue(),
+            biApi.kpiPatients(),
+            biApi.kpiClinical(),
+          ]);
+        if (cancelled) return;
+        if (dashRes.status === 'fulfilled') setDashboards(dashRes.value);
+        if (appointRes.status === 'fulfilled') setKpiAppointments(appointRes.value);
+        if (revRes.status === 'fulfilled') setKpiRevenue(revRes.value);
+        if (patRes.status === 'fulfilled') setKpiPatients(patRes.value);
+        if (clinRes.status === 'fulfilled') setKpiClinical(clinRes.value);
+        if (dashRes.status === 'rejected' && appointRes.status === 'rejected') {
+          setError(t('bi.loadFailed'));
+        }
+      } catch {
+        if (!cancelled) setError(t('bi.loadFailed'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [t]);
+
+  const loadWidgets = async (dashboardId: string) => {
     try {
-      const r = await api.get(`/bi/dashboards/${dashId}/widgets`);
-      setWidgets(r.data.data);
-    } catch { setWidgets([]); }
+      const data = await biApi.listWidgets(dashboardId);
+      setWidgets(data);
+    } catch {
+      setWidgets([]);
+    }
   };
 
-  if (loading) return <Spinner size="lg" className="py-16" />;
+  const validateDashboardForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    const name = sanitizeString(dashboardForm.name);
+    if (!name) {
+      errors.name = t('common.required');
+    } else if (name.length > 200) {
+      errors.name = t('common.maxLength', { max: 200 });
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateWidgetForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    const title = sanitizeString(widgetForm.title);
+    if (!title) {
+      errors.title = t('common.required');
+    } else if (title.length > 200) {
+      errors.title = t('common.maxLength', { max: 200 });
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleCreateDashboard = async () => {
+    if (!validateDashboardForm()) return;
+    setSubmitting(true);
+    try {
+      await biApi.createDashboard({
+        name: sanitizeString(dashboardForm.name),
+        description: dashboardForm.description || undefined,
+        category: dashboardForm.category,
+        refreshInterval: dashboardForm.refreshInterval,
+      });
+      toast.success(t('common.created'));
+      setShowDashboardModal(false);
+      setDashboardForm({ name: '', description: '', category: 'executive', refreshInterval: '5m' });
+      setFormErrors({});
+      const updated = await biApi.listDashboards();
+      setDashboards(updated);
+    } catch {
+      toast.error(t('common.error'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteDashboard = async (id: string) => {
+    if (!window.confirm(t('common.confirmDelete'))) return;
+    try {
+      await biApi.deleteDashboard(id);
+      toast.success(t('common.deleted'));
+      setDashboards((prev) => prev.filter((d) => d.id !== id));
+      if (selectedDashboard?.id === id) {
+        setSelectedDashboard(null);
+        setWidgets([]);
+      }
+    } catch {
+      toast.error(t('common.error'));
+    }
+  };
+
+  const handleCreateWidget = async () => {
+    if (!selectedDashboard) return;
+    if (!validateWidgetForm()) return;
+    setSubmitting(true);
+    try {
+      await biApi.createWidget(selectedDashboard.id, {
+        title: sanitizeString(widgetForm.title),
+        widgetType: widgetForm.widgetType,
+        dataSource: widgetForm.dataSource,
+        width: widgetForm.width,
+        height: widgetForm.height,
+      });
+      toast.success(t('common.created'));
+      setShowWidgetModal(false);
+      setWidgetForm({ title: '', widgetType: 'kpi', dataSource: 'appointments', width: 4, height: 2 });
+      setFormErrors({});
+      await loadWidgets(selectedDashboard.id);
+    } catch {
+      toast.error(t('common.error'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteWidget = async (id: string) => {
+    if (!window.confirm(t('common.confirmDelete'))) return;
+    try {
+      await biApi.deleteWidget(id);
+      toast.success(t('common.deleted'));
+      setWidgets((prev) => prev.filter((w) => w.id !== id));
+    } catch {
+      toast.error(t('common.error'));
+    }
+  };
+
+  const filteredDashboards = dashboards.filter(
+    (d) =>
+      !search ||
+      d.name.toLowerCase().includes(search.toLowerCase()) ||
+      d.category.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return <PageLoader message={t('common.loading')} />;
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <EmptyState
+          icon={<AlertTriangle className="w-12 h-12 text-red-400" />}
+          title={t('common.error')}
+          message={error}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="page-header">
-        <div><h1 className="page-title">BI Dashboards</h1><p className="text-gray-500 mt-1">{dashboards.length} dashboards</p></div>
-        <Button><Plus className="w-4 h-4" /> New Dashboard</Button>
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">{t('bi.title')}</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {dashboards.length} {t('bi.dashboards').toLowerCase()}
+          </p>
+        </div>
+        {tab === 'dashboards' && (
+          <Button onClick={() => { setShowDashboardModal(true); setFormErrors({}); }}>
+            <Plus className="w-4 h-4 mr-1" /> {t('bi.newDashboard')}
+          </Button>
+        )}
       </div>
 
+      {/* Tabs */}
       <div className="flex gap-2 mb-6">
-        <Button variant={tab === 'dashboards' ? 'primary' : 'secondary'} onClick={() => setTab('dashboards')}><LayoutDashboard className="w-4 h-4" /> Dashboards ({dashboards.length})</Button>
-        <Button variant={tab === 'kpi' ? 'primary' : 'secondary'} onClick={() => setTab('kpi')}><TrendingUp className="w-4 h-4" /> KPIs</Button>
+        <Button
+          variant={tab === 'dashboards' ? 'primary' : 'secondary'}
+          onClick={() => setTab('dashboards')}
+        >
+          <LayoutDashboard className="w-4 h-4" />
+          <span className="ml-1">{t('bi.dashboards')} ({dashboards.length})</span>
+        </Button>
+        <Button
+          variant={tab === 'kpi' ? 'primary' : 'secondary'}
+          onClick={() => setTab('kpi')}
+        >
+          <TrendingUp className="w-4 h-4" />
+          <span className="ml-1">{t('bi.kpis')}</span>
+        </Button>
       </div>
 
+      {/* Dashboards Tab */}
       {tab === 'dashboards' && (
         <>
-          <Card className="mb-6"><CardBody>
-            <Input placeholder="Search dashboards..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-md" />
-          </CardBody></Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {dashboards.filter((d: any) => !search || d.name?.toLowerCase().includes(search.toLowerCase())).map((d: any) => (
-              <Card key={d.id} className={`cursor-pointer transition-all hover:shadow-md ${selectedDashboard?.id === d.id ? 'ring-2 ring-primary-500' : ''}`}
-                onClick={() => { setSelectedDashboard(d); loadWidgets(d.id); }}>
-                <CardBody>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold">{d.name}</h3>
-                    <Badge>{d.category}</Badge>
-                  </div>
-                  <p className="text-xs text-gray-500">{d.description || 'No description'}</p>
-                  <p className="text-xs text-gray-400 mt-2">Refresh: {d.refreshInterval} · {d.isDefault ? 'Default' : ''}</p>
-                </CardBody>
-              </Card>
-            ))}
+          <div className="mb-4 max-w-md">
+            <Input
+              placeholder={t('bi.searchPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
 
+          {filteredDashboards.length === 0 ? (
+            <EmptyState
+              icon={<LayoutDashboard className="w-12 h-12 text-gray-300" />}
+              title={t('bi.noDashboards')}
+              message={t('common.noData')}
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {filteredDashboards.map((d) => (
+                <div
+                  key={d.id}
+                  className={`bg-white rounded-lg border p-4 cursor-pointer transition-all hover:shadow-md ${
+                    selectedDashboard?.id === d.id ? 'ring-2 ring-primary-500' : ''
+                  }`}
+                  onClick={() => {
+                    setSelectedDashboard(d);
+                    void loadWidgets(d.id);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      setSelectedDashboard(d);
+                      void loadWidgets(d.id);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-sm">{escapeHtml(d.name)}</h3>
+                    <Badge>{escapeHtml(d.category)}</Badge>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {d.description ? escapeHtml(d.description) : t('bi.noDescription')}
+                  </p>
+                  <div className="flex items-center justify-between mt-3 text-xs text-gray-400">
+                    <span>
+                      {t('bi.refresh')}: {escapeHtml(d.refreshInterval)}
+                      {d.isDefault ? ` · ${t('bi.default')}` : ''}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleDeleteDashboard(d.id);
+                      }}
+                      className="text-red-400 hover:text-red-600"
+                      aria-label="Delete"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Selected Dashboard Widgets */}
           {selectedDashboard && (
             <div>
-              <h2 className="text-lg font-semibold mb-4">{selectedDashboard.name} — Widgets ({widgets.length})</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">
+                  {escapeHtml(selectedDashboard.name)} — {t('bi.widgets')} ({widgets.length})
+                </h2>
+                <Button
+                  size="sm"
+                  onClick={() => { setShowWidgetModal(true); setFormErrors({}); }}
+                >
+                  <Plus className="w-4 h-4 mr-1" /> {t('bi.widgets')}
+                </Button>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {widgets.map((w: any) => (
-                  <Card key={w.id}>
-                    <CardBody>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-sm">{w.title}</h4>
-                        <Badge>{w.widgetType}</Badge>
+                {widgets.map((w) => (
+                  <div key={w.id} className="bg-white rounded-lg border p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-sm">{escapeHtml(w.title)}</h4>
+                      <div className="flex items-center gap-2">
+                        <Badge>{escapeHtml(w.widgetType)}</Badge>
+                        <button
+                          onClick={() => void handleDeleteWidget(w.id)}
+                          className="text-red-400 hover:text-red-600 text-xs"
+                          aria-label="Delete"
+                        >
+                          ×
+                        </button>
                       </div>
-                      <p className="text-xs text-gray-500">Source: {w.dataSource} · {w.width}x{w.height}</p>
-                    </CardBody>
-                  </Card>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {t('bi.dataSource')}: {escapeHtml(w.dataSource)} · {w.width}×{w.height}
+                    </p>
+                  </div>
                 ))}
-                {widgets.length === 0 && <p className="text-gray-500 col-span-2 text-center py-8">No widgets configured for this dashboard</p>}
+                {widgets.length === 0 && (
+                  <EmptyState
+                    icon={<BarChart3 className="w-12 h-12 text-gray-300" />}
+                    title={t('bi.noWidgets')}
+                    message={t('common.noData')}
+                  />
+                )}
               </div>
             </div>
           )}
         </>
       )}
 
+      {/* KPI Tab */}
       {tab === 'kpi' && (
         <div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Card><CardBody>
+            {/* Appointments KPI */}
+            <div className="bg-white rounded-lg border p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg"><Activity className="w-5 h-5 text-blue-600" /></div>
-                <div><p className="text-xs text-gray-500">Appointments</p><p className="text-xl font-bold">{kpiData.appointments?.total || 0}</p></div>
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Activity className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">{t('bi.appointments')}</p>
+                  <p className="text-xl font-bold">
+                    {kpiAppointments?.total ?? 0}
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-gray-400 mt-2">{kpiData.appointments?.today || 0} today</p>
-            </CardBody></Card>
-            <Card><CardBody>
+              <p className="text-xs text-gray-400 mt-2">
+                {kpiAppointments?.today ?? 0} {t('bi.today')}
+              </p>
+            </div>
+
+            {/* Revenue KPI */}
+            <div className="bg-white rounded-lg border p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg"><DollarSign className="w-5 h-5 text-green-600" /></div>
-                <div><p className="text-xs text-gray-500">Revenue</p><p className="text-xl font-bold">{Number(kpiData.revenue?.total || 0).toFixed(0)} EGP</p></div>
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <DollarSign className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">{t('bi.revenue')}</p>
+                  <p className="text-xl font-bold">
+                    {(kpiRevenue?.total ?? 0).toLocaleString()} EGP
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-gray-400 mt-2">{Number(kpiData.revenue?.recent || 0).toFixed(0)} EGP (30d)</p>
-            </CardBody></Card>
-            <Card><CardBody>
+              <p className="text-xs text-gray-400 mt-2">
+                {(kpiRevenue?.recent ?? 0).toLocaleString()} EGP ({t('bi.last30Days')})
+              </p>
+            </div>
+
+            {/* Patients KPI */}
+            <div className="bg-white rounded-lg border p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg"><Users className="w-5 h-5 text-purple-600" /></div>
-                <div><p className="text-xs text-gray-500">Patients</p><p className="text-xl font-bold">{kpiData.patients?.total || 0}</p></div>
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Users className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">{t('bi.patients')}</p>
+                  <p className="text-xl font-bold">
+                    {(kpiPatients?.total ?? 0).toLocaleString()}
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-gray-400 mt-2">{kpiData.patients?.newThisMonth || 0} new this month</p>
-            </CardBody></Card>
-            <Card><CardBody>
+              <p className="text-xs text-gray-400 mt-2">
+                {kpiPatients?.newThisMonth ?? 0} {t('bi.newThisMonth')}
+              </p>
+            </div>
+
+            {/* Clinical KPI */}
+            <div className="bg-white rounded-lg border p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg"><BarChart3 className="w-5 h-5 text-orange-600" /></div>
-                <div><p className="text-xs text-gray-500">Clinical</p><p className="text-xl font-bold">{kpiData.clinical?.labOrders || 0}</p></div>
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <BarChart3 className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">{t('bi.clinical')}</p>
+                  <p className="text-xl font-bold">
+                    {kpiClinical?.labOrders ?? 0}
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-gray-400 mt-2">{kpiData.clinical?.prescriptions || 0} RX · {kpiData.clinical?.radiologyOrders || 0} imaging</p>
-            </CardBody></Card>
+              <p className="text-xs text-gray-400 mt-2">
+                {kpiClinical?.prescriptions ?? 0} {t('bi.prescriptions')} ·{' '}
+                {kpiClinical?.radiologyOrders ?? 0} {t('bi.imaging')}
+              </p>
+            </div>
           </div>
 
-          <Card><CardBody>
-            <h3 className="font-semibold mb-3">Appointments by Status</h3>
-            {kpiData.appointments?.byStatus?.length > 0 ? (
+          {/* Appointments by Status */}
+          <div className="bg-white rounded-lg border p-4">
+            <h3 className="font-semibold mb-3">{t('bi.byStatus')}</h3>
+            {(kpiAppointments?.byStatus ?? []).length > 0 ? (
               <div className="flex gap-4 flex-wrap">
-                {kpiData.appointments.byStatus.map((s: any) => (
+                {kpiAppointments!.byStatus.map((s) => (
                   <div key={s.status} className="flex items-center gap-2">
-                    <Badge>{s.status}</Badge>
+                    <Badge>{escapeHtml(s.status)}</Badge>
                     <span className="font-medium">{s.count}</span>
                   </div>
                 ))}
               </div>
-            ) : <p className="text-sm text-gray-500">No appointment data</p>}
-          </CardBody></Card>
+            ) : (
+              <p className="text-sm text-gray-500">{t('bi.noAppointmentData')}</p>
+            )}
+          </div>
         </div>
       )}
+
+      {/* Create Dashboard Modal */}
+      <Modal
+        open={showDashboardModal}
+        onClose={() => { setShowDashboardModal(false); setFormErrors({}); }}
+        title={t('bi.newDashboard')}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => { setShowDashboardModal(false); setFormErrors({}); }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleCreateDashboard} loading={submitting}>
+              {t('common.create')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label={t('bi.name')}
+            required
+            value={dashboardForm.name}
+            onChange={(e) =>
+              setDashboardForm((prev) => ({ ...prev, name: e.target.value }))
+            }
+            error={formErrors.name}
+          />
+          <Input
+            label={t('bi.description')}
+            value={dashboardForm.description}
+            onChange={(e) =>
+              setDashboardForm((prev) => ({ ...prev, description: e.target.value }))
+            }
+          />
+          <Select
+            label={t('bi.category')}
+            value={dashboardForm.category}
+            onChange={(e) =>
+              setDashboardForm((prev) => ({ ...prev, category: e.target.value }))
+            }
+            options={CATEGORY_OPTIONS}
+          />
+          <Select
+            label={t('bi.refreshInterval')}
+            value={dashboardForm.refreshInterval}
+            onChange={(e) =>
+              setDashboardForm((prev) => ({
+                ...prev,
+                refreshInterval: e.target.value,
+              }))
+            }
+            options={REFRESH_OPTIONS}
+          />
+        </div>
+      </Modal>
+
+      {/* Create Widget Modal */}
+      <Modal
+        open={showWidgetModal}
+        onClose={() => { setShowWidgetModal(false); setFormErrors({}); }}
+        title={t('bi.widgets')}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => { setShowWidgetModal(false); setFormErrors({}); }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleCreateWidget} loading={submitting}>
+              {t('common.create')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label={t('bi.name')}
+            required
+            value={widgetForm.title}
+            onChange={(e) =>
+              setWidgetForm((prev) => ({ ...prev, title: e.target.value }))
+            }
+            error={formErrors.title}
+          />
+          <Select
+            label={t('bi.widgetType')}
+            value={widgetForm.widgetType}
+            onChange={(e) =>
+              setWidgetForm((prev) => ({ ...prev, widgetType: e.target.value }))
+            }
+            options={[
+              { value: 'kpi', label: 'KPI' },
+              { value: 'chart', label: 'Chart' },
+              { value: 'table', label: 'Table' },
+              { value: 'gauge', label: 'Gauge' },
+              { value: 'text', label: 'Text' },
+            ]}
+          />
+          <Select
+            label={t('bi.dataSource')}
+            value={widgetForm.dataSource}
+            onChange={(e) =>
+              setWidgetForm((prev) => ({ ...prev, dataSource: e.target.value }))
+            }
+            options={[
+              { value: 'appointments', label: t('bi.appointments') },
+              { value: 'revenue', label: t('bi.revenue') },
+              { value: 'patients', label: t('bi.patients') },
+              { value: 'clinical', label: t('bi.clinical') },
+            ]}
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label={t('bi.width')}
+              type="number"
+              min={1}
+              max={12}
+              value={widgetForm.width}
+              onChange={(e) =>
+                setWidgetForm((prev) => ({
+                  ...prev,
+                  width: parseInt(e.target.value, 10) || 4,
+                }))
+              }
+            />
+            <Input
+              label={t('bi.height')}
+              type="number"
+              min={1}
+              max={12}
+              value={widgetForm.height}
+              onChange={(e) =>
+                setWidgetForm((prev) => ({
+                  ...prev,
+                  height: parseInt(e.target.value, 10) || 2,
+                }))
+              }
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
