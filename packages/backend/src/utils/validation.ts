@@ -507,7 +507,9 @@ export const insuranceClaimsListSchema = z.object({
   status: z.string().optional(),
   insuranceId: z.string().uuid().optional(),
   patientId: z.string().uuid().optional(),
-});\n\n// ── Integrations ──
+});
+
+// ── Integrations ──
 export const createIntegrationConnectionSchema = z.object({
   definitionId: z.string().uuid(),
   name: z.string().min(1).max(200),
@@ -541,7 +543,10 @@ export const updateWebhookSchema = z.object({
   headers: z.record(z.string()).optional(),
   status: z.enum(['active', 'disabled', 'paused']).optional(),
   retryCount: z.number().int().min(0).max(10).optional(),
-});\n\n\n// ── SaaS Billing ──
+});
+
+
+// ── SaaS Billing ──
 export const createSubscriptionSchema = z.object({
   planId: z.string().uuid(),
   billingCycle: z.enum(['monthly', 'yearly']).default('monthly'),
@@ -559,7 +564,10 @@ export const trackUsageSchema = z.object({
   metric: z.string().min(1).max(100),
   quantity: z.number().int().min(1).default(1),
   recordDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-});\n\n\n// ── White-Label ──
+});
+
+
+// ── White-Label ──
 export const updateBrandingSchema = z.object({
   brandName: z.string().max(200).optional(),
   logoUrl: z.string().url().optional().nullable(),
@@ -575,7 +583,10 @@ export const updateBrandingSchema = z.object({
 export const addDomainSchema = z.object({
   domain: z.string().min(3).max(253).regex(/^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)*\.[a-z]{2,}$/i),
   isPrimary: z.boolean().optional().default(false),
-});\n\n\n// ── Compliance Reports ──
+});
+
+
+// ── Compliance Reports ──
 export const createComplianceReportSchema = z.object({
   title: z.string().min(1).max(200),
   type: z.enum(['internal', 'external', 'regulatory', 'hipaa', 'gdpr']).default('internal'),
@@ -626,7 +637,10 @@ export const updateBaaSchema = z.object({
   scope: z.string().max(2000).optional(),
   terms: z.string().max(50000).optional(),
   expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-});\n\n\n// ── DR Backup ──
+});
+
+
+// ── DR Backup ──
 export const createBackupConfigSchema = z.object({
   name: z.string().min(1).max(200),
   type: z.enum(['full', 'incremental', 'differential']).default('full'),
@@ -656,4 +670,4 @@ export const updateDrConfigSchema = z.object({
   rtoMinutes: z.number().int().min(1).max(1440).optional(),
   crossRegionReplication: z.boolean().optional(),
   secondaryRegion: z.string().max(100).optional().nullable(),
-});\n
+});
