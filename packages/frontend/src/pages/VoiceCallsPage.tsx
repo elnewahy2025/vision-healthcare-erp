@@ -1,8 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardBody, Button, Input, Select, Modal, Spinner, EmptyState } from '../components/ui';
-import { PhoneCall, Phone, PhoneIncoming, PhoneOutgoing, Clock, BarChart3, Plus, Search, Video } from 'lucide-react';
+import toast from 'react-hot-toast';
+import {
+  PhoneCall, Phone, Clock, BarChart3, Plus, Video,
+} from 'lucide-react';
+import {
+  Card, CardBody, Button, Input, Select, Modal, Badge, Table,
+  PageLoader,
+  type Column,
+} from '../components/ui';
 import api from '../lib/api';
+import { sanitizeString, escapeHtml } from '../lib/sanitize';
+import { isValidEgyptianPhone } from '../lib/validators';
+
+/* ── Types ─────────────────────────────────────────────────────────── */
+
+type VoiceTab = 'calls' | 'make' | 'stats';
 
 interface VoiceCall {
   id: string;
@@ -26,101 +39,227 @@ interface VoiceStats {
   byType: Array<{ call_type: string; count: number }>;
 }
 
+interface Participant {
+  phone: string;
+  role: 'doctor' | 'patient' | 'staff';
+}
+
+/* ── Constants ─────────────────────────────────────────────────────── */
+
+const STATUS_VARIANTS: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'gray'> = {
+  completed: 'success',
+  answered: 'info',
+  ringing: 'warning',
+  initiated: 'gray',
+  failed: 'danger',
+  busy: 'warning',
+  'no-answer': 'info',
+};
+
+/* ── Helpers ───────────────────────────────────────────────────────── */
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/* ── Component ─────────────────────────────────────────────────────── */
+
 export default function VoiceCallsPage() {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<'calls' | 'make' | 'stats'>('calls');
-  const [calls, setCalls] = useState<VoiceCall[]>([]);
-  const [stats, setStats] = useState<VoiceStats | null>(null);
+  const [tab, setTab] = useState<VoiceTab>('calls');
   const [loading, setLoading] = useState(true);
-  const [callLoading, setCallLoading] = useState(false);
-  const [pagination, setPagination] = useState({ page: 1, total: 1, limit: 20 });
+
+  /* ── Calls ── */
+  const [calls, setCalls] = useState<VoiceCall[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
   const [selectedCall, setSelectedCall] = useState<VoiceCall | null>(null);
-  const [showConferenceModal, setShowConferenceModal] = useState(false);
 
-  const [callForm, setCallForm] = useState({
-    toNumber: '',
-    notes: '',
-  });
+  /* ── Stats ── */
+  const [stats, setStats] = useState<VoiceStats | null>(null);
 
-  const [conferenceForm, setConferenceForm] = useState<{
-    participants: Array<{ phone: string; role: 'doctor' | 'patient' | 'staff' }>;
-  }>({
-    participants: [{ phone: '', role: 'doctor' }, { phone: '', role: 'patient' }],
-  });
+  /* ── Make call ── */
+  const [callForm, setCallForm] = useState({ toNumber: '', notes: '' });
+  const [callErrors, setCallErrors] = useState<Record<string, string>>({});
+  const [callLoading, setCallLoading] = useState(false);
 
-  const loadCalls = async () => {
+  /* ── Conference ── */
+  const [showConference, setShowConference] = useState(false);
+  const [participants, setParticipants] = useState<Participant[]>([
+    { phone: '', role: 'doctor' },
+    { phone: '', role: 'patient' },
+  ]);
+
+  /* ── Data fetching ── */
+
+  const fetchCalls = useCallback(async (): Promise<void> => {
     try {
-      const params: any = { page: pagination.page, limit: pagination.limit };
+      const params: Record<string, string | number> = { page: String(page), limit: '20' };
       if (statusFilter) params.status = statusFilter;
-      if (typeFilter) params.callType = typeFilter;
-      const res = await api.get('/voice/calls', { params });
-      setCalls(res.data.data);
-      setPagination(prev => ({ ...prev, total: res.data.pagination.totalPages }));
-    } catch { /* empty */ }
-  };
+      const { data } = await api.get('/voice/calls', { params });
+      setCalls((data.data ?? []) as VoiceCall[]);
+      setTotalPages(data.pagination?.totalPages ?? 1);
+    } catch {
+      toast.error(t('voice.loadFailed'));
+    }
+  }, [page, statusFilter, t]);
 
-  const loadStats = async () => {
+  const fetchStats = useCallback(async (): Promise<void> => {
     try {
-      const res = await api.get('/voice/stats');
-      setStats(res.data.data);
-    } catch { /* empty */ }
-  };
+      const { data } = await api.get('/voice/stats');
+      setStats((data.data ?? null) as VoiceStats | null);
+    } catch { /* non-critical */ }
+  }, []);
+
+  /* ── Initial load ── */
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([loadCalls(), loadStats()]).finally(() => setLoading(false));
-  }, [tab, statusFilter, typeFilter, pagination.page]);
-
-  const handleCall = async () => {
-    if (!callForm.toNumber) return;
-    setCallLoading(true);
-    try {
-      await api.post('/voice/call', { toNumber: callForm.toNumber, notes: callForm.notes || undefined });
-      setCallForm({ toNumber: '', notes: '' });
-      loadCalls();
-      setTab('calls');
-    } finally { setCallLoading(false); }
-  };
-
-  const handleConference = async () => {
-    const validParticipants = conferenceForm.participants.filter(p => p.phone);
-    if (validParticipants.length < 2) return;
-    setCallLoading(true);
-    try {
-      await api.post('/voice/conference', { participants: validParticipants });
-      setShowConferenceModal(false);
-      setConferenceForm({ participants: [{ phone: '', role: 'doctor' }, { phone: '', role: 'patient' }] });
-      loadCalls();
-    } finally { setCallLoading(false); }
-  };
-
-  const formatDuration = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const statusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      initiated: 'bg-gray-100 text-gray-800',
-      ringing: 'bg-yellow-100 text-yellow-800',
-      answered: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
-      busy: 'bg-orange-100 text-orange-800',
-      'no-answer': 'bg-purple-100 text-purple-800',
+    let cancelled = false;
+    const loadAll = async (): Promise<void> => {
+      setLoading(true);
+      await Promise.allSettled([fetchCalls(), fetchStats()]);
+      if (!cancelled) setLoading(false);
     };
-    return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors[status] || 'bg-gray-100 text-gray-800'}`}>{status}</span>;
-  };
+    void loadAll();
+    return () => { cancelled = true; };
+  }, [fetchCalls, fetchStats]);
 
-  const formatNumber = (n: string) => {
-    if (n.startsWith('+2')) return n;
-    return `+${n.replace(/[^0-9]/g, '')}`;
-  };
+  /* ── Tab data loading ── */
 
-  if (loading) return <Spinner size="lg" />;
+  useEffect(() => {
+    if (tab !== 'calls' && tab !== 'stats') return;
+    let cancelled = false;
+    const loadTab = async (): Promise<void> => {
+      if (tab === 'calls') {
+        try {
+          const params: Record<string, string | number> = { page: String(page), limit: '20' };
+          if (statusFilter) params.status = statusFilter;
+          const { data } = await api.get('/voice/calls', { params });
+          if (!cancelled) {
+            setCalls((data.data ?? []) as VoiceCall[]);
+            setTotalPages(data.pagination?.totalPages ?? 1);
+          }
+        } catch { if (!cancelled) toast.error(t('voice.loadFailed')); }
+      }
+      if (tab === 'stats') {
+        try {
+          const { data } = await api.get('/voice/stats');
+          if (!cancelled) setStats((data.data ?? null) as VoiceStats | null);
+        } catch { /* non-critical */ }
+      }
+    };
+    void loadTab();
+    return () => { cancelled = true; };
+  }, [tab, page, statusFilter, t]);
+
+  /* ── Make call handler ── */
+
+  const handleCall = useCallback(async (): Promise<void> => {
+    const errors: Record<string, string> = {};
+    if (!callForm.toNumber.trim()) errors.toNumber = t('common.required');
+    else if (!isValidEgyptianPhone(callForm.toNumber)) errors.toNumber = 'Invalid phone number';
+    setCallErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    setCallLoading(true);
+    try {
+      await api.post('/voice/call', {
+        toNumber: callForm.toNumber.trim(),
+        notes: sanitizeString(callForm.notes) || undefined,
+      });
+      toast.success(t('voice.callInitiated'));
+      setCallForm({ toNumber: '', notes: '' });
+      setTab('calls');
+      void fetchCalls();
+    } catch {
+      toast.error(t('voice.callFailed'));
+    } finally {
+      setCallLoading(false);
+    }
+  }, [callForm, t, fetchCalls]);
+
+  /* ── Conference handler ── */
+
+  const handleConference = useCallback(async (): Promise<void> => {
+    const valid = participants.filter((p) => p.phone.trim());
+    if (valid.length < 2) {
+      toast.error(t('voice.minParticipants'));
+      return;
+    }
+
+    setCallLoading(true);
+    try {
+      await api.post('/voice/conference', {
+        participants: valid.map((p) => ({
+          phone: p.phone.trim(),
+          role: p.role,
+        })),
+      });
+      toast.success(t('voice.conferenceStarted'));
+      setShowConference(false);
+      setParticipants([{ phone: '', role: 'doctor' }, { phone: '', role: 'patient' }]);
+      void fetchCalls();
+    } catch {
+      toast.error(t('voice.conferenceFailed'));
+    } finally {
+      setCallLoading(false);
+    }
+  }, [participants, t, fetchCalls]);
+
+  /* ── Table columns ── */
+
+  const callColumns: Column<VoiceCall>[] = [
+    {
+      key: 'from_number',
+      header: t('voice.fromNumber'),
+      render: (item) => <span className="font-mono text-sm">{escapeHtml(item.from_number)}</span>,
+    },
+    {
+      key: 'to_number',
+      header: t('voice.toNumberLabel'),
+      render: (item) => <span className="font-mono text-sm">{escapeHtml(item.to_number)}</span>,
+    },
+    {
+      key: 'call_type',
+      header: t('voice.type'),
+      render: (item) => <Badge>{item.call_type}</Badge>,
+    },
+    {
+      key: 'duration_seconds',
+      header: t('voice.duration'),
+      render: (item) => (
+        <span className="flex items-center gap-1">
+          <Clock className="w-3 h-3 text-gray-400" />
+          {formatDuration(item.duration_seconds)}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: t('voice.status'),
+      render: (item) => (
+        <Badge variant={STATUS_VARIANTS[item.status] ?? 'gray'}>{item.status}</Badge>
+      ),
+    },
+    {
+      key: 'created_at',
+      header: t('voice.date'),
+      render: (item) => <span className="text-sm">{escapeHtml(item.created_at?.split('T')[0] ?? '-')}</span>,
+    },
+  ];
+
+  /* ── Tabs ── */
+
+  const tabs: Array<{ key: VoiceTab; icon: React.ReactNode; label: string }> = [
+    { key: 'calls', icon: <PhoneCall className="w-4 h-4" />, label: t('voice.callsTab') },
+    { key: 'make', icon: <Plus className="w-4 h-4" />, label: t('voice.makeTab') },
+    { key: 'stats', icon: <BarChart3 className="w-4 h-4" />, label: t('voice.statsTab') },
+  ];
+
+  /* ── Render ── */
 
   return (
     <div className="space-y-6">
@@ -131,246 +270,254 @@ export default function VoiceCallsPage() {
             <PhoneCall className="w-6 h-6 text-purple-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">{t('nav.voiceCalls')}</h1>
-            <p className="text-sm text-gray-500">Manage and log voice calls via Twilio</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('voice.title')}</h1>
+            <p className="text-sm text-gray-500">{t('voice.subtitle')}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setShowConferenceModal(true)} icon={<Video className="w-4 h-4" />}>
-            Conference
+          <Button variant="secondary" onClick={() => setShowConference(true)}>
+            <Video className="w-4 h-4 mr-1" />
+            {t('voice.conferenceCall')}
           </Button>
-          <Button onClick={() => setTab('make')} icon={<Phone className="w-4 h-4" />}>
-            New Call
+          <Button onClick={() => setTab('make')}>
+            <Phone className="w-4 h-4 mr-1" />
+            {t('voice.makeCall')}
           </Button>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tab Navigation */}
       <div className="flex gap-2 border-b border-gray-200 pb-2">
-        {(['calls', 'make', 'stats'] as const).map(tabKey => (
+        {tabs.map((tabItem) => (
           <button
-            key={tabKey}
-            onClick={() => setTab(tabKey)}
-            className={`px-4 py-2 rounded-lg font-medium capitalize transition-colors ${
-              tab === tabKey ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+            key={tabItem.key}
+            onClick={() => setTab(tabItem.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === tabItem.key
+                ? 'bg-primary-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
-            {tabKey === 'make' ? 'New Call' : tabKey}
+            {tabItem.icon}
+            {tabItem.label}
           </button>
         ))}
       </div>
 
-      {/* Stats Tab */}
-      {tab === 'stats' && stats && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card><CardBody>
-              <p className="text-sm text-gray-500">Total Calls</p>
-              <p className="text-3xl font-bold text-purple-600">{stats.total}</p>
-            </CardBody></Card>
-            <Card><CardBody>
-              <p className="text-sm text-gray-500">Today</p>
-              <p className="text-3xl font-bold text-blue-600">{stats.today}</p>
-            </CardBody></Card>
-            <Card><CardBody>
-              <p className="text-sm text-gray-500">Total Minutes</p>
-              <p className="text-3xl font-bold text-green-600">{stats.totalMinutes}</p>
-            </CardBody></Card>
-            {stats.byStatus?.slice(0, 1).map(s => (
-              <Card key={s.status}><CardBody>
-                <p className="text-sm text-gray-500 capitalize">{s.status}</p>
-                <p className="text-3xl font-bold">{Number(s.count)}</p>
-              </CardBody></Card>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card><CardBody>
-              <h3 className="font-semibold mb-3">By Status</h3>
-              <div className="space-y-2">
-                {stats.byStatus?.map(s => (
-                  <div key={s.status} className="flex justify-between items-center">
-                    {statusBadge(s.status)}
-                    <span className="font-medium">{Number(s.count)} calls</span>
-                  </div>
-                ))}
+      {/* Content */}
+      {loading ? (
+        <PageLoader message={t('common.loading')} />
+      ) : (
+        <>
+          {/* ── CALLS TAB ── */}
+          {tab === 'calls' && (
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <Select
+                  label={t('voice.status')}
+                  value={statusFilter}
+                  onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                  options={[
+                    { value: '', label: t('voice.filterAll') },
+                    { value: 'completed', label: t('voice.filterCompleted') },
+                    { value: 'failed', label: t('voice.filterFailed') },
+                    { value: 'ringing', label: t('voice.filterRinging') },
+                  ]}
+                />
               </div>
-            </CardBody></Card>
-            <Card><CardBody>
-              <h3 className="font-semibold mb-3">By Type</h3>
-              <div className="space-y-2">
-                {stats.byType?.map(t => (
-                  <div key={t.call_type} className="flex justify-between items-center">
-                    <span className="capitalize text-sm font-medium">{t.call_type}</span>
-                    <span className="font-medium">{Number(t.count)} calls</span>
-                  </div>
-                ))}
-              </div>
-            </CardBody></Card>
-          </div>
-        </div>
-      )}
-
-      {/* Make Call Tab */}
-      {tab === 'make' && (
-        <Card><CardBody>
-          <h3 className="font-semibold mb-4">Make a Voice Call</h3>
-          <div className="space-y-4 max-w-lg">
-            <Input label="To Number" placeholder="+201234567890" value={callForm.toNumber}
-              onChange={(e) => setCallForm(p => ({ ...p, toNumber: e.target.value }))} />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-              <textarea className="w-full rounded-lg border-gray-300 border p-3 h-24" placeholder="Call notes..."
-                value={callForm.notes} onChange={(e) => setCallForm(p => ({ ...p, notes: e.target.value }))} />
-            </div>
-            <Button onClick={handleCall} disabled={callLoading || !callForm.toNumber}
-              icon={<Phone className="w-4 h-4" />}>
-              {callLoading ? 'Calling...' : 'Start Call'}
-            </Button>
-          </div>
-        </CardBody></Card>
-      )}
-
-      {/* Calls List Tab */}
-      {tab === 'calls' && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              options={[
-                { value: '', label: 'All Statuses' },
-                { value: 'completed', label: 'Completed' },
-                { value: 'failed', label: 'Failed' },
-                { value: 'ringing', label: 'Ringing' },
-                { value: 'no-answer', label: 'No Answer' },
-              ]}
-            />
-            <Select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              options={[
-                { value: '', label: 'All Types' },
-                { value: 'outbound', label: 'Outbound' },
-                { value: 'inbound', label: 'Inbound' },
-                { value: 'conference', label: 'Conference' },
-              ]}
-            />
-          </div>
-
-          {calls.length === 0 ? (
-            <EmptyState icon={<PhoneCall className="w-12 h-12" />} title="No calls" message="No voice calls found" />
-          ) : (
-            <div className="bg-white rounded-xl border overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">From</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">To</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {calls.map(call => (
-                    <tr key={call.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                          call.call_type === 'inbound' ? 'bg-green-100 text-green-800' :
-                          call.call_type === 'conference' ? 'bg-blue-100 text-blue-800' :
-                          'bg-purple-100 text-purple-800'
-                        }`}>{call.call_type}</span>
-                      </td>
-                      <td className="px-4 py-3 text-sm">{formatNumber(call.from_number)}</td>
-                      <td className="px-4 py-3 text-sm">{formatNumber(call.to_number)}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-gray-400" />
-                          {formatDuration(call.duration_seconds)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{statusBadge(call.status)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{new Date(call.created_at).toLocaleString()}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => setSelectedCall(call)} className="p-1 rounded hover:bg-gray-100">
-                          <Phone className="w-4 h-4 text-gray-500" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="flex justify-between items-center px-4 py-3 border-t">
-                <span className="text-sm text-gray-500">Page {pagination.page} of {pagination.total}</span>
-                <div className="flex gap-2">
-                  <Button variant="secondary" size="sm" disabled={pagination.page <= 1}
-                    onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}>Prev</Button>
-                  <Button variant="secondary" size="sm" disabled={pagination.page >= pagination.total}
-                    onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}>Next</Button>
+              <Card>
+                <CardBody className="p-0">
+                  <Table<VoiceCall>
+                    columns={callColumns}
+                    data={calls}
+                    loading={false}
+                    emptyMessage={t('voice.loadFailed')}
+                    onRowClick={(item) => setSelectedCall(item)}
+                  />
+                </CardBody>
+              </Card>
+              {totalPages > 1 && (
+                <div className="flex justify-between items-center">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    {t('voice.prev')}
+                  </Button>
+                  <span className="text-sm text-gray-500">
+                    {t('voice.pageOf', { current: String(page), total: String(totalPages) } as Record<string, unknown>)}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                  >
+                    {t('voice.next')}
+                  </Button>
                 </div>
-              </div>
+              )}
             </div>
           )}
-        </div>
+
+          {/* ── MAKE CALL TAB ── */}
+          {tab === 'make' && (
+            <Card>
+              <CardBody className="p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">{t('voice.makeCall')}</h3>
+                <div className="space-y-4 max-w-lg">
+                  <Input
+                    label={t('voice.toNumber')}
+                    placeholder={t('voice.toNumberPlaceholder')}
+                    value={callForm.toNumber}
+                    onChange={(e) => setCallForm((p) => ({ ...p, toNumber: e.target.value }))}
+                    error={callErrors.toNumber}
+                  />
+                  <Input
+                    label={t('voice.notes')}
+                    placeholder={t('voice.notesPlaceholder')}
+                    value={callForm.notes}
+                    onChange={(e) => setCallForm((p) => ({ ...p, notes: e.target.value }))}
+                  />
+                  <Button onClick={() => void handleCall()} disabled={callLoading}>
+                    <Phone className="w-4 h-4 mr-1" />
+                    {callLoading ? t('voice.calling') : t('voice.makeCall')}
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          )}
+
+          {/* ── STATS TAB ── */}
+          {tab === 'stats' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card>
+                <CardBody className="p-5 text-center">
+                  <p className="text-3xl font-bold text-gray-900">{stats?.total ?? 0}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t('voice.totalCalls')}</p>
+                </CardBody>
+              </Card>
+              <Card>
+                <CardBody className="p-5 text-center">
+                  <p className="text-3xl font-bold text-green-600">{stats?.today ?? 0}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t('voice.callsToday')}</p>
+                </CardBody>
+              </Card>
+              <Card>
+                <CardBody className="p-5 text-center">
+                  <p className="text-3xl font-bold text-blue-600">{stats?.totalMinutes ?? 0}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t('voice.totalMinutes')}</p>
+                </CardBody>
+              </Card>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Call Detail Modal */}
-      {selectedCall && (
-        <Modal open={!!selectedCall} onClose={() => setSelectedCall(null)} title="Call Details">
-          <div className="space-y-3">
-            <div className="flex justify-between"><span className="text-gray-500">Type:</span><span className="capitalize">{selectedCall.call_type}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">From:</span><span>{formatNumber(selectedCall.from_number)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">To:</span><span>{formatNumber(selectedCall.to_number)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Duration:</span><span>{formatDuration(selectedCall.duration_seconds)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Status:</span>{statusBadge(selectedCall.status)}</div>
-            <div className="flex justify-between"><span className="text-gray-500">Date:</span><span>{new Date(selectedCall.created_at).toLocaleString()}</span></div>
+      {/* ── Call Detail Modal ── */}
+      <Modal
+        open={!!selectedCall}
+        onClose={() => setSelectedCall(null)}
+        title={t('voice.callDetails')}
+      >
+        {selectedCall && (
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">{t('voice.type')}</span>
+              <span className="capitalize">{escapeHtml(selectedCall.call_type)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">{t('voice.fromNumber')}</span>
+              <span className="font-mono">{escapeHtml(selectedCall.from_number)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">{t('voice.toNumberLabel')}</span>
+              <span className="font-mono">{escapeHtml(selectedCall.to_number)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">{t('voice.duration')}</span>
+              <span>{formatDuration(selectedCall.duration_seconds)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">{t('voice.status')}</span>
+              <Badge variant={STATUS_VARIANTS[selectedCall.status] ?? 'gray'}>
+                {selectedCall.status}
+              </Badge>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">{t('voice.date')}</span>
+              <span>{escapeHtml(new Date(selectedCall.created_at).toLocaleString())}</span>
+            </div>
             {selectedCall.notes && (
-              <div><p className="text-gray-500 mb-1">Notes:</p><p className="bg-gray-50 p-3 rounded-lg">{selectedCall.notes}</p></div>
+              <div>
+                <p className="text-gray-500 mb-1">{t('voice.notesLabel')}</p>
+                <p className="bg-gray-50 p-3 rounded-lg">{escapeHtml(selectedCall.notes)}</p>
+              </div>
             )}
           </div>
-        </Modal>
-      )}
+        )}
+      </Modal>
 
-      {/* Conference Modal */}
-      {showConferenceModal && (
-        <Modal open={showConferenceModal} onClose={() => setShowConferenceModal(false)} title="Conference Call">
-          <div className="space-y-4">
-            <p className="text-sm text-gray-500">Add at least 2 participants for a conference call.</p>
-            {conferenceForm.participants.map((p, i) => (
-              <div key={i} className="grid grid-cols-2 gap-2">
-                <Input label={`Participant ${i + 1} Phone`} placeholder="+201234567890" value={p.phone}
-                  onChange={(e) => {
-                    const newParts = [...conferenceForm.participants];
-                    newParts[i] = { ...newParts[i], phone: e.target.value };
-                    setConferenceForm({ participants: newParts });
-                  }} />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                  <select className="w-full rounded-lg border-gray-300 border p-2" value={p.role}
-                    onChange={(e) => {
-                      const newParts = [...conferenceForm.participants];
-                      newParts[i] = { ...newParts[i], role: e.target.value as any };
-                      setConferenceForm({ participants: newParts });
-                    }}>
-                    <option value="doctor">Doctor</option>
-                    <option value="patient">Patient</option>
-                    <option value="staff">Staff</option>
-                  </select>
-                </div>
-              </div>
-            ))}
-            <Button variant="secondary" size="sm" onClick={() =>
-              setConferenceForm(p => ({ participants: [...p.participants, { phone: '', role: 'staff' }] }))
-            }>+ Add Participant</Button>
-            <Button onClick={handleConference} disabled={callLoading || conferenceForm.participants.filter(p => p.phone).length < 2}
-              icon={<Video className="w-4 h-4" />}>
-              {callLoading ? 'Starting...' : 'Start Conference'}
+      {/* ── Conference Modal ── */}
+      <Modal
+        open={showConference}
+        onClose={() => setShowConference(false)}
+        title={t('voice.conferenceCall')}
+        size="md"
+        footer={
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" onClick={() => setShowConference(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={() => void handleConference()}
+              disabled={callLoading || participants.filter((p) => p.phone.trim()).length < 2}
+            >
+              <Video className="w-4 h-4 mr-1" />
+              {callLoading ? t('voice.starting') : t('voice.startConference')}
             </Button>
           </div>
-        </Modal>
-      )}
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500">{t('voice.minParticipants')}</p>
+          {participants.map((p, idx) => (
+            <div key={idx} className="grid grid-cols-2 gap-3">
+              <Input
+                label={t('voice.participantPhone', { num: String(idx + 1) } as Record<string, unknown>)}
+                placeholder={t('voice.toNumberPlaceholder')}
+                value={p.phone}
+                onChange={(e) => {
+                  const next = [...participants];
+                  next[idx] = { ...next[idx], phone: e.target.value };
+                  setParticipants(next);
+                }}
+              />
+              <Select
+                label={t('voice.role')}
+                value={p.role}
+                onChange={(e) => {
+                  const next = [...participants];
+                  next[idx] = { ...next[idx], role: e.target.value as Participant['role'] };
+                  setParticipants(next);
+                }}
+                options={[
+                  { value: 'doctor', label: t('voice.doctor') },
+                  { value: 'patient', label: t('voice.patient') },
+                  { value: 'staff', label: t('voice.staff') },
+                ]}
+              />
+            </div>
+          ))}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setParticipants((prev) => [...prev, { phone: '', role: 'staff' }])}
+          >
+            {t('voice.addParticipant')}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }
