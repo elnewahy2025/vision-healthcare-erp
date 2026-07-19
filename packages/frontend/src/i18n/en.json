@@ -2600,5 +2600,18 @@
   "sec.mfaDisabled": "Two-factor authentication disabled",
   "sec.invalidCode": "Invalid code",
   "sec.enter6Digit": "Enter 6-digit code",
-  "sec.failedMfaSetup": "Failed to start MFA setup"
+  "sec.failedMfaSetup": "Failed to start MFA setup",
+  "admin.title": "Administration",
+  "admin.userManagement": "User Management",
+  "admin.userManagementDesc": "Manage staff accounts and roles",
+  "admin.securitySettings": "Security Settings",
+  "admin.securitySettingsDesc": "Authentication, 2FA, and access control",
+  "admin.systemMonitor": "System Monitor",
+  "admin.systemMonitorDesc": "Server health and performance",
+  "admin.auditLogs": "Audit Logs",
+  "admin.auditLogsDesc": "Activity tracking and compliance",
+  "admin.dataManagement": "Data Management",
+  "admin.dataManagementDesc": "Import, export, and backup settings",
+  "admin.integrations": "Integrations",
+  "admin.integrationsDesc": "Third-party service connections"
 }

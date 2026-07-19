@@ -2598,5 +2598,18 @@
   "sec.mfaDisabled": "تم تعطيل المصادقة الثنائية",
   "sec.invalidCode": "رمز غير صحيح",
   "sec.enter6Digit": "أدخل رمز مكون من 6 أرقام",
-  "sec.failedMfaSetup": "فشل بدء إعداد المصادقة الثنائية"
+  "sec.failedMfaSetup": "فشل بدء إعداد المصادقة الثنائية",
+  "admin.title": "الإدارة",
+  "admin.userManagement": "إدارة المستخدمين",
+  "admin.userManagementDesc": "إدارة حسابات الموظفين والأدوار",
+  "admin.securitySettings": "إعدادات الأمان",
+  "admin.securitySettingsDesc": "المصادقة والمصادقة الثنائية والتحكم في الوصول",
+  "admin.systemMonitor": "مراقبة النظام",
+  "admin.systemMonitorDesc": "صحة الخادم والأداء",
+  "admin.auditLogs": "سجلات التدقيق",
+  "admin.auditLogsDesc": "تتبع النشاط والامتثال",
+  "admin.dataManagement": "إدارة البيانات",
+  "admin.dataManagementDesc": "الاستيراد والتصدير وإعدادات النسخ الاحتياطي",
+  "admin.integrations": "التكاملات",
+  "admin.integrationsDesc": "اتصالات الخدمات الخارجية"
 }
