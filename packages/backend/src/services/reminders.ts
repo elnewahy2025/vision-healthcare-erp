@@ -107,10 +107,10 @@ export async function processPendingReminders(): Promise<{ sent: number; failed:
     .join('users', 'appointments.doctor_id', 'users.id')
     .where('appointment_reminders.status', 'pending')
     .where('appointments.status', 'scheduled')
-    .where('appointments.scheduled_date', '<=', tomorrow)
+    .where('appointments.appointment_date', '<=', tomorrow)
     .select(
       'appointment_reminders.*',
-      'appointments.scheduled_date',
+      'appointments.appointment_date',
       'patients.first_name as patient_first_name',
       'patients.last_name as patient_last_name',
       'patients.phone as patient_phone',
@@ -132,7 +132,7 @@ export async function processPendingReminders(): Promise<{ sent: number; failed:
         patientPhone: reminder.patient_phone,
         patientEmail: reminder.patient_email,
         doctorName: `Dr. ${reminder.doctor_first_name} ${reminder.doctor_last_name}`,
-        appointmentTime: new Date(reminder.scheduled_date).toLocaleString('en-EG', {
+        appointmentTime: new Date(reminder.appointment_date).toLocaleString('en-EG', {
           weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
           hour: '2-digit', minute: '2-digit',
         }),
@@ -161,7 +161,7 @@ export async function autoCreateReminders(appointmentId: string, tenantId: strin
   const appointment = await db('appointments').where({ id: appointmentId, tenant_id: tenantId }).first();
   if (!appointment) return;
 
-  const aptDate = new Date(appointment.scheduled_date);
+  const aptDate = new Date(appointment.appointment_date);
   const reminder24h = new Date(aptDate.getTime() - 24 * 60 * 60 * 1000);
   const reminder1h = new Date(aptDate.getTime() - 60 * 60 * 1000);
 

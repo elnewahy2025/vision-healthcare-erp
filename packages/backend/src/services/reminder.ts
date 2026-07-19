@@ -37,13 +37,13 @@ async function checkAndSendReminders(): Promise<void> {
     .join('patients', 'appointments.patient_id', 'patients.id')
     .join('tenants', 'appointments.tenant_id', 'tenants.id')
     .where('appointments.status', 'scheduled')
-    .whereRaw("appointments.scheduled_date > NOW()")
-    .whereRaw("appointments.scheduled_date <= NOW() + INTERVAL '24 hours'")
+    .whereRaw("appointments.appointment_date > NOW()")
+    .whereRaw("appointments.appointment_date <= NOW() + INTERVAL '24 hours'")
     .whereRaw("COALESCE((appointments.metadata->>'reminder_sent'), 'false') != 'true'")
     .select(
       'appointments.id as appointment_id',
       'appointments.tenant_id',
-      'appointments.scheduled_date',
+      'appointments.appointment_date',
       'appointments.type',
       'appointments.reason',
       'patients.first_name',
@@ -63,7 +63,7 @@ async function checkAndSendReminders(): Promise<void> {
 
   for (const apt of upcomingAppointments) {
     try {
-      const aptDate = new Date(apt.scheduled_date);
+      const aptDate = new Date(apt.appointment_date);
       const timeStr = aptDate.toLocaleTimeString('en-EG', { hour: '2-digit', minute: '2-digit' });
       const dateStr = aptDate.toLocaleDateString('en-EG', { year: 'numeric', month: 'long', day: 'numeric' });
       const hoursUntil = Math.floor((aptDate.getTime() - now.getTime()) / (1000 * 60 * 60));
@@ -147,7 +147,7 @@ export async function sendManualReminder(appointmentId: string, tenantId: string
 
     if (!apt) return false;
 
-    const aptDate = new Date(apt.scheduled_date);
+    const aptDate = new Date(apt.appointment_date);
     const timeStr = aptDate.toLocaleTimeString('en-EG', { hour: '2-digit', minute: '2-digit' });
     const dateStr = aptDate.toLocaleDateString('en-EG', { year: 'numeric', month: 'long', day: 'numeric' });
 
