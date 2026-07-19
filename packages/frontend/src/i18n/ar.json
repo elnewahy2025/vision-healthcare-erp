@@ -2560,5 +2560,16 @@
   "notifTmpl.channel": "القناة",
   "notifTmpl.locale": "اللغة",
   "notifTmpl.templateCreated": "تم إنشاء القالب",
-  "notifTmpl.failedCreate": "فشل إنشاء القالب"
+  "notifTmpl.failedCreate": "فشل إنشاء القالب",
+  "notifLog.title": "سجلات الإشعارات",
+  "notifLog.time": "الوقت",
+  "notifLog.channel": "القناة",
+  "notifLog.recipient": "المستلم",
+  "notifLog.template": "القالب",
+  "notifLog.status": "الحالة",
+  "notifLog.sent": "مرسل",
+  "notifLog.failed": "فشل",
+  "notifLog.noLogs": "لم يتم إرسال أي إشعارات بعد",
+  "notifLog.pageOf": "صفحة {current} من {total}",
+  "notifLog.loadingLogs": "جاري تحميل السجلات..."
 }

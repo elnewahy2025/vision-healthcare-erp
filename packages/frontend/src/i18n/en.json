@@ -2562,5 +2562,16 @@
   "notifTmpl.channel": "Channel",
   "notifTmpl.locale": "Locale",
   "notifTmpl.templateCreated": "Template created",
-  "notifTmpl.failedCreate": "Failed to create template"
+  "notifTmpl.failedCreate": "Failed to create template",
+  "notifLog.title": "Notification Logs",
+  "notifLog.time": "Time",
+  "notifLog.channel": "Channel",
+  "notifLog.recipient": "Recipient",
+  "notifLog.template": "Template",
+  "notifLog.status": "Status",
+  "notifLog.sent": "Sent",
+  "notifLog.failed": "Failed",
+  "notifLog.noLogs": "No notifications sent yet",
+  "notifLog.pageOf": "Page {current} of {total}",
+  "notifLog.loadingLogs": "Loading logs..."
 }
