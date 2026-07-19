@@ -2613,5 +2613,18 @@
   "admin.dataManagement": "Data Management",
   "admin.dataManagementDesc": "Import, export, and backup settings",
   "admin.integrations": "Integrations",
-  "admin.integrationsDesc": "Third-party service connections"
+  "admin.integrationsDesc": "Third-party service connections",
+  "settings.title": "Settings",
+  "settings.profileSettings": "Profile Settings",
+  "settings.profileSettingsDesc": "Update your personal information",
+  "settings.appearance": "Appearance",
+  "settings.appearanceDesc": "Theme, language, and display preferences",
+  "settings.notifications": "Notifications",
+  "settings.notificationsDesc": "Configure notification preferences",
+  "settings.regionalSettings": "Regional Settings",
+  "settings.regionalSettingsDesc": "Currency, timezone, and locale",
+  "settings.printTemplates": "Print Templates",
+  "settings.printTemplatesDesc": "Customize printed documents",
+  "settings.security": "Security",
+  "settings.securityDesc": "Password, 2FA, and session management"
 }

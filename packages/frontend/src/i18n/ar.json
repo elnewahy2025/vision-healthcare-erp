@@ -2611,5 +2611,18 @@
   "admin.dataManagement": "إدارة البيانات",
   "admin.dataManagementDesc": "الاستيراد والتصدير وإعدادات النسخ الاحتياطي",
   "admin.integrations": "التكاملات",
-  "admin.integrationsDesc": "اتصالات الخدمات الخارجية"
+  "admin.integrationsDesc": "اتصالات الخدمات الخارجية",
+  "settings.title": "الإعدادات",
+  "settings.profileSettings": "إعدادات الملف الشخصي",
+  "settings.profileSettingsDesc": "تحديث معلوماتك الشخصية",
+  "settings.appearance": "المظهر",
+  "settings.appearanceDesc": "السمة واللغة وتفضيلات العرض",
+  "settings.notifications": "الإشعارات",
+  "settings.notificationsDesc": "تكوين تفضيلات الإشعارات",
+  "settings.regionalSettings": "الإعدادات الإقليمية",
+  "settings.regionalSettingsDesc": "العملة والمنطقة الزمنية والإعدادات المحلية",
+  "settings.printTemplates": "قوالب الطباعة",
+  "settings.printTemplatesDesc": "تخصيص المستندات المطبوعة",
+  "settings.security": "الأمان",
+  "settings.securityDesc": "كلمة المرور والمصادقة الثنائية وإدارة الجلسات"
 }
