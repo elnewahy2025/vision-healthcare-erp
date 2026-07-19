@@ -1,8 +1,4 @@
-import { config as dotenvConfig } from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenvConfig({ path: path.resolve(__dirname, '../../../.env') });
+import './loadEnv.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
