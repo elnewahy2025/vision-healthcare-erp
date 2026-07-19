@@ -102,6 +102,15 @@ async function buildApp() {
   await app.register(websocket);
   await app.register(jwt, { secret: env.JWT_SECRET });
 
+  // Decorate app with authenticate middleware
+  app.decorate("authenticate", async (request: any, reply: any) => {
+    try {
+      await request.jwtVerify();
+    } catch (err) {
+      reply.status(401).send({ success: false, error: "Unauthorized" });
+    }
+  });
+
   await app.register(swagger, {
     openapi: {
       info: {
