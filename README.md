@@ -1,6 +1,6 @@
 # 🏥 Vision Healthcare ERP
 
-**Enterprise Healthcare SaaS Platform** — A comprehensive, multi-tenant Electronic Medical Records (EMR) and Practice Management system designed for the Egyptian healthcare market. Covers the full patient lifecycle from appointment scheduling through billing, with AI-powered clinical decision support, real-time analytics, and multi-branch management.
+**Enterprise Healthcare SaaS Platform** — A comprehensive, multi-tenant Electronic Medical Records (EMR) and Practice Management system designed for the **Egyptian healthcare market**. Covers the full patient lifecycle from appointment scheduling through billing, with AI-powered clinical decision support, real-time analytics, and multi-branch management.
 
 ![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![Node](https://img.shields.io/badge/node-%3E%3D18-green)
@@ -14,7 +14,7 @@
 - [Architecture Overview](#-architecture-overview)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
-- [Prerequisites & Dependencies](#-prerequisites--dependencies)
+- [Prerequisites & Dependencies](#prerequisites--dependencies)
 - [Quick Start](#-quick-start)
 - [Environment Variables](#-environment-variables)
 - [Feature Modules](#-feature-modules)
@@ -22,13 +22,14 @@
 - [Backend Modules](#-backend-modules)
 - [Database Migrations](#-database-migrations)
 - [Docker Deployment](#docker-deployment)
-- [Free Tier Deployment](#free-tier-deployment)
+- [Free Tier Deployment](#-free-tier-deployment)
 - [Windows 11 Setup Guide](#-windows-11-setup-guide)
 - [Testing](#-testing)
 - [Egypt Market Features](#-egypt-market-features)
 - [API Documentation](#-api-documentation)
 - [Backup & Monitoring](#-backup--monitoring)
 - [Contributing](#-contributing)
+- [Project Statistics](#-project-statistics)
 
 ---
 
@@ -36,19 +37,20 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   Frontend (React + Vite + TailwindCSS)      │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │
-│  │  Staff   │ │  Kiosk   │ │ Patient  │ │Queue TV  │        │
-│  │   PWA    │ │ Check-in │ │ Portal   │ │ Display  │        │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘        │
-│       │            │            │            │               │
-│  82 Pages | Code-Split | Lazy-Loaded | Recharts Analytics    │
+│              Frontend (React 18 + Vite + TailwindCSS)       │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+│  │  Staff   │ │  Kiosk   │ │ Patient  │ │Queue TV  │       │
+│  │   PWA    │ │ Check-in │ │ Portal   │ │ Display  │       │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘       │
+│       │            │            │            │              │
+│  82 Pages | Code-Split | Lazy-Loaded | Recharts Analytics   │
+│  2,646 i18n Keys (EN + AR) | 19 Shared UI Components       │
 ├──────────────┴────────────┴────────────┴────────────────────┤
-│              Nginx Reverse Proxy (SSL + Rate Limiting)       │
+│              Nginx Reverse Proxy (SSL + Rate Limiting)      │
 ├──────────────┬──────────────────────────────────────────────┤
-│              │         Backend (Fastify + TypeScript)         │
+│              │        Backend (Fastify 4 + TypeScript)       │
 │    ┌─────────┴─────────┐  ┌──────────────────────────────┐  │
-│    │    61 Modules     │  │      Shared (Types/Utils)     │  │
+│    │    62 Modules     │  │      Shared (Types/Utils)     │  │
 │    │  Auth, Patient,   │  │  Zod Validators, Enums,       │  │
 │    │  Billing, EMR,    │  │  i18n, Error Classes,         │  │
 │    │  AI, MultiBranch, │  │  Currency/Date Formatters     │  │
@@ -56,7 +58,7 @@
 │    └─────────┬─────────┘  └──────────────────────────────┘  │
 │              │                                               │
 │    ┌─────────┴─────────┐                                    │
-│    │  17 Services      │                                    │
+│    │  18 Services      │                                    │
 │    │ Email, SMS, Chat  │                                    │
 │    │ Voice, PDF, Audit │                                    │
 │    │ Reminder, Sentry  │                                    │
@@ -73,724 +75,549 @@
 
 ---
 
-## 🔧 Tech Stack
+## 🛠 Tech Stack
 
 ### Frontend
 | Technology | Version | Purpose |
 |---|---|---|
-| **React** | 18.3 | UI library |
-| **TypeScript** | 5.4+ | Type safety |
-| **Vite** | 5.3+ | Build tool + dev server |
-| **TailwindCSS** | 3.4+ | Utility-first CSS |
-| **React Router DOM** | 6.23+ | Client-side routing |
-| **React i18next** | 23.11+ | Arabic/English i18n |
-| **Recharts** | 2.12+ | Analytics charting |
-| **React Hook Form** | 7.52+ | Form management |
-| **Zod** | 3.23+ | Schema validation |
-| **Lucide React** | 0.395+ | Icons |
-| **date-fns** | 3.6+ | Date utilities |
-| **react-hot-toast** | 2.4+ | Toast notifications |
-| **clsx** | 2.1+ | Class merging |
-| **axios** | 1.7+ | HTTP client |
+| React | 18.3 | UI framework |
+| TypeScript | 5.9 | Type safety |
+| Vite | 5.x | Build tool + dev server |
+| TailwindCSS | 3.4 | Utility-first styling |
+| React Router | 6.x | Client-side routing |
+| Recharts | 2.x | Data visualization |
+| react-i18next | 14.x | Internationalization (EN/AR) |
+| react-hot-toast | 2.x | Toast notifications |
+| lucide-react | 0.4x | Icons |
+| axios | 1.7 | HTTP client |
 
 ### Backend
 | Technology | Version | Purpose |
 |---|---|---|
-| **Node.js** | 20+ | Runtime |
-| **Fastify** | latest | HTTP framework |
-| **TypeScript** | 5.4+ | Type safety |
-| **Knex.js** | latest | SQL query builder |
-| **PostgreSQL** | 15 | Primary database |
-| **Redis** | 7 | Caching, sessions |
-| **Zod** | 3.23+ | Request validation |
-| **JSON Web Token** | latest | Authentication |
-| **tsx** | latest | TypeScript execution |
+| Fastify | 4.x | HTTP framework |
+| TypeScript | 5.x | Type safety |
+| Knex.js | 3.x | SQL query builder + migrations |
+| PostgreSQL | 15 | Primary database |
+| Redis | 7.x | Caching, sessions, rate limiting |
+| MinIO | Latest | S3-compatible object storage |
+| Swagger | @fastify/swagger | API documentation |
+| Zod | 3.x | Schema validation |
 
-### Infrastructure
+### DevOps
 | Technology | Purpose |
 |---|---|
-| **Docker + Compose** | Containerization |
-| **Nginx** | Reverse proxy, SSL, rate limiting |
-| **MinIO** | S3-compatible file storage |
-| **Elasticsearch** | Search (optional) |
-| **Sentry** | Error monitoring |
-| **Vercel** | Frontend hosting |
+| Docker + Docker Compose | Containerization |
+| Nginx | Reverse proxy, SSL, rate limiting |
+| GitHub Actions | CI/CD (ready) |
+| Sentry | Error monitoring |
 
 ---
 
 ## 📁 Project Structure
 
 ```
-Vision Healthcare/
+vision-healthcare-erp/
 ├── packages/
-│   ├── shared/                    # Shared types, config, utils
-│   │   └── src/
-│   │       ├── config/            # Environment config
-│   │       └── types/             # TypeScript types
-│   ├── backend/                   # Fastify API server
+│   ├── shared/              # Shared types, validators, utils
 │   │   ├── src/
-│   │   │   ├── core/              # DB, Redis, migrations
-│   │   │   ├── modules/           # 61 feature modules
-│   │   │   ├── services/          # 17 service integrations
-│   │   │   └── utils/             # Validators, helpers
-│   │   ├── migrations/            # 20 database migrations
+│   │   │   ├── types/       # TypeScript interfaces
+│   │   │   ├── validators/  # Zod schemas
+│   │   │   ├── utils/       # Formatters, helpers
+│   │   │   └── constants/   # Enums, config
 │   │   └── package.json
-│   └── frontend/                  # React SPA
+│   │
+│   ├── backend/             # Fastify API server
+│   │   ├── src/
+│   │   │   ├── core/        # Database, Redis, error handler, migrations
+│   │   │   ├── modules/     # 62 feature modules
+│   │   │   ├── services/    # 18 service layer
+│   │   │   └── index.ts     # App entry point
+│   │   ├── migrations/      # 20 database migrations
+│   │   └── package.json
+│   │
+│   └── frontend/            # React SPA
 │       ├── src/
-│       │   ├── pages/             # 82 page components
-│       │   ├── components/        # Shared UI components
-│       │   ├── stores/            # Auth, theme stores
-│       │   ├── hooks/             # Custom hooks (RTL, etc.)
-│       │   ├── i18n/              # en.json, ar.json
-│       │   ├── styles/            # globals.css, rtl.css
-│       │   └── lib/               # API client, utils
-│       ├── public/                # PWA assets, SW, manifest
+│       │   ├── pages/       # 82 page components
+│       │   ├── components/  # 19 shared UI components
+│       │   ├── stores/      # Zustand state stores
+│       │   ├── lib/         # API client, validators, sanitize
+│       │   ├── i18n/        # Translation files (en.json, ar.json)
+│       │   └── App.tsx      # Router + layout
+│       ├── public/
 │       └── package.json
-├── docker-compose.yml             # Development Docker setup
-├── docker-compose.prod.yml        # Production Docker setup
-├── Dockerfile.backend             # Backend multi-stage build
-├── Dockerfile.frontend            # Frontend Nginx build
-├── Dockerfile.backup              # Automated backup container
-├── deployment/nginx/              # Nginx configs
-├── scripts/                       # backup.sh, icon generation
-├── package.json                   # Root workspace config
-├── tsconfig.base.json             # Shared TS config
-├── vercel.json                    # Vercel deployment config
-└── README.md                      # This file
+│
+├── docker-compose.yml       # Full stack orchestration
+├── nginx/                   # Reverse proxy config
+├── .env.example             # Environment template
+└── package.json             # Root workspace config
 ```
 
 ---
 
-## 📦 Prerequisites & Dependencies
+## Prerequisites & Dependencies
 
 ### Required Software
-
-| Software | Version | Download URL |
+| Software | Version | Download |
 |---|---|---|
-| **Node.js** | 20+ LTS | https://nodejs.org |
-| **npm** | 9+ (comes with Node) | https://www.npmjs.com |
-| **PostgreSQL** | 15+ | https://www.postgresql.org/download/ |
-| **Redis** | 7+ | https://redis.io/download |
+| **Node.js** | ≥ 18.x | https://nodejs.org |
+| **PostgreSQL** | 15+ | https://www.postgresql.org/download/windows/ |
+| **Git** | Latest | https://git-scm.com |
 
-### Optional (for Docker deployment)
-| Software | Version | Download URL |
-|---|---|---|
-| **Docker** | 24+ | https://docs.docker.com/get-docker/ |
-| **Docker Compose** | 2.20+ | https://docs.docker.com/compose/install/ |
-
-### Windows-Specific Dependencies
+### Optional Software
 | Software | Purpose | Download |
 |---|---|---|
-| **WSL2** | Redis on Windows | Enabled via Windows Features |
-| **Memurai** | Redis alternative for Windows | https://www.memurai.com/ |
-| **pgAdmin** | PostgreSQL GUI | https://www.pgadmin.org/ |
+| **Redis** | Caching (app degrades gracefully without it) | Via WSL2 or Memurai |
+| **Docker Desktop** | Containerized deployment | https://docker.com/products/docker-desktop |
+| **pgAdmin** | Database GUI | https://www.pgadmin.org |
+| **VS Code** | Code editor | https://code.visualstudio.com |
 
-### npm Packages (auto-installed)
-
-**Root workspace** (`npm install` at project root):
-```json
-{
-  "concurrently": "latest",
-  "typescript": "^5.4.0"
-}
-```
-
-**Frontend** (`packages/frontend/package.json`):
-```json
-{
-  "dependencies": {
-    "@hookform/resolvers": "^3.6.0",
-    "axios": "^1.7.2",
-    "clsx": "^2.1.1",
-    "date-fns": "^3.6.0",
-    "i18next": "^23.11.5",
-    "lucide-react": "^0.395.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-hook-form": "^7.52.0",
-    "react-hot-toast": "^2.4.1",
-    "react-i18next": "^14.1.2",
-    "react-router-dom": "^6.23.1",
-    "recharts": "^2.12.7",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@tailwindcss/forms": "^0.5.7",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.4",
-    "typescript": "^5.4.0",
-    "vite": "^5.3.1"
-  }
-}
-```
-
-**Backend** (`packages/backend/package.json`):
-```json
-{
-  "dependencies": {
-    "fastify": "latest",
-    "@fastify/cors": "latest",
-    "@fastify/websocket": "latest",
-    "@fastify/rate-limit": "latest",
-    "@fastify/multipart": "latest",
-    "@fastify/static": "latest",
-    "knex": "latest",
-    "pg": "latest",
-    "ioredis": "latest",
-    "jsonwebtoken": "latest",
-    "bcryptjs": "latest",
-    "zod": "^3.23.8",
-    "otplib": "latest",
-    "pdfmake": "latest",
-    "nodemailer": "latest",
-    "tsx": "latest"
-  },
-  "devDependencies": {
-    "typescript": "^5.4.0",
-    "vitest": "latest"
-  }
-}
-```
+### Node.js Packages (auto-installed)
+All dependencies are managed via npm workspaces. Running `npm install` at the root installs everything.
 
 ---
 
 ## 🚀 Quick Start
 
-### Option 1: Docker (Recommended)
-```bash
-git clone <repo-url> vision-healthcare
-cd vision-healthcare
-cp .env.example .env  # Edit with your settings
-docker compose up -d
-# Backend: http://localhost:3000
-# Frontend: http://localhost:5173
-# API Docs: http://localhost:3000/docs
-```
+### Option 1: Local Development (Recommended)
 
-### Option 2: Manual Setup
 ```bash
-# 1. Install all dependencies
+# 1. Clone the repository
+git clone https://github.com/elnewahy2025/vision-healthcare-erp.git
+cd vision-healthcare-erp
+
+# 2. Install all dependencies
 npm install
 
-# 2. Create PostgreSQL database
-psql -U postgres -c "CREATE DATABASE healthcare2;"
+# 3. Build shared package first
+npm run build -w packages/shared
 
-# 3. Configure environment
+# 4. Set up environment
 cp .env.example .env
 # Edit .env with your database credentials
 
-# 4. Build shared package (required first)
-npm run build -w packages/shared
+# 5. Create PostgreSQL database
+psql -U postgres -c "CREATE DATABASE healthcare2;"
 
-# 5. Run database migrations
+# 6. Run database migrations
 npm run migrate
 
-# 6. Start development servers
-npm run dev
-# Backend: http://localhost:3000
-# Frontend: http://localhost:5173
+# 7. Start development servers (in two terminals)
+npm run dev:backend    # Terminal 1 — API on port 3000
+npm run dev:frontend   # Terminal 2 — UI on port 5173
 ```
 
-### Production Build
+### Option 2: Docker Compose
+
 ```bash
-# Build all packages
-npm run build
+# 1. Clone and configure
+git clone https://github.com/elnewahy2025/vision-healthcare-erp.git
+cd vision-healthcare-erp
+cp .env.example .env
 
-# Start production server
-npm run start -w packages/backend
+# 2. Start all services
+docker compose up -d --build
 
-# Serve frontend with Nginx (see Dockerfile.frontend)
+# 3. Run migrations inside the backend container
+docker exec visionhc-backend npm run migrate
+
+# 4. Access the application
+# Frontend: http://localhost:80
+# Backend:  http://localhost:3000
+# API Docs: http://localhost:3000/docs
+# MinIO:    http://localhost:9001
 ```
 
 ---
 
-## 🔐 Environment Variables
+## 🔧 Environment Variables
 
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` and configure:
 
-```env
-# Server
-NODE_ENV=production
-PORT=3000
-HOST=0.0.0.0
-
-# PostgreSQL
+```bash
+# === DATABASE ===
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=healthcare
+DB_NAME=healthcare2
 DB_USER=postgres
 DB_PASSWORD=your_password
 
-# Redis
+# === REDIS ===
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
-# JWT
-JWT_SECRET=your-super-secret-jwt-key-min-32-chars
-JWT_REFRESH_SECRET=your-refresh-secret-key-min-32-chars
+# === AUTH ===
+JWT_SECRET=your_64_char_random_secret
+JWT_REFRESH_SECRET=your_64_char_random_secret
 
-# File Storage (MinIO)
+# === STORAGE (MinIO) ===
 MINIO_ENDPOINT=localhost
 MINIO_PORT=9000
 MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
+MINIO_SECRET_KEY=your_minio_secret
 MINIO_BUCKET=healthcare
 
-# CORS
-CORS_ORIGIN=http://localhost:5173
+# === EMAIL (SMTP or SendGrid) ===
+SMTP_HOST=localhost
+SMTP_PORT=587
+SMTP_FROM=noreply@visionhealthcare.com
+SENDGRID_API_KEY=your_sendgrid_key
 
-# === Optional Integrations ===
+# === SMS (Twilio) ===
+TWILIO_ACCOUNT_SID=your_twilio_sid
+TWILIO_AUTH_TOKEN=your_twilio_token
+TWILIO_PHONE_NUMBER=+201234567890
 
-# Email (SendGrid)
-SENDGRID_API_KEY=SG.xxx
+# === WHATSAPP BUSINESS API ===
+WHATSAPP_API_TOKEN=your_whatsapp_token
+WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
 
-# SMS (Twilio)
-TWILIO_ACCOUNT_SID=ACxxx
-TWILIO_AUTH_TOKEN=xxx
-TWILIO_PHONE_NUMBER=+1234567890
+# === PAYMENTS ===
+STRIPE_SECRET_KEY=sk_test_xxx
+FAWRY_MERCHANT_CODE=your_fawry_code
+FAWRY_SECURITY_KEY=your_fawry_key
 
-# WhatsApp Business API
-WHATSAPP_API_TOKEN=xxx
-WHATSAPP_PHONE_NUMBER_ID=xxx
+# === SUPABASE (File Storage) ===
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your_service_key
 
-# Payments - Egypt
-FAWRY_MERCHANT_CODE=xxx
-FAWRY_SECURITY_KEY=xxx
-INSTAPAY_WALLET=xxx
+# === SENTRY (Error Monitoring) ===
+SENTRY_DSN=https://your_dsn@sentry.io/project_id
+APP_VERSION=1.0.0
 
-# Payments - International (Stripe)
-STRIPE_SECRET_KEY=sk_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
-
-# Error Monitoring (Sentry)
-SENTRY_DSN=https://xxx@sentry.io/xxx
-
-# Search (Elasticsearch - optional)
-ELASTICSEARCH_URL=http://localhost:9200
-
-# Frontend
-VITE_API_URL=http://localhost:3000/api/v1
+# === APP ===
+CORS_ORIGIN=https://yourdomain.com
+APP_URL=https://yourdomain.com
+NODE_ENV=development
+PORT=3000
 ```
 
 ---
 
-## 🧩 Feature Modules
+## 📦 Feature Modules
 
-### Core Modules (Phases 1–8)
-| Module | Description |
-|---|---|
-| **Authentication** | JWT auth, tenant isolation, role-based access |
-| **Patients** | CRUD, MRN, Egyptian National ID validation |
-| **Appointments** | Scheduling, calendar, status management |
-| **EMR** | Electronic medical records, encounters, vitals |
-| **Billing** | Invoices, payments, insurance claims |
-| **Laboratory** | Test orders, results, reference ranges |
-| **Radiology** | Imaging orders, reports, DICOM support |
-| **Pharmacy** | Prescriptions, dispensing, inventory |
-| **Queue** | Patient queue management, priority |
-| **Referrals** | Inter-department referrals |
-| **Nursing** | Nursing assessments, care plans |
-| **Home Visits** | Home visit scheduling and tracking |
-| **Telemedicine** | Video consultations |
-| **Insurance** | Provider management, eligibility |
-| **Inventory** | Stock management, reorder alerts |
-| **HR & Payroll** | Staff management, schedules, payroll |
-| **CRM** | Patient relationships, follow-ups |
-| **DMS** | Document management system |
-| **Workflow** | Custom workflow automation |
-| **Forms** | Custom form builder |
-| **Compliance** | Regulatory compliance tracking |
-| **AI Hub** | AI-powered clinical decision support |
-| **BI** | Business intelligence dashboards |
-| **Reports** | Report generation and scheduling |
+### Clinical
+- **EMR (Electronic Medical Records)** — Patient charts, vitals, SOAP notes
+- **AI Diagnosis** — Differential diagnosis suggestions from symptoms
+- **AI Clinical Notes** — Automated clinical note generation
+- **ICD-10 Arabic** — 25+ diagnosis codes with Arabic translations
+- **Arabic Medications** — 20+ drugs with Arabic names and dosages
+- **Lab Orders & Results** — Lab management with result tracking
+- **Radiology** — Imaging orders and reports
+- **Prescriptions** — Digital prescription management
+- **Allergies** — Patient allergy tracking with interaction checks
+- **Referrals** — Inter-department and external referrals
 
-### Advanced Modules (Phases 9–10)
-| Module | Description |
-|---|---|
-| **SaaS Billing** | Multi-tenant subscription management |
-| **White-Label** | Custom branding per tenant |
-| **Compliance Reports** | Audit-ready compliance reports |
-| **DR Backup** | Disaster recovery automation |
-| **Regions** | Multi-region/multi-currency support |
-| **Patient Portal** | External patient-facing portal |
-| **Online Booking** | Public appointment booking |
-| **Patient Messages** | Secure patient messaging |
-| **API Keys** | Developer API key management |
-| **Data Export** | Full data export capabilities |
-| **System Monitor** | Real-time system health |
-| **Bulk Import** | Batch data import |
-| **User Preferences** | Per-user settings |
-| **Print Templates** | Customizable print layouts |
-| **Communications** | Multi-channel messaging |
+### Operations
+- **Appointments** — Scheduling with calendar view
+- **Smart Scheduling** — AI-optimized appointment scheduling
+- **Queue Management** — Real-time queue with WebSocket updates
+- **Multi-Branch** — Multi-location management with branch switching
+- **Home Visits** — Home visit scheduling and tracking
+- **Inventory** — Medical supplies and pharmacy inventory
+- **Pharmacy** — Prescription dispensing and stock management
 
-### Security & Communication (Phases 11–12)
-| Module | Description |
-|---|---|
-| **Forgot/Reset Password** | Email-based password reset |
-| **Two-Factor Auth (TOTP)** | Time-based OTP authentication |
-| **OTP** | One-time password verification |
-| **Audit Logging** | Comprehensive audit trail |
-| **Email (SendGrid)** | Transactional email service |
-| **SMS (Twilio)** | SMS notifications |
-| **Template Engine** | Reusable notification templates |
+### Financial
+- **Billing** — Invoice generation and payment tracking
+- **ETA e-Invoice** — Egyptian Tax Authority QR code invoices
+- **Insurance Claims** — Full claims lifecycle management
+- **Expense Tracking** — Operational expense management
+- **Financial Reports** — P&L, budget tracking, financial analytics
+- **SaaS Billing** — Subscription management for multi-tenant
 
-### File & Document Management (Phase 13)
-| Module | Description |
-|---|---|
-| **File Upload/Download** | MinIO/Supabase/local storage |
-| **Image Viewer** | In-app image viewing |
-| **Document Categories** | Organized file management |
+### Patient Experience
+- **Patient Portal** — Self-service web portal for patients
+- **Kiosk Check-In** — Self-service check-in with queue assignment
+- **Queue Display** — Real-time TV display with WebSocket updates
+- **Post-Visit Surveys** — Patient satisfaction feedback
+- **WhatsApp Integration** — Appointment reminders and notifications
+- **SMS/Email Notifications** — Automated communication
 
-### Financial & Insurance (Phase 14–15)
-| Module | Description |
-|---|---|
-| **Stripe Payments** | International card payments |
-| **Insurance Claims** | Full claims lifecycle |
-| **Aging Reports** | Accounts receivable aging |
-| **Revenue Reports** | Financial performance |
-| **ICD-10 Browser** | 200+ ICD-10 codes with Arabic |
-| **Medication DB** | 20+ medications with Arabic names |
-| **Allergies** | Allergy tracking and alerts |
-| **Patient Timeline** | Chronological patient history |
+### AI & Analytics
+- **Clinical AI Hub** — AI-powered clinical decision support
+- **Predictive Analytics** — No-show prediction, revenue forecasting, patient risk
+- **BI Dashboard** — Business intelligence with interactive charts
+- **Advanced Reporting** — Custom report generation
+- **Data Import/Export** — CSV/Excel data management
 
-### Testing (Phase 16)
-- 37 tests across 11 test files
-- Unit tests for auth, patients, billing, clinical modules
-- Service tests for audit, TOTP
-- Utility tests for validators, formatters
+### Administration
+- **User Management** — Staff accounts with role-based access
+- **Security Settings** — Password policies, 2FA, session management
+- **Audit Logs** — Complete activity trail with filtering and export
+- **System Monitor** — Server health, CPU, memory, database metrics
+- **Developer Portal** — API keys, webhooks, integration management
+- **Compliance** — Regulatory compliance tracking
 
-### Egypt Market (Phase 17)
-| Feature | Description |
-|---|---|
-| **Fawry** | Egyptian payment gateway integration |
-| **InstaPay** | Mobile wallet payments |
-| **ETA e-Invoice** | QR code for Egyptian Tax Authority |
-| **Egyptian National ID** | 14-digit ID validation (00201...) |
-| **8 Egyptian Insurers** | Misr Insurance, Allianz Egypt, AXA Egypt, etc. |
-
-### Communication & Financial (Phases 18–19)
-| Module | Description |
-|---|---|
-| **WhatsApp Business** | WhatsApp message sending |
-| **Voice Calls (Twilio)** | Automated voice calls |
-| **In-App Chat** | WebSocket real-time chat |
-| **Expense Tracking** | Business expense management |
-| **ETA e-Invoicing** | Electronic invoicing for Egypt |
-| **P&L Reports** | Profit and loss statements |
-| **Budget Plans** | Budget planning and tracking |
-
-### AI & Intelligence (Phase 20)
-| Module | Description |
-|---|---|
-| **Clinical Notes AI** | AI-generated clinical notes |
-| **Diagnosis Assistant** | ICD-10 diagnosis suggestions |
-| **Predictive Analytics** | Patient risk prediction |
-| **Smart Scheduling** | AI-optimized scheduling |
-
-### Infrastructure (Phase 21)
-| Feature | Description |
-|---|---|
-| **Production Docker** | Multi-stage Docker builds |
-| **CI/CD** | Automated deployment pipeline |
-| **Sentry Monitoring** | Error tracking and alerts |
-| **Backup Automation** | Daily automated backups |
-| **Health Checks** | /health, /ready, /live endpoints |
-
-### Patient Experience (Phase 22)
-| Module | Description |
-|---|---|
-| **Kiosk Check-In** | Self-service patient check-in |
-| **Queue TV Display** | Real-time queue display (WebSocket) |
-| **Post-Visit Survey** | Patient satisfaction surveys |
-| **Patient Mobile App** | Mobile-optimized patient shell |
-
-### Enhancements (Completed)
-| Enhancement | Description |
-|---|---|
-| **SMS/Email Reminders** | Automated appointment reminders |
-| **WebSocket Chat** | Real-time messaging |
-| **PDF Generation** | Invoice, prescription, lab report PDFs |
-| **Dashboard Widgets** | Customizable per-role widgets |
-| **Patient Self-Scheduling** | Online appointment booking |
-| **Fine-Grained RBAC** | Role-based access control |
-| **Arabic RTL Support** | Full right-to-left layout |
-| **Offline PWA** | Service worker caching |
-| **WhatsApp Templates** | Template management UI |
-| **Data Import (CSV/Excel)** | Bulk data import |
-| **Arabic Medical Content** | ICD-10 + medications in Arabic |
-| **Advanced Audit Logs** | Exportable audit viewer |
-
-### Strategic Higher-Effort (New)
-| Module | Description |
-|---|---|
-| **Multi-Branch Management** | CRUD, stats, staff assignment, governorate filtering |
-| **Analytics Dashboard** | Real-time charts (area, bar, pie, line) with Recharts |
-| **Patient Self-Service Portal** | 3-step booking wizard, lab results, prescriptions, invoices |
-| **Pharmacy Advanced** | Drug interaction checker, low-stock alerts |
-| **Insurance Claims Lifecycle** | Full lifecycle, 12 Egypt insurers, bulk submit, analytics |
-| **Advanced Reporting Engine** | 10 report types, scheduling, PDF/CSV export |
-| **Developer API Portal** | API keys, 20 endpoint docs, webhooks, rate limits |
+### Communication
+- **WhatsApp Business** — Template management and messaging
+- **Voice Calls** — Call logging and tracking
+- **Chat** — Internal messaging system
+- **Notification Templates** — Customizable notification templates
+- **Notification Logs** — Delivery tracking and analytics
 
 ---
 
-## 🛣 Frontend Routes
+## 🗺 Frontend Routes
 
-All 82 pages with lazy-loaded code splitting:
-
-| Route | Page | Category |
+| Route | Page | Description |
 |---|---|---|
-| `/` | Dashboard | Core |
-| `/login` | Login | Auth |
-| `/register` | Register | Auth |
-| `/forgot-password` | Forgot Password | Auth |
-| `/reset-password` | Reset Password | Auth |
-| `/patients` | Patients List | Clinical |
-| `/patients/:id` | Patient Detail | Clinical |
-| `/appointments` | Appointments | Clinical |
-| `/emr` | Medical Records | Clinical |
-| `/laboratory` | Laboratory | Clinical |
-| `/radiology` | Radiology | Clinical |
-| `/pharmacy` | Pharmacy | Clinical |
-| `/pharmacy-advanced` | Pharmacy Advanced | Clinical |
-| `/queue` | Queue Management | Operations |
-| `/referrals` | Referrals | Operations |
-| `/nursing` | Nursing | Operations |
-| `/home-visits` | Home Visits | Operations |
-| `/telemedicine` | Telemedicine | Operations |
-| `/billing` | Billing | Financial |
-| `/insurance` | Insurance | Financial |
-| `/insurance-claims` | Insurance Claims | Financial |
-| `/insurance-claims-lifecycle` | Claims Lifecycle | Financial |
-| `/financial-reports` | Financial Reports | Financial |
-| `/expenses` | Expense Tracking | Financial |
-| `/eta-invoicing` | ETA Invoicing | Egypt |
-| `/inventory` | Inventory | Operations |
-| `/hr` | HR & Payroll | Operations |
-| `/crm` | CRM | Operations |
-| `/dms` | Documents | Operations |
-| `/workflow` | Workflow | Operations |
-| `/forms` | Forms | Operations |
-| `/compliance` | Compliance | Operations |
-| `/ai-hub` | AI Hub | Intelligence |
-| `/clinical-ai` | Clinical AI | Intelligence |
-| `/predictive-analytics` | Predictive Analytics | Intelligence |
-| `/smart-scheduling` | Smart Scheduling | Intelligence |
-| `/bi` | BI Dashboards | Intelligence |
-| `/reports` | Reports | Intelligence |
-| `/analytics-dashboard` | Analytics Dashboard | Intelligence |
-| `/advanced-reporting` | Advanced Reporting | Intelligence |
-| `/integrations` | Integrations | Platform |
-| `/saas-billing` | SaaS Billing | Platform |
-| `/white-label` | White-Label | Platform |
-| `/compliance-reports` | Compliance Reports | Platform |
-| `/dr-backup` | Backup & DR | Platform |
-| `/regions` | Regions | Platform |
-| `/branches` | Multi-Branch | Platform |
-| `/branches/:id` | Branch Detail | Platform |
-| `/patient-portal` | Patient Portal | Patient |
-| `/online-booking` | Online Booking | Patient |
-| `/patient-messages` | Patient Messages | Patient |
-| `/patient-self-service` | Patient Self-Service | Patient |
-| `/patient-app` | Patient Mobile App | Patient |
-| `/kiosk` | Kiosk Check-In | Patient |
-| `/queue-display` | Queue Display | Patient |
-| `/post-visit-survey` | Post-Visit Survey | Patient |
-| `/notifications` | Notifications | Communications |
-| `/communications` | Communications | Communications |
-| `/whatsapp` | WhatsApp | Communications |
-| `/whatsapp-templates` | WhatsApp Templates | Communications |
-| `/voice-calls` | Voice Calls | Communications |
-| `/chat` | In-App Chat | Communications |
-| `/api-keys` | API Keys | Developer |
-| `/developer-portal` | Developer API | Developer |
-| `/data-export` | Data Export | Developer |
-| `/data-import-advanced` | Data Import | Developer |
-| `/data-warehouse` | Data Warehouse | Developer |
-| `/bulk-import` | Bulk Import | Developer |
-| `/system-monitor` | System Monitor | Admin |
-| `/audit-logs` | Audit Logs | Admin |
-| `/audit-logs-advanced` | Advanced Audit Logs | Admin |
-| `/security` | Security Settings | Admin |
-| `/admin` | Administration | Admin |
-| `/settings` | Settings | Admin |
-| `/user-preferences` | User Preferences | Admin |
-| `/print-templates` | Print Templates | Admin |
-| `/notification-templates` | Notification Templates | Admin |
-| `/notification-logs` | Notification Logs | Admin |
-| `/automation` | Automation | Admin |
-| `/barcodes` | Barcodes | Admin |
-| `/sessions` | Sessions | Admin |
+| `/` | Dashboard | Main dashboard with KPIs |
+| `/patients` | Patients | Patient list and management |
+| `/patients/:id` | Patient Detail | Individual patient record |
+| `/appointments` | Appointments | Calendar scheduling |
+| `/emr` | EMR | Electronic medical records |
+| `/clinical-ai` | Clinical AI | AI diagnosis and notes |
+| `/billing` | Billing | Invoices and payments |
+| `/insurance` | Insurance | Insurance management |
+| `/insurance-claims` | Insurance Claims | Claims lifecycle |
+| `/pharmacy` | Pharmacy | Prescription management |
+| `/inventory` | Inventory | Stock management |
+| `/lab` | Laboratory | Lab orders and results |
+| `/radiology` | Radiology | Imaging management |
+| `/hr` | Human Resources | Staff management |
+| `/reports` | Reports | Report generation |
+| `/analytics` | Analytics | BI dashboard |
+| `/predictive-analytics` | Predictive Analytics | AI predictions |
+| `/smart-scheduling` | Smart Scheduling | AI-optimized scheduling |
+| `/kiosk` | Kiosk Check-In | Self-service check-in |
+| `/queue-display` | Queue Display | Real-time queue TV |
+| `/survey` | Post-Visit Survey | Patient feedback |
+| `/patient-app` | Patient Mobile App | Mobile portal preview |
+| `/notification-templates` | Notification Templates | Template management |
+| `/notification-logs` | Notification Logs | Delivery tracking |
+| `/security` | Security Settings | Password, 2FA |
+| `/admin` | Administration | System admin hub |
+| `/settings` | Settings | App preferences |
+| `/audit-logs` | Audit Logs | Activity tracking |
+| `/audit-logs-advanced` | Audit Logs Advanced | Advanced audit with export |
+| `/developer-portal` | Developer Portal | API management |
+| `/data-import` | Data Import | CSV/Excel import |
+| `/whatsapp` | WhatsApp | Business messaging |
+| `/voice-calls` | Voice Calls | Call management |
+| `/chat` | Chat | Internal messaging |
+| `/expense-tracking` | Expense Tracking | Expense management |
+| `/eta-invoicing` | ETA Invoicing | Egyptian tax invoices |
+| `/financial-reports` | Financial Reports | P&L and budgets |
+| `/multi-branch` | Multi-Branch | Branch management |
+| `/system-monitor` | System Monitor | Server health |
+| `/compliance` | Compliance | Regulatory tracking |
+| `/regions` | Regions | Regional settings |
+| `/print-templates` | Print Templates | Document templates |
+| `/user-preferences` | User Preferences | Profile settings |
+| `/integrations` | Integrations | Third-party connections |
+| `/data-export` | Data Export | Export management |
+| `/data-warehouse` | Data Warehouse | Advanced analytics |
+| `/dms` | Document Management | Document storage |
+| `/automation` | Automation | Workflow automation |
+| `/saas-billing` | SaaS Billing | Subscription management |
+| `/compliance-reports` | Compliance Reports | Compliance analytics |
+| `/pharmacy-advanced` | Pharmacy Advanced | Advanced pharmacy |
+| `/patient-self-service` | Patient Self-Service | Patient portal |
+| `/portal` | Patient Portal | Patient login |
 
 ---
 
-## 🔌 Backend Modules (61 registered)
+## 🔌 Backend Modules (62)
 
-All modules follow the pattern: `registerXxxModule(app: FastifyInstance)`
-
-```
-advanced-communication  ai-hub              ai-intelligence
-api-gateway             appointment         auth
-automation              barcodes            bi
-billing                 bulk-import         clinical
-common                  communications      compliance
-compliance-reports      crm                 dashboard-widgets
-data-export             data-warehouse      dms
-dr-backup               emr                 financial-deepening
-forms                   health              home-visits
-hr                      insurance           insurance-claims
-integrations            inventory           laboratory
-medical-content         multi-branch        notification
-nursing                 online-booking      patient
-patient-experience      patient-messaging   patient-portal
-patient-scheduling      pdf                 pdf-generator
-pharmacy                print-templates     queue
-radiology               rbac                referral
-regions                 reports             saas-billing
-session-manager         system-monitor      telemedicine
-user-preferences        white-label         workflow
-```
-
-### Backend Services (17)
-```
-appointment-reminder    audit               chat
-email                   notification        otp
-payment                 pdf                 reminder
-sentry                  sms                 storage
-totp                    voice               whatsapp
-```
-
----
-
-## 📊 Database Migrations (20 files)
-
-| Migration | Tables Created |
+| Module | Description |
 |---|---|
-| 001_initial_schema | tenants, users, patients, appointments, invoices, etc. |
-| 002_clinical_modules | encounters, vitals, lab_orders, lab_results, prescriptions |
-| 003_operations | queue_entries, referrals, nursing_assessments, inventory |
-| 004_intelligence | reports, workflows, forms, compliance_records |
-| 005_scale | saas_subscriptions, white_label_configs, regions |
-| 006_patient_experience | patient_portal_users, online_bookings, surveys |
-| 007_platform_maturity | api_keys, data_exports, system_metrics |
-| 008_experience | user_preferences, print_templates, notification_logs |
-| 009_communications | communication_logs, email_templates |
-| 010_intelligence | ai_models, ai_predictions, bi_dashboards |
-| 011_automation_digital | automation_rules, barcodes, data_warehouse_tables |
-| 012_security_communication | two_factor_secrets, whatsapp_messages, voice_calls |
-| 013_missing | branches, report_schedules, webhooks |
-| 014_clinical_reference | icd10_codes, medications, allergies |
-| 015_egypt_market | fawry_payments, instapay_transactions, eta_invoices, egypt_insurers |
-| 016_advanced_communication | whatsapp_templates, chat_messages, voice_recordings |
-| 017_financial_deepening | expenses, budgets, eta_e_invoices |
-| 018_ai_intelligence | ai_clinical_notes, ai_diagnoses, predictive_models |
-| 019_patient_experience | kiosk_checkins, queue_displays, post_visit_surveys |
-| 020_enhancements | dashboard_widgets |
+| `auth` | JWT authentication, login, register, password reset |
+| `patient` | Patient CRUD, search, medical history |
+| `appointment` | Scheduling, calendar, availability |
+| `emr` | Electronic medical records, SOAP notes |
+| `ai-intelligence` | AI diagnosis, clinical notes, predictions, smart scheduling |
+| `billing` | Invoices, payments, financial transactions |
+| `insurance` | Insurance providers, claims processing |
+| `insurance-claims` | Claims lifecycle management |
+| `pharmacy` | Prescription management, dispensing |
+| `pharmacy-advanced` | Advanced pharmacy operations |
+| `inventory` | Stock management, reorder alerts |
+| `lab` | Lab orders, results, templates |
+| `radiology` | Imaging orders, reports |
+| `clinical` | Allergies, timeline, clinical data |
+| `hr` | Staff management, roles, permissions |
+| `rbac` | Role-based access control, permissions |
+| `reports` | Report generation, analytics |
+| `analytics` | Dashboard widgets, KPI calculations |
+| `multi-branch` | Multi-location management |
+| `communications` | Notification templates, delivery logs |
+| `patient-messaging` | Patient communication, reminders |
+| `patient-experience` | Kiosk, queue, surveys |
+| `patient-portal` | Patient self-service portal with OTP auth |
+| `whatsapp` | WhatsApp Business API integration |
+| `voice` | Voice call logging and tracking |
+| `chat` | Internal messaging system |
+| `audit` | Audit logging and compliance |
+| `system-monitor` | Server health, CPU, memory metrics |
+| `dms` | Document management and storage |
+| `automation` | Workflow automation rules |
+| `data-import` | CSV/Excel data import |
+| `data-export` | Data export functionality |
+| `compliance` | Regulatory compliance tracking |
+| `integrations` | Third-party service connections |
+| `regions` | Regional settings, currencies, timezones |
+| `print-templates` | Document template management |
+| `developer-portal` | API keys, webhooks management |
+| `saas-billing` | Subscription and tenant billing |
+| `home-visit` | Home visit scheduling |
+| `referral` | Referral management |
+| `nursing` | Nursing workflows |
+| `medications` | Medication catalog |
+| `icd10` | ICD-10 diagnosis codes |
+| `form-builder` | Custom form builder |
+| `sessions` | Session management |
+| `user-preferences` | User profile settings |
+| `notifications` | Push notifications |
+| `audit-logs-advanced` | Advanced audit with filtering |
+| `expense-tracking` | Expense management |
+| `eta-invoicing` | Egyptian Tax Authority invoicing |
+| `financial-reports` | Financial report generation |
+| `compliance-reports` | Compliance report generation |
+| `insurance-claims-lifecycle` | Claims lifecycle analytics |
+| `barcode` | Barcode generation and scanning |
+| `ai-hub` | AI feature hub |
+| `clinical-reference` | Clinical reference data |
+| `egypt-market` | Egypt-specific features |
+| `data-warehouse` | Data warehouse analytics |
+| `bi` | Business intelligence |
+
+---
+
+## 🗃 Database Migrations (20)
+
+| Migration | Description |
+|---|---|
+| `001_initial_schema` | Core tables: tenants, users, patients, appointments, invoices |
+| `002_clinical_modules` | EMR, prescriptions, lab, radiology, allergies |
+| `003_operations` | Inventory, pharmacy, HR, referrals |
+| `004_intelligence` | AI features, analytics, predictions |
+| `005_scale` | Multi-branch, advanced features |
+| `006_patient_experience` | Kiosk, queue, surveys |
+| `007_platform_maturity` | SaaS billing, developer portal |
+| `008_experience` | Enhanced patient experience |
+| `009_communications` | Notification templates and logs |
+| `010_intelligence` | AI intelligence features |
+| `011_automation_digital` | Automation rules, digital workflows |
+| `012_security_communication` | Security enhancements, communication |
+| `013_missing` | Missing tables and columns |
+| `014_clinical_reference` | Clinical reference data |
+| `015_egypt_market` | Egypt-specific tables and data |
+| `016_advanced_communication` | Advanced messaging features |
+| `017_financial_deepening` | Financial deepening features |
+| `018_ai_intelligence` | AI intelligence tables |
+| `019_patient_experience` | Patient experience tables |
+| `020_enhancements` | Latest enhancements |
 
 ---
 
 ## 🐳 Docker Deployment
 
-### Development
-```bash
-docker compose up -d
-# Starts: PostgreSQL, Redis, MinIO, Elasticsearch, Backend, Frontend, Nginx
-```
-
-### Production
-```bash
-# Set secrets in environment
-export JWT_SECRET=$(openssl rand -hex 32)
-export JWT_REFRESH_SECRET=$(openssl rand -hex 32)
-
-docker compose -f docker-compose.prod.yml up -d --build
-```
-
-### Services in Docker Compose
+### Services
 | Service | Port | Description |
 |---|---|---|
-| `postgres` | 5432 | PostgreSQL 15 |
-| `redis` | 6379 | Redis 7 |
-| `minio` | 9000/9001 | S3-compatible storage |
-| `elasticsearch` | 9200 | Search engine (optional) |
-| `backend` | 3000 | Fastify API |
-| `frontend` | 5173 | React SPA (Nginx) |
-| `nginx` | 80/443 | Reverse proxy with SSL |
+| `postgres` | 5432 | PostgreSQL 15 database |
+| `redis` | 6379 | Redis 7 cache |
+| `minio` | 9000/9001 | S3-compatible object storage |
+| `backend` | 3000 | Fastify API server |
+| `frontend` | 5173 | Vite dev server |
+| `nginx` | 80/443 | Reverse proxy |
+
+### Commands
+```bash
+# Start all services
+docker compose up -d --build
+
+# View logs
+docker compose logs -f backend
+
+# Stop all services
+docker compose down
+
+# Reset database
+docker compose down -v
+docker compose up -d postgres
+npm run migrate
+```
 
 ---
 
 ## ☁️ Free Tier Deployment
 
-### Recommended Stack (100% free)
+### Option 1: Railway (Recommended)
+1. Push to GitHub
+2. Go to https://railway.app
+3. New Project → Deploy from GitHub repo
+4. Add PostgreSQL plugin
+5. Set environment variables
+6. Deploy
 
-| Service | Tier | Purpose |
-|---|---|---|
-| **Render** | Free | Backend API + PostgreSQL |
-| **Vercel** | Hobby | Frontend (React SPA) |
-| **Redis Cloud** | 30MB free | Caching |
-| **Supabase** | Free | File storage (1GB) |
-| **Cloudflare** | Free | CDN, SSL, DDoS |
-| **GitHub** | Free | Source + CI/CD |
-| **Sentry** | Free (5k events) | Error monitoring |
+### Option 2: Render
+1. Push to GitHub
+2. Go to https://render.com
+3. New Web Service → Connect repo
+4. Build: `npm install && npm run build`
+5. Start: `npm run start -w packages/backend`
+6. Add PostgreSQL database
 
-### Step-by-Step
-
-1. **Database (Render):** Create PostgreSQL, copy connection URL
-2. **Backend (Render Web Service):**
-   - Build: `npm install && npm run build -w packages/shared && npm run build -w packages/backend`
-   - Start: `npm run start -w packages/backend`
-   - Health: `/api/v1/health`
-3. **Frontend (Vercel):**
-   ```bash
-   cd packages/frontend
-   vercel --prod
-   ```
-   - Set `VITE_API_URL` to backend URL
-4. **SSL (Cloudflare):** Point DNS, enable proxy
+### Option 3: Vercel (Frontend) + Railway (Backend)
+- Frontend: Deploy to Vercel (free tier)
+- Backend: Deploy to Railway with PostgreSQL
 
 ---
 
 ## 🪟 Windows 11 Setup Guide
 
-### Prerequisites
-1. **Node.js 20+** — https://nodejs.org
+### Required Software
+1. **Node.js 18+** — https://nodejs.org (LTS version)
 2. **PostgreSQL 15** — https://www.postgresql.org/download/windows/ (port 5432)
-3. **Redis** — Via WSL2 (`sudo apt install redis-server`) or Memurai
-4. **VS Code** — https://code.visualstudio.com
+3. **Git** — https://git-scm.com
+4. **Redis** — Via WSL2 (`sudo apt install redis-server`) or Memurai
+5. **VS Code** — https://code.visualstudio.com
+6. **pgAdmin** — https://www.pgadmin.org (database GUI)
 
 ### PowerShell Commands
 ```powershell
-# Clone and enter project
-git clone <repo-url> vision-healthcare
-cd vision-healthcare
+# Clone the repository
+git clone https://github.com/elnewahy2025/vision-healthcare-erp.git
+cd vision-healthcare-erp
 
-# Create database
-psql -U postgres -c "CREATE DATABASE healthcare;"
+# Install dependencies
+npm install
+
+# Build shared package
+npm run build -w packages/shared
+
+# Create database (open pgAdmin or use psql)
+psql -U postgres -c "CREATE DATABASE healthcare2;"
 
 # Configure environment
 Copy-Item .env.example .env
-notepad .env  # Set DB_PASSWORD
-
-# Install and build
-npm install
-npm run build -w packages/shared
+notepad .env  # Set DB_PASSWORD, DB_NAME=healthcare2
 
 # Run migrations
 npm run migrate
 
-# Start development (two terminals)
-npm run dev:backend   # Terminal 1
-npm run dev:frontend  # Terminal 2
+# Start development (two PowerShell terminals)
+npm run dev:backend    # Terminal 1
+npm run dev:frontend   # Terminal 2
+
+# Open in browser
+# Frontend: http://localhost:5173
+# Backend:  http://localhost:3000
+# API Docs: http://localhost:3000/docs
 ```
 
 ### Troubleshooting
-- **Port 5432 in use:** `netstat -aon | findstr :5432` → stop conflicting service
-- **Redis unavailable:** App degrades gracefully; Redis is optional for dev
-- **pg_dump not found:** Add `C:\Program Files\PostgreSQL\15\bin` to PATH
-- **Execution policy:** `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+| Issue | Solution |
+|---|---|
+| Port 5432 in use | `netstat -aon | findstr :5432` → stop conflicting service |
+| Redis unavailable | App degrades gracefully; Redis is optional for dev |
+| `psql` not recognized | Add `C:\Program Files\PostgreSQL\15\bin` to PATH |
+| SSL connection error | Set `DB_SSL=false` in `.env` for local PostgreSQL |
+| Password auth failed | Verify password in pgAdmin → Properties → Connection |
+| Migration table exists | Drop and recreate the database, then re-run migration |
+| `ERR_MODULE_NOT_FOUND` | Run `npm run build -w packages/shared` first |
+| `FST_ERR_DUPLICATED_ROUTE` | Pull latest code: `git pull origin main` |
+| `ECONNREFUSED` on Redis | Redis is optional; app continues without it |
 
 ---
 
@@ -803,7 +630,7 @@ npm test
 # Run with watch mode
 npm run test:watch -w packages/backend
 
-# Run specific test
+# Run specific test file
 npx vitest run packages/backend/src/modules/__tests__/patients.test.ts
 ```
 
@@ -826,14 +653,17 @@ npx vitest run packages/backend/src/modules/__tests__/patients.test.ts
 
 ## 🇪🇬 Egypt Market Features
 
-- **Fawry Payments** — Egyptian payment gateway
+- **Fawry Payments** — Egyptian payment gateway integration
 - **InstaPay** — Mobile wallet integration
-- **ETA e-Invoice** — QR code generation for Egyptian Tax Authority
+- **ETA e-Invoice** — QR code generation for Egyptian Tax Authority compliance
 - **Egyptian National ID** — 14-digit validation (00201...)
+- **Egyptian Phone Validation** — +20 format mobile number validation
 - **8 Egyptian Insurers** — Misr Insurance, Allianz Egypt, AXA Egypt, GIG Egypt, Arab Misr Insurance, CIL, Royal Insurance, Egypt Life Takaful
 - **Arabic ICD-10** — 25+ diagnosis codes with Arabic translations
-- **Arabic Medications** — 20+ drugs with Arabic names and usage
-- **Full RTL Support** — Complete right-to-left layout
+- **Arabic Medications** — 20+ drugs with Arabic names and usage instructions
+- **Full RTL Support** — Complete right-to-left layout for Arabic
+- **EGP Currency** — All financial operations in Egyptian Pounds
+- **Arabic UI** — Complete Arabic translation (2,644 keys)
 
 ---
 
@@ -847,17 +677,29 @@ http://localhost:3000/docs
 ### Key Endpoints
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/v1/auth/login` | User login |
+| `POST` | `/api/v1/auth/login` | User login (JWT) |
 | `POST` | `/api/v1/auth/register` | Register organization |
+| `POST` | `/api/v1/auth/forgot-password` | Password reset request |
+| `POST` | `/api/v1/auth/change-password` | Change password |
+| `POST` | `/api/v1/auth/mfa/setup` | Setup 2FA |
+| `POST` | `/api/v1/auth/mfa/enable` | Enable 2FA |
 | `GET` | `/api/v1/patients` | List patients |
 | `POST` | `/api/v1/patients` | Create patient |
+| `GET` | `/api/v1/patients/:id` | Get patient |
+| `PUT` | `/api/v1/patients/:id` | Update patient |
 | `GET` | `/api/v1/appointments` | List appointments |
 | `POST` | `/api/v1/appointments` | Book appointment |
 | `GET` | `/api/v1/billing/invoices` | List invoices |
 | `POST` | `/api/v1/billing/invoices` | Create invoice |
 | `GET` | `/api/v1/branches` | List branches |
-| `GET` | `/api/v1/insurance-claims` | List claims |
-| `POST` | `/api/v1/reports/generate` | Generate report |
+| `POST` | `/api/v1/ai/diagnosis` | AI diagnosis |
+| `POST` | `/api/v1/ai/clinical-notes` | AI clinical notes |
+| `POST` | `/api/v1/ai/predictions/no-show` | No-show prediction |
+| `POST` | `/api/v1/ai/schedule/optimize` | Smart scheduling |
+| `POST` | `/api/v1/portal/login` | Patient portal OTP login |
+| `GET` | `/api/v1/portal/dashboard` | Patient portal dashboard |
+| `POST` | `/api/v1/kiosk/checkin` | Kiosk check-in |
+| `GET` | `/api/v1/audit-logs` | Audit logs |
 | `GET` | `/api/v1/health` | Health check |
 
 ---
@@ -907,16 +749,20 @@ docker exec visionhc-backup /scripts/backup.sh
 2. Code: Follow existing module patterns
 3. Test: `npm test`
 4. Lint: `npm run lint`
-5. Commit: `git commit -m 'Add my feature'`
+5. Commit: `git commit -m 'feat: Add my feature'`
 6. Push: `git push origin feature/my-feature`
 7. PR: Open pull request
 
 ### Code Conventions
-- TypeScript strict mode
+- TypeScript strict mode — no `any` types
 - All backend modules: `registerXxxModule(app)` pattern
 - Frontend: Lazy-loaded pages, `useTranslation()` for i18n
-- All nav items must have `en.json` and `ar.json` entries
-- Mobile: `min-h-[44px]` touch targets, 16px font
+- All text: EN + AR translation keys (no hardcoded English)
+- Security: `sanitizeString()` on all user inputs and API responses
+- Forms: Validation with error display on every form
+- Actions: `try/catch` with `toast.error()` on every async action
+- Components: Use shared UI components (Modal, Button, Input, Select, Badge, PageLoader, EmptyState, Card)
+- Mobile: `min-h-[44px]` touch targets, 16px font minimum
 
 ---
 
@@ -925,16 +771,18 @@ docker exec visionhc-backup /scripts/backup.sh
 | Metric | Count |
 |---|---|
 | Frontend Pages | 82 |
-| Backend Modules | 61 |
-| Backend Services | 17 |
+| Backend Modules | 62 |
+| Backend Services | 18 |
 | Database Migrations | 20 |
-| UI Components | 16 |
-| Frontend Lines (TSX) | ~14,500 |
-| Backend Lines (TS) | ~11,800 |
-| Migration Lines (TS) | ~3,100 |
+| Shared UI Components | 19 |
+| Frontend Lines (TSX) | ~29,600 |
+| Backend Lines (TS) | ~12,300 |
+| i18n Translation Keys | 2,646 (EN) + 2,644 (AR) |
 | Tests | 37 (all passing) |
 | Build Output | ~1.6 MB |
-| i18n Languages | 2 (EN, AR) |
+| i18n Languages | 2 (English, Arabic) |
+| Target Market | Egypt 🇪🇬 |
+| Currency | EGP (Egyptian Pound) |
 
 ---
 
