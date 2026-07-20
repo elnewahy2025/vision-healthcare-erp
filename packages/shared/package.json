@@ -36,6 +36,9 @@
     "dev": "tsc --watch",
     "lint": "tsc --noEmit"
   },
+  "dependencies": {
+    "@types/node": "^22.0.0"
+  },
   "devDependencies": {
     "typescript": "^5.4.0"
   }
