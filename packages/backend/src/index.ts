@@ -1,5 +1,7 @@
 import './loadEnv.js';
 import Fastify from 'fastify';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -219,10 +221,9 @@ async function start() {
 
   // Run migrations automatically on startup
   try {
-    const migrationDir = new URL('../migrations', import.meta.url).pathname;
+    const migrationDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../migrations');
     const [batchNo, migrations] = await db.migrate.latest({
       directory: migrationDir,
-      extension: 'ts',
     });
     if (migrations.length === 0) {
       console.log('✓ Database is up to date');
