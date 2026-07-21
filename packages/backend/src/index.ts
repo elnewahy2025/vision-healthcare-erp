@@ -217,6 +217,23 @@ async function start() {
     process.exit(1);
   }
 
+  // Run migrations automatically on startup
+  try {
+    const migrationDir = new URL('../migrations', import.meta.url).pathname;
+    const [batchNo, migrations] = await db.migrate.latest({
+      directory: migrationDir,
+      extension: 'ts',
+    });
+    if (migrations.length === 0) {
+      console.log('✓ Database is up to date');
+    } else {
+      console.log(`✓ Ran ${migrations.length} migration(s) (batch ${batchNo})`);
+    }
+  } catch (err) {
+    console.error('✗ Migration failed:', err);
+    console.error('Server will continue, but some tables may be missing.');
+  }
+
   try {
     await redis.ping();
     console.log('✓ Redis connected');
