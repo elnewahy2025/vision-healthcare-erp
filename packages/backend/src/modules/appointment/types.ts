@@ -1,0 +1,68 @@
+export interface AppointmentRow {
+  id: string;
+  tenant_id: string;
+  patient_id: string;
+  doctor_id: string;
+  branch_id: string;
+  appointment_date: string;
+  start_time: string;
+  end_time: string;
+  duration: number;
+  type: string;
+  status: string;
+  reason: string | null;
+  notes: string | null;
+  is_walk_in: boolean;
+  is_virtual: boolean;
+  telemedicine_link: string | null;
+  reminder_sent: boolean;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  rescheduled_from: string | null;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  patient_first_name?: string;
+  patient_last_name?: string;
+  medical_record_number?: string;
+  patient_dob?: string;
+  patient_gender?: string;
+  patient_phone?: string;
+  doctor_first_name?: string;
+  doctor_last_name?: string;
+}
+
+export interface AppointmentResponse {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  doctorId: string;
+  branchId: string;
+  appointmentDate: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  type: string;
+  status: string;
+  reason: string | null;
+  notes: string | null;
+  isWalkIn: boolean;
+  isVirtual: boolean;
+  telemedicineLink: string | null;
+  reminderSent: boolean;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  rescheduledFrom: string | null;
+  patientName?: string;
+  patientMrn?: string;
+  patientDob?: string;
+  patientGender?: string;
+  patientPhone?: string;
+  doctorName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
