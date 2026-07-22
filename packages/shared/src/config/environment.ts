@@ -111,3 +111,63 @@ export function getEnv(): Environment {
     BACKUP_RETENTION: process.env.BACKUP_RETENTION || '7',
   };
 }
+
+
+// ============================================
+// Startup Validation — Fail Fast on Missing Secrets
+// ============================================
+
+const INSECURE_DEFAULTS = [
+  "dev-secret-change-in-production",
+  "dev-refresh-secret-change-in-production",
+  "CHANGE_ME",
+  "CHANGE_ME_GENERATE_WITH_openssl_rand_hex_32",
+  "CHANGE_ME_GENERATE_A_DIFFERENT_openssl_rand_hex_32",
+  "CHANGE_ME_USE_STRONG_PASSWORD",
+  "minioadmin",
+  "Omar2009!",
+];
+
+export function validateProductionEnvironment(): void {
+  const envVars = getEnv();
+  if (envVars.NODE_ENV !== "production") return;
+
+  const errors: string[] = [];
+
+  if (!process.env.JWT_SECRET || INSECURE_DEFAULTS.includes(process.env.JWT_SECRET)) {
+    errors.push("JWT_SECRET is missing or set to an insecure default value.");
+  }
+  if (!process.env.JWT_REFRESH_SECRET || INSECURE_DEFAULTS.includes(process.env.JWT_REFRESH_SECRET)) {
+    errors.push("JWT_REFRESH_SECRET is missing or set to an insecure default value.");
+  }
+  if (
+    process.env.JWT_SECRET &&
+    process.env.JWT_REFRESH_SECRET &&
+    process.env.JWT_SECRET === process.env.JWT_REFRESH_SECRET
+  ) {
+    errors.push("JWT_SECRET and JWT_REFRESH_SECRET must be different values.");
+  }
+  if (!process.env.DB_PASSWORD || INSECURE_DEFAULTS.includes(process.env.DB_PASSWORD)) {
+    errors.push("DB_PASSWORD is missing or set to an insecure default value.");
+  }
+  if (envVars.CORS_ORIGIN === "*") {
+    errors.push("CORS_ORIGIN must not be '*' in production. Set specific allowed origins.");
+  }
+  if (
+    process.env.MINIO_ACCESS_KEY === "minioadmin" ||
+    process.env.MINIO_SECRET_KEY === "minioadmin"
+  ) {
+    errors.push("MinIO credentials must not be default 'minioadmin' values in production.");
+  }
+
+  if (errors.length > 0) {
+    console.error("========================================");
+    console.error("FATAL: Production environment validation failed");
+    console.error("========================================");
+    errors.forEach((err) => console.error(`  ✗ ${err}`));
+    console.error("========================================");
+    console.error("Fix the above issues and restart the server.");
+    console.error("========================================");
+    process.exit(1);
+  }
+}

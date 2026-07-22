@@ -11,7 +11,7 @@ import multipart from '@fastify/multipart';
 
 import websocket from '@fastify/websocket';
 import jwt from '@fastify/jwt';
-import { getEnv } from '@healthcare/shared/config';
+import { getEnv, validateProductionEnvironment } from '@healthcare/shared/config';
 import { registerAuthModule } from './modules/auth/index.js';
 import { registerPatientModule } from './modules/patient/index.js';
 import { registerAppointmentModule } from './modules/appointment/index.js';
@@ -98,7 +98,25 @@ async function buildApp() {
 
   // Plugins
   await app.register(cors, { origin: env.CORS_ORIGIN, credentials: true });
-  await app.register(helmet, { contentSecurityPolicy: false });
+  await app.register(helmet, {
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      fontSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+});
   await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
   await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
   await app.register(websocket);
@@ -211,6 +229,7 @@ await registerDashboardWidgetsModule(app);
 }
 
 async function start() {
+  validateProductionEnvironment();
   try {
     await db.raw('SELECT 1');
     console.log('✓ Database connected');

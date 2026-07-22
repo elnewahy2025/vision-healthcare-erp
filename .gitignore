@@ -10,6 +10,10 @@ packages/shared/dist/
 .env
 .env.local
 .env.production
+.env.docker
+.env.*.local
+*.bak
+*.backup
 
 # IDE
 .vscode/
@@ -45,6 +49,3 @@ deployment/nginx/ssl/*.key
 packages/frontend/public/icons/icon-192.png
 packages/frontend/public/icons/icon-512.png
 packages/frontend/public/icons/generate-icons.mjs
-
-# Lock files
-package-lock.json

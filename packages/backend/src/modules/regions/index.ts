@@ -62,7 +62,7 @@ export async function registerRegionsModule(app: FastifyInstance) {
       { code: 'local', name: 'Self-Hosted (On-Premise)', provider: 'self', location: 'Local', compliance_flags: '[]' },
     ];
     for (const r of defaultRegions) {
-      await db('regions').insert({ code: r.code, name: r.name, provider: r.provider, location: r.location, compliance_flags: r.compliance_flights });
+      await db('regions').insert({ code: r.code, name: r.name, provider: r.provider, location: r.location, compliance_flags: r.compliance_flags });
     }
     return sendSuccess(reply, { count: defaultRegions.length }, 'Default regions seeded', 201);
   });
