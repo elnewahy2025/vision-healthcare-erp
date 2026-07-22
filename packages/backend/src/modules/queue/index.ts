@@ -1,10 +1,11 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerQueueModule(app: FastifyInstance) {
-  app.get('/api/v1/queue', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/queue', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const { branchId, serviceType, status } = request.query as any;
     let q = db('queue_entries').where('queue_entries.tenant_id', tenantId);
@@ -18,7 +19,7 @@ export async function registerQueueModule(app: FastifyInstance) {
     return sendSuccess(reply, entries.map(mapEntry));
   });
 
-  app.post('/api/v1/queue', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/queue', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const maxPos = await db('queue_entries').where({ tenant_id: tenantId, branch_id: body.branchId || null, status: 'waiting' }).max('position as m').first();
     const qNum = "Q-" + String(Date.now()).slice(-6);
@@ -31,13 +32,13 @@ export async function registerQueueModule(app: FastifyInstance) {
     return sendSuccess(reply, mapEntry(entry), 'Added to queue', 201);
   });
 
-  app.put('/api/v1/queue/:id/call', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/queue/:id/call', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any;
     await db('queue_entries').where({ id }).update({ status: 'called', called_at: new Date() });
     return sendSuccess(reply, null, 'Patient called');
   });
 
-  app.put('/api/v1/queue/:id/status', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/queue/:id/status', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const { status } = request.body as any;
     const update: any = { status, updated_at: new Date() };
     if (status === 'in_progress') update.started_at = new Date();

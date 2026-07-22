@@ -1,11 +1,12 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerPharmacyModule(app: FastifyInstance) {
   // Inventory
-  app.get('/api/v1/pharmacy/inventory', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/pharmacy/inventory', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const { search, status } = request.query as any;
     let q = db('pharmacy_inventory').where({ tenant_id: tenantId });
@@ -15,7 +16,7 @@ export async function registerPharmacyModule(app: FastifyInstance) {
     return sendSuccess(reply, items.map(mapDrug));
   });
 
-  app.post('/api/v1/pharmacy/inventory', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/pharmacy/inventory', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const [item] = await db('pharmacy_inventory').insert({
       tenant_id: tenantId, drug_name: body.drugName, generic_name: body.genericName,
@@ -28,14 +29,14 @@ export async function registerPharmacyModule(app: FastifyInstance) {
     return sendSuccess(reply, mapDrug(item), 'Drug added', 201);
   });
 
-  app.put('/api/v1/pharmacy/inventory/:id/stock', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/pharmacy/inventory/:id/stock', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const { quantity } = request.body as any;
     await db('pharmacy_inventory').where({ id }).increment('stock_quantity', quantity).update({ updated_at: new Date() });
     return sendSuccess(reply, null, 'Stock updated');
   });
 
   // Prescriptions
-  app.get('/api/v1/pharmacy/prescriptions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/pharmacy/prescriptions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const { status, patientId } = request.query as any;
     let q = db('pharmacy_prescriptions').where('pharmacy_prescriptions.tenant_id', tenantId).whereNull('pharmacy_prescriptions.deleted_at');
@@ -55,7 +56,7 @@ export async function registerPharmacyModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/pharmacy/prescriptions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/pharmacy/prescriptions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const prescNum = "RX-" + Date.now().toString(36).toUpperCase();
     const [presc] = await db('pharmacy_prescriptions').insert({
@@ -73,7 +74,7 @@ export async function registerPharmacyModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: presc.id, prescriptionNumber: presc.prescription_number }, 'Prescription created', 201);
   });
 
-  app.post('/api/v1/pharmacy/prescriptions/:id/dispense', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/pharmacy/prescriptions/:id/dispense', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const { items } = request.body as any;
     if (items?.length) {
       for (const it of items) {

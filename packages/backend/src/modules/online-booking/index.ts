@@ -1,7 +1,8 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerOnlineBookingModule(app: FastifyInstance) {
   // ── Public: Get available slots (no auth) ──
@@ -72,7 +73,7 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
   });
 
   // ── Authenticated: Manage booking slots ──
-  app.get('/api/v1/booking/manage/slots', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/booking/manage/slots', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { date, doctorId } = request.query as any;
     let q = db('booking_slots').where('booking_slots.tenant_id', tenantId);
     if (date) q = q.andWhere('date', date);
@@ -81,7 +82,7 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
     return sendSuccess(reply, slots);
   });
 
-  app.post('/api/v1/booking/manage/slots', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/booking/manage/slots', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     // Bulk create slots for a date range
     const { doctorId, date, startTime, endTime, intervalMinutes, branchId } = body;
@@ -110,7 +111,7 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
   });
 
   // ── Authenticated: View booking requests ──
-  app.get('/api/v1/booking/manage/requests', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/booking/manage/requests', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { status } = request.query as any;
     let q = db('booking_requests').where('booking_requests.tenant_id', tenantId);
     if (status) q = q.andWhere('status', status);
@@ -128,7 +129,7 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
     })));
   });
 
-  app.put('/api/v1/booking/manage/requests/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/booking/manage/requests/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const ctx = getCtx(request); const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.status) update.status = body.status;

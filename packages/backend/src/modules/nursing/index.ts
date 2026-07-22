@@ -1,10 +1,11 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerNursingModule(app: FastifyInstance) {
-  app.get('/api/v1/nursing/tasks', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/nursing/tasks', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { status, assignedTo } = request.query as any;
     let q = db('nursing_tasks').where('nursing_tasks.tenant_id', tenantId).whereNull('nursing_tasks.deleted_at');
     if (status) q = q.andWhere('nursing_tasks.status', status);
@@ -21,7 +22,7 @@ export async function registerNursingModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/nursing/tasks', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/nursing/tasks', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const [task] = await db('nursing_tasks').insert({
       tenant_id: tenantId, patient_id: body.patientId, title: body.title,
@@ -32,7 +33,7 @@ export async function registerNursingModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: task.id }, 'Task created', 201);
   });
 
-  app.put('/api/v1/nursing/tasks/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/nursing/tasks/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.status) update.status = body.status;
@@ -42,7 +43,7 @@ export async function registerNursingModule(app: FastifyInstance) {
     return sendSuccess(reply, null, 'Task updated');
   });
 
-  app.post('/api/v1/nursing/notes', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/nursing/notes', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const [note] = await db('nursing_notes').insert({
       tenant_id: tenantId, patient_id: body.patientId, nurse_id: ctx.userId,

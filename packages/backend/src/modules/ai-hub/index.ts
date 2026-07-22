@@ -1,11 +1,12 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerAiHubModule(app: FastifyInstance) {
   // ── AI Providers ──
-  app.get('/api/v1/ai/providers', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/ai/providers', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const providers = await db('ai_providers').where({ tenant_id: tenantId }).orderBy('name');
     return sendSuccess(reply, providers.map((p: any) => ({
@@ -15,7 +16,7 @@ export async function registerAiHubModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/ai/providers', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/ai/providers', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const [p] = await db('ai_providers').insert({
       tenant_id: tenantId, name: body.name, provider: body.provider,
@@ -25,7 +26,7 @@ export async function registerAiHubModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: p.id, name: p.name }, 'AI provider added', 201);
   });
 
-  app.put('/api/v1/ai/providers/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/ai/providers/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.name) update.name = body.name; if (body.config) update.config = JSON.stringify(body.config);
@@ -36,10 +37,10 @@ export async function registerAiHubModule(app: FastifyInstance) {
   });
 
   // ── AI Models ──
-  app.get('/api/v1/ai/models', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/ai/models', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const models = await db('ai_models').where({ tenant_id: tenantId }).orderBy('model_name');
-    return sendSuccess(reply, models.map((m: any) => ({
+    return sendSuccess(reply, models.map((m: Record<string, unknown>) => ({
       id: m.id, providerId: m.provider_id, modelName: m.model_name,
       displayName: m.display_name, capabilities: m.capabilities,
       costPer1kInput: Number(m.cost_per_1k_input), costPer1kOutput: Number(m.cost_per_1k_output),
@@ -47,7 +48,7 @@ export async function registerAiHubModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/ai/models', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/ai/models', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const [m] = await db('ai_models').insert({
       tenant_id: tenantId, provider_id: body.providerId, model_name: body.modelName,
@@ -59,7 +60,7 @@ export async function registerAiHubModule(app: FastifyInstance) {
   });
 
   // ── AI Assistants ──
-  app.get('/api/v1/ai/assistants', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/ai/assistants', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { category } = request.query as any;
     let q = db('ai_assistants').where('ai_assistants.tenant_id', tenantId);
     if (category) q = q.andWhere('category', category);
@@ -74,7 +75,7 @@ export async function registerAiHubModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/ai/assistants', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/ai/assistants', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const slug = body.slug || body.name.toLowerCase().replace(/\s+/g, '_');
     const [a] = await db('ai_assistants').insert({
@@ -86,7 +87,7 @@ export async function registerAiHubModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: a.id, name: a.name, slug: a.slug }, 'Assistant created', 201);
   });
 
-  app.put('/api/v1/ai/assistants/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/ai/assistants/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.name) update.name = body.name; if (body.systemPrompt !== undefined) update.system_prompt = body.systemPrompt;
@@ -97,7 +98,7 @@ export async function registerAiHubModule(app: FastifyInstance) {
   });
 
   // ── AI Request Log ──
-  app.get('/api/v1/ai/requests', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/ai/requests', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { status, source, limit } = request.query as any;
     let q = db('ai_requests').where('ai_requests.tenant_id', tenantId);
     if (status) q = q.andWhere('status', status);
@@ -114,7 +115,7 @@ export async function registerAiHubModule(app: FastifyInstance) {
   });
 
   // ── AI Cost Tracking ──
-  app.get('/api/v1/ai/costs', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/ai/costs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { days } = request.query as any;
     const since = new Date(Date.now() - (Number(days) || 30) * 86400000).toISOString().split('T')[0];
     const costs = await db('ai_cost_logs').where({ tenant_id: tenantId }).andWhere('date', '>=', since).orderBy('date', 'desc');
@@ -127,7 +128,7 @@ export async function registerAiHubModule(app: FastifyInstance) {
   });
 
   // ── Chat Completion (proxy stub) ──
-  app.post('/api/v1/ai/chat', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/ai/chat', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     // Record the request (actual AI call would happen via provider adapter)
     const [reqLog] = await db('ai_requests').insert({

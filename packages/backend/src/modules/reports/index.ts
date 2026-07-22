@@ -1,11 +1,12 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerReportsModule(app: FastifyInstance) {
   // ── Report Definitions ──
-  app.get('/api/v1/reports', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/reports', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { category } = request.query as any;
     let q = db('report_definitions').where('report_definitions.tenant_id', tenantId);
     if (category) q = q.andWhere('category', category);
@@ -19,7 +20,7 @@ export async function registerReportsModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/reports', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/reports', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const slug = body.slug || body.name.toLowerCase().replace(/\s+/g, '_');
     const [rep] = await db('report_definitions').insert({
@@ -33,7 +34,7 @@ export async function registerReportsModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: rep.id, name: rep.name, slug: rep.slug }, 'Report definition created', 201);
   });
 
-  app.put('/api/v1/reports/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/reports/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.name) update.name = body.name; if (body.description !== undefined) update.description = body.description;
@@ -46,7 +47,7 @@ export async function registerReportsModule(app: FastifyInstance) {
     return sendSuccess(reply, null, 'Report updated');
   });
 
-  app.delete('/api/v1/reports/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.delete('/api/v1/reports/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any;
     await db('report_schedules').where({ report_id: id }).del();
     await db('report_executions').where({ report_id: id }).del();
@@ -55,7 +56,7 @@ export async function registerReportsModule(app: FastifyInstance) {
   });
 
   // ── Report Schedules ──
-  app.get('/api/v1/reports/:id/schedules', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/reports/:id/schedules', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { id } = request.params as any;
     const schedules = await db('report_schedules').where({ tenant_id: tenantId, report_id: id }).orderBy('created_at', 'desc');
     return sendSuccess(reply, schedules.map((s: any) => ({
@@ -66,7 +67,7 @@ export async function registerReportsModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/reports/:id/schedules', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/reports/:id/schedules', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { id } = request.params as any; const body = request.body as any;
     const [s] = await db('report_schedules').insert({
       tenant_id: tenantId, report_id: id, cron: body.cron || '0 8 * * 1',
@@ -76,7 +77,7 @@ export async function registerReportsModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: s.id }, 'Schedule created', 201);
   });
 
-  app.put('/api/v1/reports/schedules/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/reports/schedules/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.cron) update.cron = body.cron; if (body.recipients) update.recipients = JSON.stringify(body.recipients);
@@ -87,7 +88,7 @@ export async function registerReportsModule(app: FastifyInstance) {
   });
 
   // ── Report Executions ──
-  app.get('/api/v1/reports/:id/executions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/reports/:id/executions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { id } = request.params as any;
     const execs = await db('report_executions').where({ tenant_id: tenantId, report_id: id }).orderBy('created_at', 'desc').limit(20);
     return sendSuccess(reply, execs.map((e: any) => ({
@@ -97,7 +98,7 @@ export async function registerReportsModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/reports/:id/execute', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/reports/:id/execute', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const { id } = request.params as any; const body = request.body as any;
     const [exec] = await db('report_executions').insert({
       tenant_id: tenantId, report_id: id, status: 'pending',
@@ -109,7 +110,7 @@ export async function registerReportsModule(app: FastifyInstance) {
   });
 
   // ── Export endpoint stub ──
-  app.get('/api/v1/reports/export/:id/:format', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/reports/export/:id/:format', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id, format } = request.params as any;
     const exec = await db('report_executions').where({ id }).first();
     if (!exec) return reply.status(404).send({ success: false, error: 'Execution not found' });

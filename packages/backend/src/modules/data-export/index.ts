@@ -1,7 +1,8 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 const EXPORT_TABLES: Record<string, string[]> = {
   patients: ['patients'],
@@ -19,7 +20,7 @@ const EXPORT_TABLES: Record<string, string[]> = {
 
 export async function registerDataExportModule(app: FastifyInstance) {
   // ── Export Definitions ──
-  app.get('/api/v1/export/definitions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/export/definitions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const defs = await db('export_definitions').where({ tenant_id: tenantId }).orderBy('name');
     return sendSuccess(reply, defs.map((d: any) => ({
@@ -30,7 +31,7 @@ export async function registerDataExportModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/export/definitions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/export/definitions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const [def] = await db('export_definitions').insert({
       tenant_id: tenantId, name: body.name, module: body.module, format: body.format || 'csv',
@@ -42,7 +43,7 @@ export async function registerDataExportModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: def.id, name: def.name }, 'Export definition created', 201);
   });
 
-  app.delete('/api/v1/export/definitions/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.delete('/api/v1/export/definitions/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     await db('export_definitions').where({ id: (request.params as any).id }).del();
     return sendSuccess(reply, null, 'Export definition deleted');
   });
@@ -55,7 +56,7 @@ export async function registerDataExportModule(app: FastifyInstance) {
   });
 
   // ── Run Export ──
-  app.post('/api/v1/export/run', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/export/run', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const module = body.module || 'patients';
     const format = body.format || 'csv';
@@ -93,7 +94,7 @@ export async function registerDataExportModule(app: FastifyInstance) {
   });
 
   // ── Export Jobs History ──
-  app.get('/api/v1/export/jobs', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/export/jobs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { status, module } = request.query as any;
     let q = db('export_jobs').where('export_jobs.tenant_id', tenantId);
     if (status) q = q.andWhere('status', status);
@@ -127,7 +128,7 @@ export async function registerDataExportModule(app: FastifyInstance) {
   });
 
   // ── Download endpoint stub ──
-  app.get('/api/v1/export/download/:jobId', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/export/download/:jobId', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { jobId } = request.params as any;
     const job = await db('export_jobs').where({ id: jobId }).first();
     if (!job) return reply.status(404).send({ success: false, error: 'Export job not found' });

@@ -1,10 +1,11 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerReferralModule(app: FastifyInstance) {
-  app.get('/api/v1/referrals', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/referrals', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { status, patientId } = request.query as any;
     let q = db('referrals').where('referrals.tenant_id', tenantId).whereNull('referrals.deleted_at');
     if (status) q = q.andWhere('referrals.status', status);
@@ -16,7 +17,7 @@ export async function registerReferralModule(app: FastifyInstance) {
     return sendSuccess(reply, rows.map(mapRef));
   });
 
-  app.post('/api/v1/referrals', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/referrals', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const refNum = "REF-" + Date.now().toString(36).toUpperCase();
     const [ref] = await db('referrals').insert({
@@ -31,7 +32,7 @@ export async function registerReferralModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: ref.id, referralNumber: ref.referral_number }, 'Referral created', 201);
   });
 
-  app.put('/api/v1/referrals/:id/status', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/referrals/:id/status', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     await db('referrals').where({ id }).update({ status: body.status, feedback: body.feedback || null, updated_at: new Date() });
     return sendSuccess(reply, null, 'Referral updated');

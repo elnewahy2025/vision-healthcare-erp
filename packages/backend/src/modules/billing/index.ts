@@ -1,5 +1,5 @@
 import { getCtx, getTenantId } from "../../utils/route-helper.js";
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../../core/database.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
@@ -7,11 +7,12 @@ import { createInvoiceSchema, paginationSchema } from '../../utils/validation.js
 import { PatientNotFoundError } from '@healthcare/shared/errors';
 import { getEnv } from '@healthcare/shared/config';
 import { generateInvoiceNumber } from '@healthcare/shared/utils';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerBillingModule(app: FastifyInstance) {
   // List invoices
   app.get('/api/v1/invoices', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const query = paginationSchema.parse(request.query);
     const tenantId = getTenantId(request);
@@ -44,7 +45,7 @@ export async function registerBillingModule(app: FastifyInstance) {
 
   // Get single invoice
   app.get('/api/v1/invoices/:invoiceId', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const { invoiceId } = request.params as any;
     const tenantId = getTenantId(request);
@@ -72,7 +73,7 @@ export async function registerBillingModule(app: FastifyInstance) {
 
   // Create invoice
   app.post('/api/v1/invoices', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const body = createInvoiceSchema.parse(request.body);
     const tenantId = getTenantId(request); const userId = getCtx(request).userId;
@@ -114,7 +115,7 @@ export async function registerBillingModule(app: FastifyInstance) {
 
   // Record payment
   app.post('/api/v1/invoices/:invoiceId/pay', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const { invoiceId } = request.params as any;
     const tenantId = getTenantId(request);
@@ -169,7 +170,7 @@ export async function registerBillingModule(app: FastifyInstance) {
 
   // Get revenue summary
   app.get('/api/v1/billing/revenue', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const { startDate, endDate } = request.query as any;
@@ -200,7 +201,7 @@ export async function registerBillingModule(app: FastifyInstance) {
 
   // Get patient invoices
   app.get('/api/v1/patients/:patientId/invoices', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const { patientId } = request.params as any;
     const tenantId = getTenantId(request);
@@ -223,7 +224,7 @@ export async function registerBillingModule(app: FastifyInstance) {
   });
   // Create Stripe checkout session
   app.post('/api/v1/payments/stripe/create', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const { invoiceId, amount, currency } = z.object({
@@ -238,7 +239,7 @@ export async function registerBillingModule(app: FastifyInstance) {
 
   // Get payment link
   app.get('/api/v1/payments/link/:tenantSlug/:invoiceId', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const { invoiceId, tenantSlug } = request.params as any;
     const { generatePaymentLink } = await import('../../services/payment.js');
@@ -247,7 +248,7 @@ export async function registerBillingModule(app: FastifyInstance) {
 
   // Revenue by month
   app.get('/api/v1/billing/revenue/monthly', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const year = parseInt((request.query as any).year) || new Date().getFullYear();
@@ -260,7 +261,7 @@ export async function registerBillingModule(app: FastifyInstance) {
 
   // Aging report
   app.get('/api/v1/billing/reports/aging', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const [current] = await db('invoices').where('tenant_id', tenantId).whereNull('deleted_at').where('due', '>', 0).whereRaw("issued_at >= NOW() - INTERVAL '30 days'").select(db.raw('COALESCE(SUM(due),0) as amount'));
@@ -272,7 +273,7 @@ export async function registerBillingModule(app: FastifyInstance) {
 
   // Top patients by revenue
   app.get('/api/v1/billing/reports/top-patients', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const patients = await db('invoices').join('patients', 'invoices.patient_id', 'patients.id')

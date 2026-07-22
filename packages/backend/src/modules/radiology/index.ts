@@ -1,11 +1,12 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { PatientNotFoundError } from '@healthcare/shared/errors';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerRadiologyModule(app: FastifyInstance) {
-  app.get('/api/v1/radiology/orders', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/radiology/orders', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const { status, patientId } = request.query as any;
     let q = db('radiology_orders').where('radiology_orders.tenant_id', tenantId).whereNull('radiology_orders.deleted_at');
@@ -17,7 +18,7 @@ export async function registerRadiologyModule(app: FastifyInstance) {
     return sendSuccess(reply, orders.map(mapOrder));
   });
 
-  app.post('/api/v1/radiology/orders', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/radiology/orders', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request);
     const body = request.body as any;
     const patient = await db('patients').where({ id: body.patientId, tenant_id: tenantId }).first();
@@ -33,7 +34,7 @@ export async function registerRadiologyModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: order.id, orderNumber: order.order_number }, 'Radiology order created', 201);
   });
 
-  app.put('/api/v1/radiology/orders/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/radiology/orders/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.status) update.status = body.status;

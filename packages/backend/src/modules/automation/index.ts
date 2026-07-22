@@ -1,11 +1,12 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerAutomationModule(app: FastifyInstance) {
   // ── Rules CRUD ──
-  app.get('/api/v1/automation/rules', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/automation/rules', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const { category, isActive, triggerType } = request.query as any;
     let q = db('automation_rules').where({ tenant_id: tenantId });
@@ -25,7 +26,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
     })));
   });
 
-  app.get('/api/v1/automation/rules/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/automation/rules/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const { id } = request.params as any;
     const rule = await db('automation_rules').where({ tenant_id: tenantId, id }).first();
@@ -46,7 +47,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
     });
   });
 
-  app.post('/api/v1/automation/rules', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/automation/rules', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const body = request.body as any;
@@ -68,7 +69,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: rule.id, name: rule.name, slug: rule.slug }, 'Rule created', 201);
   });
 
-  app.put('/api/v1/automation/rules/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/automation/rules/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any;
     const body = request.body as any;
     const update: any = { updated_at: new Date() };
@@ -87,7 +88,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
     return sendSuccess(reply, null, 'Rule updated');
   });
 
-  app.delete('/api/v1/automation/rules/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.delete('/api/v1/automation/rules/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any;
     await db('automation_rule_actions').where({ rule_id: id }).del();
     await db('automation_rules').where({ id }).del();
@@ -95,7 +96,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
   });
 
   // ── Rule Actions ──
-  app.get('/api/v1/automation/rules/:ruleId/actions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/automation/rules/:ruleId/actions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { ruleId } = request.params as any;
     const actions = await db('automation_rule_actions').where({ rule_id: ruleId }).orderBy('step_order');
     return sendSuccess(reply, actions.map((a: any) => ({
@@ -106,7 +107,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/automation/rules/:ruleId/actions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/automation/rules/:ruleId/actions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { ruleId } = request.params as any;
     const body = request.body as any;
     const maxStep = await db('automation_rule_actions').where({ rule_id: ruleId }).max('step_order as max').first();
@@ -120,7 +121,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: action.id, stepOrder: action.step_order }, 'Action added', 201);
   });
 
-  app.put('/api/v1/automation/rules/:ruleId/actions/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/automation/rules/:ruleId/actions/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any;
     const body = request.body as any;
     const update: any = {};
@@ -134,14 +135,14 @@ export async function registerAutomationModule(app: FastifyInstance) {
     return sendSuccess(reply, null, 'Action updated');
   });
 
-  app.delete('/api/v1/automation/rules/:ruleId/actions/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.delete('/api/v1/automation/rules/:ruleId/actions/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any;
     await db('automation_rule_actions').where({ id }).del();
     return sendSuccess(reply, null, 'Action deleted');
   });
 
   // ── Trigger Rule Execution ──
-  app.post('/api/v1/automation/rules/:id/trigger', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/automation/rules/:id/trigger', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const { id } = request.params as any;
@@ -205,7 +206,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
   });
 
   // ── Execution Logs ──
-  app.get('/api/v1/automation/logs', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/automation/logs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const { ruleId, status, limit, offset } = request.query as any;
     let q = db('automation_execution_logs').where('automation_execution_logs.tenant_id', tenantId);
@@ -219,7 +220,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
       .limit(Number(limit) || 50)
       .offset(Number(offset) || 0);
     return sendSuccess(reply, {
-      logs: logs.map((l: any) => ({
+      logs: logs.map((l: Record<string, unknown>) => ({
         id: l.id, ruleId: l.rule_id, ruleName: l.rule_name,
         triggerType: l.trigger_type, referenceType: l.reference_type,
         referenceId: l.reference_id, status: l.status,
@@ -233,7 +234,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
   });
 
   // ── Get available trigger events ──
-  app.get('/api/v1/automation/trigger-events', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (_request, reply) => {
+  app.get('/api/v1/automation/trigger-events', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (_request, reply) => {
     const events = [
       { id: 'appointment.created', label: 'Appointment Created', category: 'appointment' },
       { id: 'appointment.completed', label: 'Appointment Completed', category: 'appointment' },
@@ -257,7 +258,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
   });
 
   // ── Get available action types ──
-  app.get('/api/v1/automation/action-types', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (_request, reply) => {
+  app.get('/api/v1/automation/action-types', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (_request, reply) => {
     const actions = [
       { id: 'send_notification', label: 'Send Notification', category: 'communication', fields: ['template', 'recipient', 'channel'] },
       { id: 'send_email', label: 'Send Email', category: 'communication', fields: ['to', 'subject', 'template'] },

@@ -253,7 +253,7 @@ export async function registerAuthModule(app: FastifyInstance) {
 
   // ===================== REFRESH TOKEN =====================
   app.post('/api/v1/auth/refresh', { preHandler: [refreshRateLimit] }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const body = request.body as Record<string, unknown> | undefined;
+    const body = request.body as any | undefined;
     const refreshToken = body?.refreshToken as string | undefined;
     if (!refreshToken) throw new UnauthorizedError('Refresh token required');
 
@@ -295,7 +295,7 @@ export async function registerAuthModule(app: FastifyInstance) {
   // ===================== LOGOUT =====================
   app.post('/api/v1/auth/logout', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(app, r, rep)] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { userId, tenantId } = getCtx(request);
-    const body = request.body as Record<string, unknown> | undefined;
+    const body = request.body as any | undefined;
     const refreshToken = body?.refreshToken as string | undefined;
 
     if (refreshToken) {

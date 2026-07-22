@@ -1,7 +1,8 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerSaasBillingModule(app: FastifyInstance) {
   // ── Subscription Plans (system-wide) ──
@@ -17,7 +18,7 @@ export async function registerSaasBillingModule(app: FastifyInstance) {
   });
 
   // ── Tenant Subscription ──
-  app.get('/api/v1/saas/subscription', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/saas/subscription', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const sub = await db('tenant_subscriptions').where({ tenant_id: tenantId })
       .leftJoin('subscription_plans', 'tenant_subscriptions.plan_id', 'subscription_plans.id')
@@ -39,7 +40,7 @@ export async function registerSaasBillingModule(app: FastifyInstance) {
     });
   });
 
-  app.post('/api/v1/saas/subscription', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/saas/subscription', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const plan = await db('subscription_plans').where({ id: body.planId }).first();
     if (!plan) return reply.status(404).send({ success: false, error: 'Plan not found' });
@@ -53,7 +54,7 @@ export async function registerSaasBillingModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: sub.id, status: sub.status }, 'Subscription created', 201);
   });
 
-  app.put('/api/v1/saas/subscription/plan', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/saas/subscription/plan', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const plan = await db('subscription_plans').where({ id: body.planId }).first();
     if (!plan) return reply.status(404).send({ success: false, error: 'Plan not found' });
@@ -64,7 +65,7 @@ export async function registerSaasBillingModule(app: FastifyInstance) {
     return sendSuccess(reply, null, 'Plan changed');
   });
 
-  app.post('/api/v1/saas/subscription/cancel', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/saas/subscription/cancel', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     await db('tenant_subscriptions').where({ tenant_id: tenantId }).update({
       status: 'cancelled', cancelled_at: new Date(), updated_at: new Date()
@@ -73,7 +74,7 @@ export async function registerSaasBillingModule(app: FastifyInstance) {
   });
 
   // ── Usage Records ──
-  app.get('/api/v1/saas/usage', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/saas/usage', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { metric, days } = request.query as any;
     const since = new Date(Date.now() - (Number(days) || 30) * 86400000).toISOString().split('T')[0];
     let q = db('usage_records').where({ tenant_id: tenantId }).where('record_date', '>=', since);
@@ -84,7 +85,7 @@ export async function registerSaasBillingModule(app: FastifyInstance) {
     return sendSuccess(reply, { records: records.map((r: any) => ({ id: r.id, metric: r.metric, quantity: r.quantity, recordDate: r.record_date })), totals });
   });
 
-  app.post('/api/v1/saas/usage/track', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/saas/usage/track', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     await db('usage_records').insert({
       tenant_id: tenantId, subscription_id: body.subscriptionId || null,
@@ -94,7 +95,7 @@ export async function registerSaasBillingModule(app: FastifyInstance) {
   });
 
   // ── Subscription Invoices ──
-  app.get('/api/v1/saas/invoices', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/saas/invoices', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const invoices = await db('subscription_invoices').where({ tenant_id: tenantId }).orderBy('created_at', 'desc').limit(50);
     return sendSuccess(reply, invoices.map((i: any) => ({

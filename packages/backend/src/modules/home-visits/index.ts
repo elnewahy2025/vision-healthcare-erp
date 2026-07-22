@@ -1,10 +1,11 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerHomeVisitsModule(app: FastifyInstance) {
-  app.get('/api/v1/home-visits', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/home-visits', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { status, assignedTo } = request.query as any;
     let q = db('home_visits').where('home_visits.tenant_id', tenantId).whereNull('home_visits.deleted_at');
     if (status) q = q.andWhere('home_visits.status', status);
@@ -23,7 +24,7 @@ export async function registerHomeVisitsModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/home-visits', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/home-visits', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const visitNum = "HV-" + Date.now().toString(36).toUpperCase();
     const [visit] = await db('home_visits').insert({
@@ -35,7 +36,7 @@ export async function registerHomeVisitsModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: visit.id, visitNumber: visit.visit_number }, 'Home visit scheduled', 201);
   });
 
-  app.put('/api/v1/home-visits/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/home-visits/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.status) update.status = body.status;

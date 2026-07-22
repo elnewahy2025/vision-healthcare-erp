@@ -22,7 +22,7 @@ export async function registerPatientSchedulingModule(app: FastifyInstance) {
     const slots: any[] = [];
     for (const doctor of doctors) {
       for (let hour = 9; hour < 17; hour++) {
-        const isBooked = existingApts.some((a: any) => a.doctor_id === doctor.id && new Date(a.scheduled_date).getHours() === hour);
+        const isBooked = existingApts.some((a: any) => a.doctor_id === doctor.id && new Date(a.scheduled_date as string).getHours() === hour);
         if (!isBooked) {
           slots.push({ doctorId: doctor.id, doctorName: `${doctor.first_name} ${doctor.last_name}`, start: `${query.date}T${String(hour).padStart(2, '0')}:00:00`, end: `${query.date}T${String(hour).padStart(2, '0')}:30:00` });
         }

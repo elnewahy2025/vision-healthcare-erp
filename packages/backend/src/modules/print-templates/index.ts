@@ -1,10 +1,11 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerPrintTemplatesModule(app: FastifyInstance) {
-  app.get('/api/v1/print/templates', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/print/templates', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { documentType } = request.query as any;
     let q = db('print_templates').where({ tenant_id: tenantId });
     if (documentType) q = q.andWhere('document_type', documentType);
@@ -16,7 +17,7 @@ export async function registerPrintTemplatesModule(app: FastifyInstance) {
     })));
   });
 
-  app.get('/api/v1/print/templates/:code', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/print/templates/:code', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { code } = request.params as any;
     const t = await db('print_templates').where({ tenant_id: tenantId, code }).first();
     if (!t) return reply.status(404).send({ success: false, error: 'Template not found' });
@@ -28,7 +29,7 @@ export async function registerPrintTemplatesModule(app: FastifyInstance) {
     });
   });
 
-  app.post('/api/v1/print/templates', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/print/templates', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const [t] = await db('print_templates').insert({
       tenant_id: tenantId, name: body.name, code: body.code,
@@ -40,7 +41,7 @@ export async function registerPrintTemplatesModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: t.id, code: t.code, name: t.name }, 'Template created', 201);
   });
 
-  app.put('/api/v1/print/templates/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/print/templates/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.name) update.name = body.name; if (body.contentHtml) update.content_html = body.contentHtml;
@@ -52,7 +53,7 @@ export async function registerPrintTemplatesModule(app: FastifyInstance) {
   });
 
   // Render a document (returns HTML for printing)
-  app.get('/api/v1/print/render/:documentType/:referenceId', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/print/render/:documentType/:referenceId', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { documentType, referenceId } = request.params as any;
     const template = await db('print_templates').where({ tenant_id: tenantId, document_type: documentType, is_default: true }).first();
     if (!template) return reply.status(404).send({ success: false, error: 'No default template for this document type' });

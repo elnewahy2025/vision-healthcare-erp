@@ -1,11 +1,12 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerBiModule(app: FastifyInstance) {
   // ── Dashboard Definitions ──
-  app.get('/api/v1/bi/dashboards', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/bi/dashboards', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { category } = request.query as any;
     let q = db('dashboard_definitions').where('dashboard_definitions.tenant_id', tenantId);
     if (category) q = q.andWhere('category', category);
@@ -18,7 +19,7 @@ export async function registerBiModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/bi/dashboards', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/bi/dashboards', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const slug = body.slug || body.name.toLowerCase().replace(/\s+/g, '_');
     const [d] = await db('dashboard_definitions').insert({
@@ -29,7 +30,7 @@ export async function registerBiModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: d.id, name: d.name, slug: d.slug }, 'Dashboard created', 201);
   });
 
-  app.put('/api/v1/bi/dashboards/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/bi/dashboards/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.name) update.name = body.name; if (body.description !== undefined) update.description = body.description;
@@ -40,7 +41,7 @@ export async function registerBiModule(app: FastifyInstance) {
     return sendSuccess(reply, null, 'Dashboard updated');
   });
 
-  app.delete('/api/v1/bi/dashboards/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.delete('/api/v1/bi/dashboards/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any;
     await db('dashboard_widgets').where({ dashboard_id: id }).del();
     await db('dashboard_definitions').where({ id }).del();
@@ -48,7 +49,7 @@ export async function registerBiModule(app: FastifyInstance) {
   });
 
   // ── Widgets ──
-  app.get('/api/v1/bi/dashboards/:id/widgets', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/bi/dashboards/:id/widgets', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { id } = request.params as any;
     const widgets = await db('dashboard_widgets').where({ tenant_id: tenantId, dashboard_id: id }).orderBy('position_y').orderBy('position_x');
     return sendSuccess(reply, widgets.map((w: any) => ({
@@ -58,7 +59,7 @@ export async function registerBiModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/bi/dashboards/:id/widgets', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/bi/dashboards/:id/widgets', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { id } = request.params as any; const body = request.body as any;
     const [w] = await db('dashboard_widgets').insert({
       tenant_id: tenantId, dashboard_id: id, title: body.title,
@@ -70,7 +71,7 @@ export async function registerBiModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: w.id, title: w.title }, 'Widget added', 201);
   });
 
-  app.put('/api/v1/bi/widgets/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/bi/widgets/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.title) update.title = body.title; if (body.config) update.config = JSON.stringify(body.config);
@@ -82,13 +83,13 @@ export async function registerBiModule(app: FastifyInstance) {
     return sendSuccess(reply, null, 'Widget updated');
   });
 
-  app.delete('/api/v1/bi/widgets/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.delete('/api/v1/bi/widgets/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     await db('dashboard_widgets').where({ id: (request.params as any).id }).del();
     return sendSuccess(reply, null, 'Widget deleted');
   });
 
   // ── KPI Data Endpoints ──
-  app.get('/api/v1/bi/kpi/appointments', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/bi/kpi/appointments', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const total = await db('appointments').where({ tenant_id: tenantId }).count('id as c').first();
     const today = await db('appointments').where({ tenant_id: tenantId }).whereRaw('DATE(created_at) = CURRENT_DATE').count('id as c').first();
@@ -96,7 +97,7 @@ export async function registerBiModule(app: FastifyInstance) {
     return sendSuccess(reply, { total: Number((total as any)?.c || 0), today: Number((today as any)?.c || 0), byStatus });
   });
 
-  app.get('/api/v1/bi/kpi/revenue', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/bi/kpi/revenue', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { days } = request.query as any;
     const since = new Date(Date.now() - (Number(days) || 30) * 86400000);
     const total = await db('payment_transactions').where({ tenant_id: tenantId }).sum('amount as total').first();
@@ -105,14 +106,14 @@ export async function registerBiModule(app: FastifyInstance) {
     return sendSuccess(reply, { total: Number((total as any)?.total || 0), recent: Number((recent as any)?.total || 0), byMethod });
   });
 
-  app.get('/api/v1/bi/kpi/patients', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/bi/kpi/patients', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const total = await db('patients').where({ tenant_id: tenantId }).whereNull('deleted_at').count('id as c').first();
     const newThisMonth = await db('patients').where({ tenant_id: tenantId }).whereRaw("DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)").count('id as c').first();
     return sendSuccess(reply, { total: Number((total as any)?.c || 0), newThisMonth: Number((newThisMonth as any)?.c || 0) });
   });
 
-  app.get('/api/v1/bi/kpi/clinical', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/bi/kpi/clinical', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { days } = request.query as any;
     const since = new Date(Date.now() - (Number(days) || 30) * 86400000);
     const labOrders = await db('lab_orders').where({ tenant_id: tenantId }).where('created_at', '>=', since).count('id as c').first();

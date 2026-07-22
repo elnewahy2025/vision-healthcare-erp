@@ -1,9 +1,10 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../../core/database.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { logAudit } from '../../services/audit.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerClinicalModule(app: FastifyInstance) {
 
@@ -22,7 +23,7 @@ export async function registerClinicalModule(app: FastifyInstance) {
     if (q.q) { const s = `%${q.q}%`; qb.where(function() { this.where('generic_name', 'ilike', s).orWhere('brand_names', 'ilike', s).orWhere('category', 'ilike', s); }); }
     if (q.category) qb.andWhere('category', q.category);
     const meds = await qb.orderBy('generic_name').limit(30);
-    return sendSuccess(reply, meds.map((m: any) => ({ id: m.id, genericName: m.generic_name, brandNames: m.brand_names, category: m.category, route: m.route, dosageForm: m.dosage_form, strength: m.strength, indications: m.indications, contraindications: m.contraindications, sideEffects: m.side_effects, interactions: m.interactions })));
+    return sendSuccess(reply, meds.map((m: Record<string, unknown>) => ({ id: m.id, genericName: m.generic_name, brandNames: m.brand_names, category: m.category, route: m.route, dosageForm: m.dosage_form, strength: m.strength, indications: m.indications, contraindications: m.contraindications, sideEffects: m.side_effects, interactions: m.interactions })));
   });
 
   app.get('/api/v1/medications/categories', async (request, reply) => {
@@ -30,13 +31,13 @@ export async function registerClinicalModule(app: FastifyInstance) {
     return sendSuccess(reply, cats.map((c: any) => c.category));
   });
 
-  app.get('/api/v1/patients/:patientId/allergies', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/patients/:patientId/allergies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { patientId } = z.object({ patientId: z.string().uuid() }).parse(request.params);
     const allergies = await db('patient_allergies').where({ patient_id: patientId }).orderBy('created_at', 'desc');
     return sendSuccess(reply, allergies.map((a: any) => ({ id: a.id, allergen: a.allergen, severity: a.severity, reaction: a.reaction, notes: a.notes, createdAt: a.created_at })));
   });
 
-  app.post('/api/v1/patients/:patientId/allergies', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/patients/:patientId/allergies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request);
     const { patientId } = z.object({ patientId: z.string().uuid() }).parse(request.params);
     const body = z.object({ allergen: z.string().min(1), severity: z.enum(['mild', 'moderate', 'severe', 'anaphylaxis']).optional().default('moderate'), reaction: z.string().optional(), notes: z.string().optional() }).parse(request.body);
@@ -45,13 +46,13 @@ export async function registerClinicalModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: allergy.id, allergen: allergy.allergen, severity: allergy.severity }, 'Allergy recorded', 201);
   });
 
-  app.delete('/api/v1/patients/:patientId/allergies/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.delete('/api/v1/patients/:patientId/allergies/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid(), patientId: z.string().uuid() }).parse(request.params);
     await db('patient_allergies').where({ id }).delete();
     return sendSuccess(reply, null, 'Allergy deleted');
   });
 
-  app.get('/api/v1/patients/:patientId/allergy-check', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/patients/:patientId/allergy-check', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { patientId } = z.object({ patientId: z.string().uuid() }).parse(request.params);
     const { medication } = z.object({ medication: z.string().optional() }).parse(request.query);
     const allergies = await db('patient_allergies').where({ patient_id: patientId }).select('allergen', 'severity', 'reaction');
@@ -66,7 +67,7 @@ export async function registerClinicalModule(app: FastifyInstance) {
     return sendSuccess(reply, { allergies, alerts, hasConflict: alerts.length > 0 });
   });
 
-  app.get('/api/v1/patients/:patientId/timeline', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/patients/:patientId/timeline', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { patientId } = z.object({ patientId: z.string().uuid() }).parse(request.params);
     const tenantId = getTenantId(request);
     const [emr, appts, invs, docs, allergies] = await Promise.all([

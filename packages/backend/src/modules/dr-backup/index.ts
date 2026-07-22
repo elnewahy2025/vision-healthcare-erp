@@ -1,11 +1,12 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerDrBackupModule(app: FastifyInstance) {
   // ── Backup Configs ──
-  app.get('/api/v1/dr/backup-configs', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/dr/backup-configs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const configs = await db('backup_configs').where({ tenant_id: tenantId }).orderBy('name');
     return sendSuccess(reply, configs.map((c: any) => ({
@@ -16,7 +17,7 @@ export async function registerDrBackupModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/dr/backup-configs', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/dr/backup-configs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const [c] = await db('backup_configs').insert({
       tenant_id: tenantId, name: body.name, type: body.type || 'full',
@@ -29,7 +30,7 @@ export async function registerDrBackupModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: c.id, name: c.name }, 'Backup config created', 201);
   });
 
-  app.put('/api/v1/dr/backup-configs/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/dr/backup-configs/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.name) update.name = body.name; if (body.schedule) update.schedule = body.schedule;
@@ -40,7 +41,7 @@ export async function registerDrBackupModule(app: FastifyInstance) {
   });
 
   // ── Backup Executions ──
-  app.get('/api/v1/dr/backups', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/dr/backups', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { status } = request.query as any;
     let q = db('backup_executions').where('backup_executions.tenant_id', tenantId);
     if (status) q = q.andWhere('status', status);
@@ -55,7 +56,7 @@ export async function registerDrBackupModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/dr/backups/run', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/dr/backups/run', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const [b] = await db('backup_executions').insert({
       tenant_id: tenantId, config_id: body.configId || null,
@@ -76,7 +77,7 @@ export async function registerDrBackupModule(app: FastifyInstance) {
   });
 
   // ── DR Config ──
-  app.get('/api/v1/dr/config', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/dr/config', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const dr = await db('dr_configs').where({ tenant_id: tenantId }).first();
     if (!dr) return sendSuccess(reply, {
@@ -93,7 +94,7 @@ export async function registerDrBackupModule(app: FastifyInstance) {
     });
   });
 
-  app.put('/api/v1/dr/config', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/dr/config', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const existing = await db('dr_configs').where({ tenant_id: tenantId }).first();
     const data: any = { updated_at: new Date() };
@@ -110,7 +111,7 @@ export async function registerDrBackupModule(app: FastifyInstance) {
     return sendSuccess(reply, null, 'DR config updated');
   });
 
-  app.post('/api/v1/dr/test', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/dr/test', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     await db('dr_configs').where({ tenant_id: tenantId }).update({ last_dr_test_at: new Date(), status: 'healthy', updated_at: new Date() });
     return sendSuccess(reply, null, 'DR test completed. System is healthy.');

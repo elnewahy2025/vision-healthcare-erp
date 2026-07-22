@@ -1,16 +1,17 @@
 import { getCtx, getTenantId } from "../../utils/route-helper.js";
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../../core/database.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { createEmrSchema, paginationSchema } from '../../utils/validation.js';
 import { PatientNotFoundError } from '@healthcare/shared/errors';
 import { calculateBMI } from '@healthcare/shared/utils';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerEmmModule(app: FastifyInstance) {
   // List EMR records
   app.get('/api/v1/emr', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const query = paginationSchema.parse(request.query);
     const tenantId = getTenantId(request);
@@ -43,7 +44,7 @@ export async function registerEmmModule(app: FastifyInstance) {
 
   // Get single EMR record
   app.get('/api/v1/emr/:emrId', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const { emrId } = request.params as any;
     const tenantId = getTenantId(request);
@@ -71,7 +72,7 @@ export async function registerEmmModule(app: FastifyInstance) {
 
   // Create EMR record
   app.post('/api/v1/emr', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const body = createEmrSchema.parse(request.body);
     const tenantId = getTenantId(request); const userId = getCtx(request).userId;
@@ -118,7 +119,7 @@ export async function registerEmmModule(app: FastifyInstance) {
 
   // Update EMR record
   app.put('/api/v1/emr/:emrId', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const { emrId } = request.params as any;
     const tenantId = getTenantId(request);
@@ -164,7 +165,7 @@ export async function registerEmmModule(app: FastifyInstance) {
 
   // Sign EMR record
   app.post('/api/v1/emr/:emrId/sign', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const { emrId } = request.params as any;
     const tenantId = getTenantId(request);
@@ -186,7 +187,7 @@ export async function registerEmmModule(app: FastifyInstance) {
 
   // Add diagnosis to EMR
   app.post('/api/v1/emr/:emrId/diagnosis', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const { emrId } = request.params as any;
     const body = z.object({
@@ -221,7 +222,7 @@ export async function registerEmmModule(app: FastifyInstance) {
 
   // Prescribe medication
   app.post('/api/v1/emr/:emrId/medications', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const { emrId } = request.params as any;
     const body = z.object({
@@ -260,7 +261,7 @@ export async function registerEmmModule(app: FastifyInstance) {
 
   // Get patient EMR history
   app.get('/api/v1/patients/:patientId/emr', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const { patientId } = request.params as any;
     const tenantId = getTenantId(request);

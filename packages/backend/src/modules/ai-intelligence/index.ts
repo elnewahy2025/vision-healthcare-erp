@@ -1,16 +1,17 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../../core/database.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated, sendError } from '../../utils/response.js';
 import { logAudit } from '../../services/audit.js';
+import { authenticate } from '../auth-guard.js';
 
 // ==================== AI CLINICAL NOTES ====================
 
 export async function registerAiIntelligenceModule(app: FastifyInstance) {
 
   // Generate AI clinical note from raw notes
-  app.post('/api/v1/ai/clinical-notes/generate', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/ai/clinical-notes/generate', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId, userId } = getCtx(request);
     const body = z.object({
       patientId: z.string().uuid(), appointmentId: z.string().uuid().optional(),
@@ -42,7 +43,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
   });
 
   // List clinical notes for a patient
-  app.get('/api/v1/ai/clinical-notes/patient/:patientId', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/ai/clinical-notes/patient/:patientId', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const { patientId } = z.object({ patientId: z.string().uuid() }).parse(request.params);
     const query = z.object({ page: z.coerce.number().optional().default(1), limit: z.coerce.number().optional().default(20) }).parse(request.query);
@@ -54,7 +55,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
   });
 
   // Update/finalize a clinical note
-  app.put('/api/v1/ai/clinical-notes/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/ai/clinical-notes/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const body = z.object({
@@ -77,7 +78,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
 
   // ==================== AI DIAGNOSIS ASSISTANT ====================
 
-  app.post('/api/v1/ai/diagnosis/suggest', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/ai/diagnosis/suggest', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId, userId } = getCtx(request);
     const body = z.object({
       patientId: z.string().uuid(), appointmentId: z.string().uuid().optional(),
@@ -105,7 +106,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
     return sendSuccess(reply, { ...record, suggestions });
   });
 
-  app.post('/api/v1/ai/diagnosis/:id/feedback', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/ai/diagnosis/:id/feedback', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const body = z.object({ selectedCode: z.string(), wasAccepted: z.boolean(), feedback: z.string().optional() }).parse(request.body);
@@ -120,7 +121,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
   // ==================== PREDICTIVE ANALYTICS ====================
 
   // Predict appointment no-shows
-  app.post('/api/v1/ai/predictions/no-show', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/ai/predictions/no-show', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const body = z.object({ date: z.string() }).parse(request.body);
 
@@ -150,7 +151,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
   });
 
   // Revenue forecast
-  app.get('/api/v1/ai/predictions/revenue', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/ai/predictions/revenue', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const query = z.object({ months: z.coerce.number().optional().default(3) }).parse(request.query);
 
@@ -170,7 +171,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
   });
 
   // Patient risk assessment
-  app.get('/api/v1/ai/predictions/patient-risk/:patientId', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/ai/predictions/patient-risk/:patientId', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const { patientId } = z.object({ patientId: z.string().uuid() }).parse(request.params);
 
@@ -199,7 +200,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
 
   // ==================== SMART SCHEDULING ====================
 
-  app.post('/api/v1/ai/schedule/optimize', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/ai/schedule/optimize', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const body = z.object({ date: z.string(), branchId: z.string().uuid().optional() }).parse(request.body);
 
@@ -224,14 +225,14 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
     return sendSuccess(reply, { schedule, slots, utilization, expectedRevenue });
   });
 
-  app.get('/api/v1/ai/schedule/:date', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/ai/schedule/:date', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const { date } = z.object({ date: z.string() }).parse(request.params);
     const schedule = await db('ai_smart_schedules').where({ tenant_id: tenantId, schedule_date: date }).first();
     return sendSuccess(reply, schedule || null);
   });
 
-  app.post('/api/v1/ai/schedule/:id/apply', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/ai/schedule/:id/apply', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     await db('ai_smart_schedules').where({ id, tenant_id: tenantId }).update({ is_applied: true, applied_at: db.fn.now() });
@@ -240,7 +241,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
 
   // ==================== AI DASHBOARD STATS ====================
 
-  app.get('/api/v1/ai/intelligence/stats', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/ai/intelligence/stats', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const totalNotes = await db('ai_clinical_notes').where({ tenant_id: tenantId }).count('id as count').first();
     const totalDiagnoses = await db('ai_diagnosis_suggestions').where({ tenant_id: tenantId }).count('id as count').first();
@@ -274,7 +275,7 @@ function generateClinicalNoteFromRaw(raw: string, noteType: string, patient: any
   lines.push(`Date: ${now.toISOString().split('T')[0]}`);
   if (patient) lines.push(`Patient: ${patient.first_name} ${patient.last_name}, Age: ${patient.age || 'Unknown'}, Gender: ${patient.gender || 'Unknown'}`);
   if (allergies.length) lines.push(`Allergies: ${allergies.map((a: any) => a.allergen).join(', ')}`);
-  if (medications.length) lines.push(`Current Medications: ${medications.map((m: any) => `${m.medication_name} ${m.dosage} ${m.frequency}`).join('; ')}`);
+  if (medications.length) lines.push(`Current Medications: ${medications.map((m: Record<string, unknown>) => `${m.medication_name} ${m.dosage} ${m.frequency}`).join('; ')}`);
   lines.push('');
   lines.push('--- SUBMITTED NOTES ---');
   lines.push(raw);

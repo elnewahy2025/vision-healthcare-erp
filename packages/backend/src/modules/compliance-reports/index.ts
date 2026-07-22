@@ -1,11 +1,12 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerComplianceReportsModule(app: FastifyInstance) {
   // ── Compliance Reports ──
-  app.get('/api/v1/compliance/reports', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/compliance/reports', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { type, status } = request.query as any;
     let q = db('compliance_reports').where('compliance_reports.tenant_id', tenantId);
     if (type) q = q.andWhere('type', type);
@@ -19,7 +20,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/compliance/reports', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/compliance/reports', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const [rep] = await db('compliance_reports').insert({
       tenant_id: tenantId, title: body.title, type: body.type || 'internal',
@@ -30,7 +31,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: rep.id, title: rep.title, type: rep.type }, 'Compliance report generated', 201);
   });
 
-  app.put('/api/v1/compliance/reports/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/compliance/reports/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.status) update.status = body.status;
@@ -41,20 +42,20 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
   });
 
   // ── HIPAA Audit Trail ──
-  app.get('/api/v1/compliance/hipaa-audit', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/compliance/hipaa-audit', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { entity, days, userId } = request.query as any;
     const since = new Date(Date.now() - (Number(days) || 90) * 86400000);
     let q = db('audit_logs').where('audit_logs.tenant_id', tenantId).where('timestamp', '>=', since);
     if (entity) q = q.andWhere('entity', entity);
     if (userId) q = q.andWhere('user_id', userId);
     const logs = await q.orderBy('timestamp', 'desc').limit(200);
-    return sendSuccess(reply, logs.map((l: any) => ({
+    return sendSuccess(reply, logs.map((l: Record<string, unknown>) => ({
       id: l.id, action: l.action, entity: l.entity, entityId: l.entity_id,
       userId: l.user_id, changes: l.changes, ip: l.ip, userAgent: l.user_agent, timestamp: l.timestamp
     })));
   });
 
-  app.get('/api/v1/compliance/hipaa-summary', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/compliance/hipaa-summary', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { days } = request.query as any;
     const since = new Date(Date.now() - (Number(days) || 90) * 86400000);
     const totalAccess = await db('audit_logs').where({ tenant_id: tenantId }).where('timestamp', '>=', since).count('id as c').first();
@@ -69,7 +70,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
   });
 
   // ── Data Retention Policies ──
-  app.get('/api/v1/compliance/retention-policies', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/compliance/retention-policies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const policies = await db('data_retention_policies').where({ tenant_id: tenantId }).orderBy('entity');
     return sendSuccess(reply, policies.map((p: any) => ({
@@ -78,7 +79,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/compliance/retention-policies', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/compliance/retention-policies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const [p] = await db('data_retention_policies').insert({
       tenant_id: tenantId, entity: body.entity, retention_days: body.retentionDays || 365,
@@ -87,7 +88,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: p.id, entity: p.entity }, 'Retention policy created', 201);
   });
 
-  app.put('/api/v1/compliance/retention-policies/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/compliance/retention-policies/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.retentionDays) update.retention_days = body.retentionDays;
@@ -98,7 +99,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
   });
 
   // ── Business Associate Agreements ──
-  app.get('/api/v1/compliance/baa', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/compliance/baa', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const agreements = await db('business_associate_agreements').where({ tenant_id: tenantId }).orderBy('created_at', 'desc');
     return sendSuccess(reply, agreements.map((a: any) => ({
@@ -108,7 +109,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/compliance/baa', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/compliance/baa', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const [baa] = await db('business_associate_agreements').insert({
       tenant_id: tenantId, organization_name: body.organizationName,
@@ -120,7 +121,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: baa.id, organizationName: baa.organization_name }, 'BAA created', 201);
   });
 
-  app.put('/api/v1/compliance/baa/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/compliance/baa/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.status) update.status = body.status;

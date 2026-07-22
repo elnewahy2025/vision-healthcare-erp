@@ -1,24 +1,25 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerInventoryModule(app: FastifyInstance) {
   // Warehouses
-  app.get('/api/v1/inventory/warehouses', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/inventory/warehouses', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const whs = await db('warehouses').where({ tenant_id: tenantId, status: 'active' });
     return sendSuccess(reply, whs.map((w: any) => ({ id: w.id, name: w.name, code: w.code, type: w.type })));
   });
 
-  app.post('/api/v1/inventory/warehouses', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/inventory/warehouses', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const [wh] = await db('warehouses').insert({ tenant_id: tenantId, name: body.name, code: body.code, type: body.type || 'main' }).returning('*');
     return sendSuccess(reply, { id: wh.id, name: wh.name }, 'Warehouse created', 201);
   });
 
   // Inventory Items
-  app.get('/api/v1/inventory/items', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/inventory/items', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { category, warehouseId, search } = request.query as any;
     let q = db('inventory_items').where('inventory_items.tenant_id', tenantId).whereNull('inventory_items.deleted_at');
     if (category) q = q.andWhere('inventory_items.category', category);
@@ -29,14 +30,14 @@ export async function registerInventoryModule(app: FastifyInstance) {
     return sendSuccess(reply, items.map((i: any) => ({ id: i.id, sku: i.sku, name: i.name, category: i.category, unit: i.unit, quantity: i.quantity, reorderPoint: i.reorder_point, unitCost: Number(i.unit_cost), unitPrice: Number(i.unit_price), batchNumber: i.batch_number, expiryDate: i.expiry_date, serialNumber: i.serial_number, manufacturer: i.manufacturer, supplier: i.supplier, warehouseId: i.warehouse_id, warehouseName: i.wh_name, status: i.status, lastRestockedAt: i.last_restocked_at })));
   });
 
-  app.post('/api/v1/inventory/items', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/inventory/items', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const [item] = await db('inventory_items').insert({ tenant_id: tenantId, warehouse_id: body.warehouseId, sku: body.sku, name: body.name, category: body.category, unit: body.unit || 'piece', quantity: body.quantity || 0, reorder_point: body.reorderPoint || 10, unit_cost: body.unitCost || 0, unit_price: body.unitPrice || 0, batch_number: body.batchNumber, expiry_date: body.expiryDate, serial_number: body.serialNumber, manufacturer: body.manufacturer, supplier: body.supplier, description: body.description }).returning('*');
     if (body.quantity) await db('inventory_transactions').insert({ tenant_id: tenantId, item_id: item.id, type: 'receipt', quantity: body.quantity, quantity_before: 0, quantity_after: body.quantity, notes: 'Initial stock' });
     return sendSuccess(reply, { id: item.id, sku: item.sku, name: item.name }, 'Item added', 201);
   });
 
-  app.put('/api/v1/inventory/items/:id/stock', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/inventory/items/:id/stock', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const item = await db('inventory_items').where({ id }).first();
     const before = item.quantity;
@@ -47,7 +48,7 @@ export async function registerInventoryModule(app: FastifyInstance) {
   });
 
   // Purchase Orders
-  app.get('/api/v1/inventory/pos', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/inventory/pos', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { status } = request.query as any;
     let q = db('purchase_orders').where('purchase_orders.tenant_id', tenantId).whereNull('purchase_orders.deleted_at');
     if (status) q = q.andWhere('purchase_orders.status', status);
@@ -58,7 +59,7 @@ export async function registerInventoryModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/inventory/pos', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/inventory/pos', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const poNum = "PO-" + Date.now().toString(36).toUpperCase();
     let total = 0;
@@ -70,7 +71,7 @@ export async function registerInventoryModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: po.id, poNumber: po.po_number }, 'Purchase order created', 201);
   });
 
-  app.put('/api/v1/inventory/pos/:id/receive', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/inventory/pos/:id/receive', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const { items } = request.body as any;
     if (items) {
       for (const it of items) {

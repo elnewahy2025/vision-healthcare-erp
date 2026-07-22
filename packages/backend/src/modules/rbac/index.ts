@@ -1,8 +1,9 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../../core/database.js';
 import { getCtx } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated, sendError } from '../../utils/response.js';
+import { authenticate } from '../auth-guard.js';
 
 // Fine-grained permission modules and actions
 const PERMISSION_MODULES = [
@@ -28,7 +29,7 @@ const ROLE_TEMPLATES: Record<string, string[]> = {
 export async function registerRbacModule(app: FastifyInstance) {
 
   // Get all available permissions
-  app.get('/api/v1/rbac/permissions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/rbac/permissions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const permissions: any[] = [];
     for (const mod of PERMISSION_MODULES) {
       for (const action of PERMISSION_ACTIONS) {
@@ -39,13 +40,13 @@ export async function registerRbacModule(app: FastifyInstance) {
   });
 
   // Get role templates
-  app.get('/api/v1/rbac/roles', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/rbac/roles', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const roles = Object.entries(ROLE_TEMPLATES).map(([name, perms]) => ({ name, permissionCount: perms.length, permissions: perms }));
     return sendSuccess(reply, roles);
   });
 
   // Get user permissions
-  app.get('/api/v1/rbac/users/:userId/permissions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/rbac/users/:userId/permissions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const { userId } = z.object({ userId: z.string().uuid() }).parse(request.params);
 
@@ -70,7 +71,7 @@ export async function registerRbacModule(app: FastifyInstance) {
   });
 
   // Update user permissions (admin only)
-  app.put('/api/v1/rbac/users/:userId/permissions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/rbac/users/:userId/permissions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId, roles } = getCtx(request);
     if (!roles?.includes('admin') && !roles?.includes('super_admin')) {
       return sendError(reply, 'Insufficient permissions', 403);

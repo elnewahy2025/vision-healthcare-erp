@@ -1,12 +1,13 @@
 import crypto from 'crypto';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerSessionManagerModule(app: FastifyInstance) {
   // ── Track current session on login ──
-  app.post('/api/v1/sessions/register', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/sessions/register', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request);
     const token = request.headers.authorization?.slice(7) || '';
     const hash = crypto.createHash('sha256').update(token).digest('hex');
@@ -25,7 +26,7 @@ export async function registerSessionManagerModule(app: FastifyInstance) {
   });
 
   // ── List active sessions ──
-  app.get('/api/v1/sessions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/sessions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request);
     const sessions = await db('user_sessions').where({ tenant_id: tenantId, user_id: ctx.userId, is_active: true })
       .where('expires_at', '>', new Date())
@@ -40,7 +41,7 @@ export async function registerSessionManagerModule(app: FastifyInstance) {
   });
 
   // ── Force logout a session ──
-  app.post('/api/v1/sessions/:id/logout', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/sessions/:id/logout', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const { id } = request.params as any;
     const session = await db('user_sessions').where({ id, tenant_id: tenantId, user_id: ctx.userId }).first();
     if (!session) return reply.status(404).send({ success: false, error: 'Session not found' });
@@ -49,7 +50,7 @@ export async function registerSessionManagerModule(app: FastifyInstance) {
   });
 
   // ── Force logout all other sessions ──
-  app.post('/api/v1/sessions/logout-others', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/sessions/logout-others', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request);
     const currentHash = crypto.createHash('sha256').update((request.headers.authorization || '').slice(7)).digest('hex');
     await db('user_sessions').where({ tenant_id: tenantId, user_id: ctx.userId, is_active: true })
@@ -59,7 +60,7 @@ export async function registerSessionManagerModule(app: FastifyInstance) {
   });
 
   // ── Security info ──
-  app.get('/api/v1/sessions/security-info', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/sessions/security-info', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request);
     const activeSessions = await db('user_sessions').where({ tenant_id: tenantId, user_id: ctx.userId, is_active: true }).count('id as c').first();
     const lastSession = await db('user_sessions').where({ tenant_id: tenantId, user_id: ctx.userId }).orderBy('created_at', 'desc').first();

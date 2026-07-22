@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import crypto from 'crypto';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
@@ -162,7 +162,7 @@ export async function registerPatientPortalModule(app: FastifyInstance) {
     const patientId = (request as any).patientId;
     const messages = await db('patient_messages').where({ patient_id: patientId })
       .orderBy('created_at', 'desc').limit(50);
-    return sendSuccess(reply, messages.map((m: any) => ({
+    return sendSuccess(reply, messages.map((m: Record<string, unknown>) => ({
       id: m.id, subject: m.subject, body: m.body,
       direction: m.direction, isRead: m.is_read,
       createdAt: m.created_at,

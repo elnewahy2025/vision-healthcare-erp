@@ -1,11 +1,12 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerPatientMessagingModule(app: FastifyInstance) {
   // ── Staff: Send message to patient ──
-  app.post('/api/v1/patient-messages/send', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/patient-messages/send', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const [msg] = await db('patient_messages').insert({
       tenant_id: tenantId, patient_id: body.patientId,
@@ -17,13 +18,13 @@ export async function registerPatientMessagingModule(app: FastifyInstance) {
   });
 
   // ── Staff: List messages for a patient ──
-  app.get('/api/v1/patient-messages/:patientId', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/patient-messages/:patientId', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { patientId } = request.params as any;
     const messages = await db('patient_messages').where({ tenant_id: tenantId, patient_id: patientId })
       .leftJoin('users', 'patient_messages.sender_id', 'users.id')
       .select('patient_messages.*', 'users.first_name as sender_first', 'users.last_name as sender_last')
       .orderBy('created_at', 'desc').limit(100);
-    return sendSuccess(reply, messages.map((m: any) => ({
+    return sendSuccess(reply, messages.map((m: Record<string, unknown>) => ({
       id: m.id, subject: m.subject, body: m.body, direction: m.direction,
       senderName: m.sender_first ? m.sender_first + ' ' + m.sender_last : null,
       isRead: m.is_read, readAt: m.read_at, createdAt: m.created_at,
@@ -31,14 +32,14 @@ export async function registerPatientMessagingModule(app: FastifyInstance) {
   });
 
   // ── Staff: Mark as read ──
-  app.put('/api/v1/patient-messages/:id/read', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/patient-messages/:id/read', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any;
     await db('patient_messages').where({ id }).update({ is_read: true, read_at: new Date() });
     return sendSuccess(reply, null, 'Marked as read');
   });
 
   // ── Staff: List conversations (unique patients with unread) ──
-  app.get('/api/v1/patient-messages/conversations/list', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/patient-messages/conversations/list', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const conversations = await db('patient_messages')
       .where('patient_messages.tenant_id', tenantId)
@@ -58,7 +59,7 @@ export async function registerPatientMessagingModule(app: FastifyInstance) {
   });
 
   // ── Appointment Reminders ──
-  app.get('/api/v1/patient-messages/reminders', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/patient-messages/reminders', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { status } = request.query as any;
     let q = db('appointment_reminders').where('appointment_reminders.tenant_id', tenantId);
     if (status) q = q.andWhere('status', status);
@@ -73,7 +74,7 @@ export async function registerPatientMessagingModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/patient-messages/reminders', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/patient-messages/reminders', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as any;
     const [rem] = await db('appointment_reminders').insert({
       tenant_id: tenantId, appointment_id: body.appointmentId,

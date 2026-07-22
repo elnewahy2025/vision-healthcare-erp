@@ -1,12 +1,13 @@
 import { getCtx, getTenantId } from "../../utils/route-helper.js";
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerCommonModule(app: FastifyInstance) {
   // Dashboard stats
   app.get('/api/v1/dashboard/stats', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const today = new Date().toISOString().split('T')[0];
@@ -67,7 +68,7 @@ export async function registerCommonModule(app: FastifyInstance) {
 
   // List doctors
   app.get('/api/v1/doctors', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const tenantId = getTenantId(request);
 
@@ -100,7 +101,7 @@ export async function registerCommonModule(app: FastifyInstance) {
 
   // Activity log (recent)
   app.get('/api/v1/activity', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const tenantId = getTenantId(request);
 

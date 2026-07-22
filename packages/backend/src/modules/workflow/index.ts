@@ -1,11 +1,12 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { authenticate } from '../auth-guard.js';
 
 export async function registerWorkflowModule(app: FastifyInstance) {
   // Workflow Definitions
-  app.get('/api/v1/workflow/definitions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/workflow/definitions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { isActive } = request.query as any;
     let q = db('workflow_definitions').where('workflow_definitions.tenant_id', tenantId);
     if (isActive !== undefined) q = q.andWhere('is_active', isActive === 'true');
@@ -17,7 +18,7 @@ export async function registerWorkflowModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/workflow/definitions', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/workflow/definitions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const slug = body.slug || body.name.toLowerCase().replace(/\s+/g, '_');
     const [def] = await db('workflow_definitions').insert({
@@ -28,7 +29,7 @@ export async function registerWorkflowModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: def.id, name: def.name, slug: def.slug }, 'Workflow definition created', 201);
   });
 
-  app.put('/api/v1/workflow/definitions/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/workflow/definitions/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.name) update.name = body.name;
@@ -41,7 +42,7 @@ export async function registerWorkflowModule(app: FastifyInstance) {
   });
 
   // Workflow Instances
-  app.get('/api/v1/workflow/instances', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/workflow/instances', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const { status, definitionId } = request.query as any;
     let q = db('workflow_instances').where('workflow_instances.tenant_id', tenantId);
     if (status) q = q.andWhere('workflow_instances.status', status);
@@ -59,7 +60,7 @@ export async function registerWorkflowModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/workflow/instances', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/workflow/instances', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
     const [inst] = await db('workflow_instances').insert({
       tenant_id: tenantId, definition_id: body.definitionId,
@@ -71,7 +72,7 @@ export async function registerWorkflowModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: inst.id, status: inst.status }, 'Workflow instance started', 201);
   });
 
-  app.put('/api/v1/workflow/instances/:id/step', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/workflow/instances/:id/step', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as any; const body = request.body as any;
     const update: any = { updated_at: new Date() };
     if (body.currentStep !== undefined) update.current_step = body.currentStep;

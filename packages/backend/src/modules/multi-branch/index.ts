@@ -1,8 +1,9 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../../core/database.js';
 import { getCtx } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated, sendError } from '../../utils/response.js';
+import { authenticate } from '../auth-guard.js';
 
 const branchSchema = z.object({
   name: z.string().min(1),
@@ -24,7 +25,7 @@ const branchSchema = z.object({
 
 export async function registerMultiBranchModule(app: FastifyInstance) {
   // List all branches
-  app.get('/api/v1/branches', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/branches', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const ctx = getCtx(request);
     const { page = 1, limit = 20, is_active, type, search } = request.query as any;
     let q = db('branches').where('tenant_id', ctx.tenantId);
@@ -37,7 +38,7 @@ export async function registerMultiBranchModule(app: FastifyInstance) {
   });
 
   // Get single branch
-  app.get('/api/v1/branches/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/branches/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const ctx = getCtx(request);
     const { id } = request.params as any;
     const row = await db('branches').where({ id, tenant_id: ctx.tenantId }).first();
@@ -50,7 +51,7 @@ export async function registerMultiBranchModule(app: FastifyInstance) {
   });
 
   // Create branch
-  app.post('/api/v1/branches', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/branches', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const ctx = getCtx(request);
     const parsed = branchSchema.safeParse(request.body);
     if (!parsed.success) return sendError(reply, parsed.error.message, 400);
@@ -62,7 +63,7 @@ export async function registerMultiBranchModule(app: FastifyInstance) {
   });
 
   // Update branch
-  app.put('/api/v1/branches/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/branches/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const ctx = getCtx(request);
     const { id } = request.params as any;
     const parsed = branchSchema.partial().safeParse(request.body);
@@ -77,7 +78,7 @@ export async function registerMultiBranchModule(app: FastifyInstance) {
   });
 
   // Delete branch (soft delete)
-  app.delete('/api/v1/branches/:id', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.delete('/api/v1/branches/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const ctx = getCtx(request);
     const { id } = request.params as any;
     const [row] = await db('branches').where({ id, tenant_id: ctx.tenantId }).update({ is_active: false, updated_at: new Date() }).returning('*');
@@ -86,7 +87,7 @@ export async function registerMultiBranchModule(app: FastifyInstance) {
   });
 
   // Branch dashboard summary
-  app.get('/api/v1/branches/summary/overview', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/branches/summary/overview', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const ctx = getCtx(request);
     const branches = await db('branches').where({ tenant_id: ctx.tenantId, is_active: true });
     const summary = await Promise.all(branches.map(async (b: any) => {
@@ -99,7 +100,7 @@ export async function registerMultiBranchModule(app: FastifyInstance) {
   });
 
   // Assign staff to branch
-  app.post('/api/v1/branches/:id/assign-staff', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/branches/:id/assign-staff', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const ctx = getCtx(request);
     const { id } = request.params as any;
     const { user_ids } = request.body as any;
@@ -111,7 +112,7 @@ export async function registerMultiBranchModule(app: FastifyInstance) {
   });
 
   // Get staff per branch
-  app.get('/api/v1/branches/:id/staff', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/branches/:id/staff', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const ctx = getCtx(request);
     const { id } = request.params as any;
     const staff = await db('users').where({ branch_id: id, tenant_id: ctx.tenantId }).select('id', 'name', 'email', 'role', 'specialization', 'is_active');
@@ -119,7 +120,7 @@ export async function registerMultiBranchModule(app: FastifyInstance) {
   });
 
   // Get patients per branch
-  app.get('/api/v1/branches/:id/patients', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/branches/:id/patients', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const ctx = getCtx(request);
     const { id } = request.params as any;
     const { page = 1, limit = 20 } = request.query as any;
