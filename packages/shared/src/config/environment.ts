@@ -8,6 +8,7 @@ export interface Environment {
   DB_NAME: string;
   DB_USER: string;
   DB_PASSWORD: string;
+  DB_SSL?: boolean;
 
   REDIS_HOST: string;
   REDIS_PORT: number;
@@ -70,6 +71,7 @@ export function getEnv(): Environment {
     DB_NAME: process.env.DB_NAME || 'healthcare',
     DB_USER: process.env.DB_USER || 'postgres',
     DB_PASSWORD: process.env.DB_PASSWORD || 'postgres',
+    DB_SSL: process.env.DB_SSL === "true",
     REDIS_HOST: process.env.REDIS_HOST || 'localhost',
     REDIS_PORT: parseInt(process.env.REDIS_PORT || '6379', 10),
     REDIS_PASSWORD: process.env.REDIS_PASSWORD,
