@@ -78,26 +78,23 @@ import { registerRbacModule } from './modules/rbac/index.js';
 import { registerMedicalContentModule } from './modules/medical-content/index.js';
 import { registerMultiBranchModule } from './modules/multi-branch/index.js';
 import { startReminderService } from './services/reminder.service.js';
+import { loggerOptions } from "./utils/logger.js";
+import pino from "pino";
+import pinoHttp from "pino-http";
 
 const env = getEnv();
 initSentry();
 
 async function buildApp() {
   const app = Fastify({
-    logger: {
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'HH:MM:ss Z',
-          ignore: 'pid,hostname',
-        },
-      },
-    },
+    logger: loggerOptions,
   });
 
   // Plugins
   await app.register(cors, { origin: env.CORS_ORIGIN, credentials: true });
+  // Pino HTTP middleware for structured request logging with redaction
+  const httpLogger = pinoHttp({ logger: pino(loggerOptions), redact: ["req.headers.authorization", "req.body.token", "req.body.password", "req.body.refreshToken"] });
+  app.addHook("onRequest", (request, reply, done) => { httpLogger(request.raw, reply.raw); done(); });
   await app.register(helmet, {
   contentSecurityPolicy: {
     directives: {
