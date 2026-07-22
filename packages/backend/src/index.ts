@@ -266,6 +266,26 @@ async function start() {
     console.log(`✓ API Docs at http://localhost:${env.PORT}/docs`);
     
     startReminderService();
+
+    // Graceful shutdown
+    const shutdown = async (signal: string) => {
+      console.log('\n✓ ' + signal + ' received. Shutting down gracefully...');
+      try {
+        await app.close();
+        console.log('✓ Fastify server closed');
+        await db.destroy();
+        console.log('✓ Database pool destroyed');
+        await redis.quit();
+        console.log('✓ Redis disconnected');
+        process.exit(0);
+      } catch (err) {
+        console.error('✗ Error during shutdown:', err);
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   } catch (err) {
     app.log.error(err);
     process.exit(1);
