@@ -81,6 +81,7 @@ import { startReminderService } from './services/reminder.service.js';
 import { loggerOptions } from "./utils/logger.js";
 import pino from "pino";
 import pinoHttp from "pino-http";
+import { apiVersioningHook } from "./core/versioning/index.js";
 
 const env = getEnv();
 initSentry();
@@ -95,6 +96,7 @@ async function buildApp() {
   // Pino HTTP middleware for structured request logging with redaction
   const httpLogger = pinoHttp({ logger: pino(loggerOptions), redact: ["req.headers.authorization", "req.body.token", "req.body.password", "req.body.refreshToken"] });
   app.addHook("onRequest", (request, reply, done) => { httpLogger(request.raw, reply.raw); done(); });
+  app.addHook("onRequest", apiVersioningHook);
   await app.register(helmet, {
   contentSecurityPolicy: {
     directives: {

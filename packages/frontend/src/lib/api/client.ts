@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { VERSION_HEADER, API_VERSION } from "./versioning";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -16,6 +17,7 @@ apiClient.interceptors.request.use(
     const tenantSlug = localStorage.getItem('tenantSlug');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+      config.headers[VERSION_HEADER] = API_VERSION;
     }
     if (tenantSlug && config.headers) {
       config.headers['X-Tenant-Slug'] = tenantSlug;
