@@ -1,6 +1,6 @@
 import { getCtx, getTenantId } from "../../utils/route-helper.js";
 import { loginRateLimit, registerRateLimit, forgotPasswordRateLimit, refreshRateLimit } from '../../utils/rate-limiter.js';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { z } from 'zod';
@@ -18,10 +18,51 @@ import { getEnv } from '@healthcare/shared/config';
 
 const TENANT_SLUG_REGEX = /^[a-z0-9-]{3,30}$/;
 
+interface TenantSettings {
+  direction?: string;
+  dateFormat?: string;
+  currency?: string;
+  timezone?: string;
+  theme?: Record<string, unknown>;
+}
+
+interface MfaPartialPayload {
+  tenantId: string;
+  userId: string;
+  roles: string[];
+  permissions: string[];
+  locale: string;
+  mfaPending: boolean;
+}
+
+interface JwtHelper {
+  sign(payload: Record<string, unknown>, opts: { expiresIn: string }): string;
+  verify(token: string): Record<string, unknown>;
+}
+
+function getJwtHelper(app: FastifyInstance): JwtHelper {
+  return app.jwt as unknown as JwtHelper;
+}
+
+function authenticate(
+  app: FastifyInstance,
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  return (app as unknown as { authenticate(req: FastifyRequest, rep: FastifyReply): Promise<void> }).authenticate(request, reply);
+}
+
+function extractTenantSettings(raw: unknown): TenantSettings {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as TenantSettings;
+  }
+  return {};
+}
+
 export async function registerAuthModule(app: FastifyInstance) {
 
   // ===================== REGISTER TENANT =====================
-  app.post('/api/v1/tenants', { preHandler: [registerRateLimit] }, async (request, reply) => {
+  app.post('/api/v1/tenants', { preHandler: [registerRateLimit] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const schema = z.object({
       name: z.string().min(2).max(200),
       slug: z.string().regex(TENANT_SLUG_REGEX, '3-30 chars, lowercase, hyphens only'),
@@ -97,7 +138,7 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== LOGIN =====================
-  app.post('/api/v1/auth/login', { preHandler: [loginRateLimit] }, async (request, reply) => {
+  app.post('/api/v1/auth/login', { preHandler: [loginRateLimit] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { email, password, tenantSlug } = loginSchema.parse(request.body);
 
     const tenant = await db('tenants').where({ slug: tenantSlug }).first();
@@ -113,14 +154,19 @@ export async function registerAuthModule(app: FastifyInstance) {
 
     // Check if MFA is enabled — return partial tokens for MFA step
     if (user.mfa_enabled) {
-      const partialToken = (app.jwt.sign as any)({ tenantId: tenant.id, userId: user.id, roles: [], permissions: [], locale: user.locale || 'en', mfaPending: true }, { expiresIn: '5m' });
+      const jwt = getJwtHelper(app);
+      const partialToken = jwt.sign({
+        tenantId: tenant.id, userId: user.id, roles: [], permissions: [],
+        locale: user.locale || 'en', mfaPending: true,
+      }, { expiresIn: '5m' });
       return sendSuccess(reply, { mfaRequired: true, partialToken, userId: user.id });
     }
 
     const permissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
     const roles = typeof user.roles === 'string' ? JSON.parse(user.roles) : user.roles;
 
-    const token = app.jwt.sign({
+    const jwt = getJwtHelper(app);
+    const token = jwt.sign({
       tenantId: tenant.id, userId: user.id,
       roles, permissions, locale: user.locale || 'en',
     }, { expiresIn: '1h' });
@@ -135,30 +181,33 @@ export async function registerAuthModule(app: FastifyInstance) {
 
     await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.login', ipAddress: request.ip, userAgent: request.headers['user-agent'] });
 
+    const settings = extractTenantSettings(tenant.settings);
+
     return sendSuccess(reply, {
       user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name,
         roles, permissions, locale: user.locale, status: user.status, mfaEnabled: user.mfa_enabled,
         lastLoginAt: user.last_login_at, createdAt: user.created_at },
       tokens: { accessToken: token, refreshToken, expiresIn: 3600 },
       tenant: tenant ? { id: tenant.id, name: tenant.name, slug: tenant.slug, locale: tenant.locale,
-        direction: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).direction || 'ltr' : 'ltr',
+        direction: settings.direction || 'ltr',
         settings: {
-          dateFormat: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).dateFormat : 'MM/DD/YYYY',
-          currency: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).currency : 'SAR',
-          timezone: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).timezone : 'Asia/Riyadh',
-          theme: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).theme : {},
+          dateFormat: settings.dateFormat || 'MM/DD/YYYY',
+          currency: settings.currency || 'SAR',
+          timezone: settings.timezone || 'Asia/Riyadh',
+          theme: settings.theme || {},
         },
       } : null,
     });
   });
 
   // ===================== VERIFY MFA TOKEN =====================
-  app.post('/api/v1/auth/mfa/verify', async (request, reply) => {
+  app.post('/api/v1/auth/mfa/verify', async (request: FastifyRequest, reply: FastifyReply) => {
     const schema = z.object({ partialToken: z.string(), code: z.string().length(6) });
     const { partialToken, code } = schema.parse(request.body);
 
     let decoded: { userId?: string; tenantId?: string; mfaPending?: boolean; [key: string]: unknown };
-    try { decoded = app.jwt.verify(partialToken); } catch { throw new UnauthorizedError('Invalid or expired token'); }
+    const jwt = getJwtHelper(app);
+    try { decoded = jwt.verify(partialToken) as { userId?: string; tenantId?: string; mfaPending?: boolean; [key: string]: unknown }; } catch { throw new UnauthorizedError('Invalid or expired token'); }
     if (!decoded.mfaPending) throw new UnauthorizedError('Invalid token type');
 
     const user = await db('users').where({ id: decoded.userId }).first();
@@ -171,7 +220,7 @@ export async function registerAuthModule(app: FastifyInstance) {
     const permissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
     const roles = typeof user.roles === 'string' ? JSON.parse(user.roles) : user.roles;
 
-    const token = app.jwt.sign({
+    const token = jwt.sign({
       tenantId: tenant.id, userId: user.id, roles, permissions, locale: user.locale || 'en',
     }, { expiresIn: '1h' });
 
@@ -184,24 +233,26 @@ export async function registerAuthModule(app: FastifyInstance) {
     await db('users').where({ id: user.id }).update({ last_login_at: new Date() });
     await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.login.mfa', ipAddress: request.ip });
 
+    const settings = extractTenantSettings(tenant?.settings);
+
     return sendSuccess(reply, {
       user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name,
         roles, permissions, locale: user.locale, status: user.status, mfaEnabled: true,
         lastLoginAt: user.last_login_at, createdAt: user.created_at },
       tokens: { accessToken: token, refreshToken, expiresIn: 3600 },
       tenant: tenant ? { id: tenant.id, name: tenant.name, slug: tenant.slug, locale: tenant.locale,
-        direction: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).direction || 'ltr' : 'ltr',
-        settings: { dateFormat: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).dateFormat : 'MM/DD/YYYY',
-          currency: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).currency : 'SAR',
-          timezone: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).timezone : 'Asia/Riyadh',
-          theme: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).theme : {},
+        direction: settings.direction || 'ltr',
+        settings: { dateFormat: settings.dateFormat || 'MM/DD/YYYY',
+          currency: settings.currency || 'SAR',
+          timezone: settings.timezone || 'Asia/Riyadh',
+          theme: settings.theme || {},
         },
       } : null,
     });
   });
 
   // ===================== REFRESH TOKEN =====================
-  app.post('/api/v1/auth/refresh', { preHandler: [refreshRateLimit] }, async (request, reply) => {
+  app.post('/api/v1/auth/refresh', { preHandler: [refreshRateLimit] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, unknown> | undefined;
     const refreshToken = body?.refreshToken as string | undefined;
     if (!refreshToken) throw new UnauthorizedError('Refresh token required');
@@ -229,7 +280,8 @@ export async function registerAuthModule(app: FastifyInstance) {
     const permissions = typeof row.permissions === 'string' ? JSON.parse(row.permissions) : row.permissions;
     const roles = typeof row.roles === 'string' ? JSON.parse(row.roles) : row.roles;
 
-    const token = app.jwt.sign({
+    const jwt = getJwtHelper(app);
+    const token = jwt.sign({
       tenantId: row.tenant_id, userId: row.user_id,
       roles, permissions, locale: row.locale || 'en',
     }, { expiresIn: '1h' });
@@ -241,7 +293,7 @@ export async function registerAuthModule(app: FastifyInstance) {
 
 
   // ===================== LOGOUT =====================
-  app.post('/api/v1/auth/logout', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/auth/logout', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(app, r, rep)] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { userId, tenantId } = getCtx(request);
     const body = request.body as Record<string, unknown> | undefined;
     const refreshToken = body?.refreshToken as string | undefined;
@@ -256,30 +308,33 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== CURRENT USER =====================
-  app.get('/api/v1/auth/me', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/auth/me', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(app, r, rep)] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { userId, tenantId } = getCtx(request);
     const user = await db('users').where({ id: userId }).first();
     const tenant = await db('tenants').where({ id: tenantId }).first();
     if (!user) throw new UnauthorizedError('User not found');
     const permissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
     const roles = typeof user.roles === 'string' ? JSON.parse(user.roles) : user.roles;
+
+    const settings = extractTenantSettings(tenant?.settings);
+
     return sendSuccess(reply, {
       user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name,
         roles, permissions, locale: user.locale, status: user.status, mfaEnabled: user.mfa_enabled,
         lastLoginAt: user.last_login_at, passwordChangedAt: user.password_changed_at, createdAt: user.created_at },
       tenant: tenant ? { id: tenant.id, name: tenant.name, slug: tenant.slug, locale: tenant.locale,
-        direction: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).direction || 'ltr' : 'ltr',
-        settings: { dateFormat: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).dateFormat : 'MM/DD/YYYY',
-          currency: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).currency : 'SAR',
-          timezone: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).timezone : 'Asia/Riyadh',
-          theme: tenant.settings && typeof tenant.settings === 'object' ? (tenant.settings as any).theme : {},
+        direction: settings.direction || 'ltr',
+        settings: { dateFormat: settings.dateFormat || 'MM/DD/YYYY',
+          currency: settings.currency || 'SAR',
+          timezone: settings.timezone || 'Asia/Riyadh',
+          theme: settings.theme || {},
         },
       } : null,
     });
   });
 
   // ===================== FORGOT PASSWORD =====================
-  app.post('/api/v1/auth/forgot-password', { preHandler: [forgotPasswordRateLimit] }, async (request, reply) => {
+  app.post('/api/v1/auth/forgot-password', { preHandler: [forgotPasswordRateLimit] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { email, tenantSlug } = z.object({ email: z.string().email(), tenantSlug: z.string() }).parse(request.body);
 
     const tenant = await db('tenants').where({ slug: tenantSlug }).first();
@@ -305,7 +360,7 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== RESET PASSWORD =====================
-  app.post('/api/v1/auth/reset-password', async (request, reply) => {
+  app.post('/api/v1/auth/reset-password', async (request: FastifyRequest, reply: FastifyReply) => {
     const { token, password } = z.object({ token: z.string(), password: z.string().min(8) }).parse(request.body);
 
     const reset = await db('password_resets').where({ token, type: 'password_reset', used_at: null }).first();
@@ -324,7 +379,7 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== CHANGE PASSWORD =====================
-  app.post('/api/v1/auth/change-password', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/auth/change-password', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(app, r, rep)] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { currentPassword, newPassword } = z.object({ currentPassword: z.string(), newPassword: z.string().min(8) }).parse(request.body);
     const { userId, tenantId } = getCtx(request);
 
@@ -343,7 +398,7 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== 2FA SETUP (Generate Secret + QR) =====================
-  app.post('/api/v1/auth/mfa/setup', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/auth/mfa/setup', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(app, r, rep)] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { userId } = getCtx(request);
 
     const { secret, otpauthUrl } = generateSecret();
@@ -356,7 +411,7 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== 2FA ENABLE (Confirm code to activate) =====================
-  app.post('/api/v1/auth/mfa/enable', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/auth/mfa/enable', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(app, r, rep)] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { code } = z.object({ code: z.string().length(6) }).parse(request.body);
     const { userId, tenantId } = getCtx(request);
 
@@ -377,7 +432,7 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== 2FA DISABLE =====================
-  app.post('/api/v1/auth/mfa/disable', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+  app.post('/api/v1/auth/mfa/disable', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(app, r, rep)] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { code } = z.object({ code: z.string().length(6) }).parse(request.body);
     const { userId, tenantId } = getCtx(request);
 
@@ -395,7 +450,7 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== SEND OTP =====================
-  app.post('/api/v1/auth/otp/send', async (request, reply) => {
+  app.post('/api/v1/auth/otp/send', async (request: FastifyRequest, reply: FastifyReply) => {
     const { identifier, tenantSlug } = z.object({ identifier: z.string(), tenantSlug: z.string() }).parse(request.body);
 
     const tenant = await db('tenants').where({ slug: tenantSlug }).first();
@@ -408,7 +463,7 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== VERIFY OTP =====================
-  app.post('/api/v1/auth/otp/verify', async (request, reply) => {
+  app.post('/api/v1/auth/otp/verify', async (request: FastifyRequest, reply: FastifyReply) => {
     const { identifier, code, purpose } = z.object({
       identifier: z.string(), code: z.string(), purpose: z.string().optional(),
     }).parse(request.body);

@@ -27,7 +27,8 @@
   },
   "env": {
     "browser": true,
-    "es2022": true
+    "es2022": true,
+    "node": true
   },
   "rules": {
     "no-console": [
@@ -39,7 +40,7 @@
         ]
       }
     ],
-    "no-debugger": "warn",
+    "no-debugger": "error",
     "no-unused-vars": "off",
     "@typescript-eslint/no-unused-vars": [
       "warn",
@@ -58,6 +59,10 @@
     "eqeqeq": [
       "error",
       "always"
+    ],
+    "curly": [
+      "error",
+      "all"
     ],
     "no-duplicate-imports": "error"
   },

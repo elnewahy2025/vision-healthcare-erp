@@ -1,21 +1,12 @@
-import type { FastifyRequest, FastifyReply, RouteOptions } from 'fastify';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 
-// Helper to create auth preHandler
-export function authGuard(request: FastifyRequest, reply: FastifyReply): void {
-  const app = request.server as any;
-  return app.authenticate(request, reply);
+interface ServerWithAuth extends FastifyInstance {
+  authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void>;
 }
 
-export function authGuardWith(...permissions: string[]) {
-  return (request: FastifyRequest, reply: FastifyReply) => {
-    const app = request.server as any;
-    return app.authorize(...permissions)(request, reply);
-  };
-}
-
-// Helper to get context
-export function getCtx(request: FastifyRequest) {
-  return (request as any).ctx as {
+interface RequestWithMeta extends FastifyRequest {
+  ctx?: {
     tenantId: string;
     userId: string;
     roles: string[];
@@ -24,8 +15,20 @@ export function getCtx(request: FastifyRequest) {
     branchId?: string;
     requestId: string;
   };
+  tenantId?: string;
+}
+
+export function authGuard(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const server = request.server as ServerWithAuth;
+  return server.authenticate(request, reply);
+}
+
+export function getCtx(request: FastifyRequest) {
+  const req = request as RequestWithMeta;
+  return req.ctx!;
 }
 
 export function getTenantId(request: FastifyRequest): string {
-  return (request as any).tenantId || getCtx(request).tenantId;
+  const req = request as RequestWithMeta;
+  return req.tenantId || getCtx(request).tenantId;
 }
