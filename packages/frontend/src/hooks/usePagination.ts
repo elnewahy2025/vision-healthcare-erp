@@ -7,7 +7,7 @@ interface PaginationState {
   totalPages: number;
 }
 
-export function usePagination(initialPage = 1, initialLimit = 20) {
+export function usePagination(initialPage = 1, initialLimit = 20): PaginationState & { setPage: (page: number) => void; setLimit: (limit: number) => void; setTotal: (total: number) => void; nextPage: () => void; prevPage: () => void; paginationParams: { page: number; limit: number } } {
   const [state, setState] = useState<PaginationState>({
     page: initialPage,
     limit: initialLimit,

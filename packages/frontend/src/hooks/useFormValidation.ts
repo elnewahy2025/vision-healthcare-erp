@@ -1,15 +1,25 @@
 import { useState, useCallback } from 'react';
-import { validateForm, type FormConfig, type FieldValidation } from '../lib/validators';
+import { validateForm, type FormConfig } from '../lib/validators';
 
-export function useFormValidation<T extends Record<string, any>>(
-  initialValues: T,
-  validationConfig: FormConfig
-) {
+interface FormValidationResult<T> {
+  values: T;
+  errors: Record<string, string>;
+  touched: Record<string, boolean>;
+  setValue: (field: string, value: unknown) => void;
+  setFieldTouched: (field: string) => void;
+  validate: () => boolean;
+  reset: () => void;
+  getFieldError: (field: string) => string | undefined;
+  getFieldProps: (field: string) => Record<string, unknown>;
+  isValid: boolean;
+}
+
+export function useFormValidation<T extends Record<string, unknown>>(initialValues: T, validationConfig: FormConfig): FormValidationResult<T> {
   const [values, setValues] = useState<T>(initialValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  const setValue = useCallback((field: string, value: any) => {
+  const setValue = useCallback((field: string, value: unknown) => {
     setValues(prev => ({ ...prev, [field]: value }));
     // Clear error when user types
     if (errors[field]) {
@@ -56,7 +66,7 @@ export function useFormValidation<T extends Record<string, any>>(
     onBlur: () => setFieldTouched(field),
     'aria-invalid': !!errors[field],
     'aria-describedby': errors[field] ? `${field}-error` : undefined,
-  }), [values, errors, touched, setValue, setFieldTouched]);
+  }), [values, errors, setValue, setFieldTouched]);
 
   return {
     values,

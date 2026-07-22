@@ -1,21 +1,43 @@
 import { getCtx, getTenantId } from "../../utils/route-helper.js";
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { createPatientSchema, updatePatientSchema, paginationSchema } from '../../utils/validation.js';
 import { PatientNotFoundError } from '@healthcare/shared/errors';
 import { generateMedicalRecordNumber } from '@healthcare/shared/utils';
 
+interface PatientRow {
+  id: string;
+  tenant_id: string;
+  medical_record_number: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  gender: string;
+  nationality: string | null;
+  blood_type: string | null;
+  email: string | null;
+  phone: string;
+  phone2: string | null;
+  address: string | null;
+  emergency_contact: string | null;
+  preferred_language: string | null;
+  status: string;
+  tags: string[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export async function registerPatientModule(app: FastifyInstance) {
 
   // List patients (with search & pagination)
   app.get('/api/v1/patients', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(request: FastifyRequest, reply: FastifyReply) => (request.server as FastifyInstance & { authenticate: (r: FastifyRequest, rep: FastifyReply) => Promise<void> }).authenticate(request, reply)],
   }, async (request, reply) => {
     const query = paginationSchema.parse(request.query);
     const tenantId = getTenantId(request);
-    const search = (request.query as any).search as string;
-    const status = (request.query as any).status as string;
+    const search = (request.query as Record<string, unknown>).search as string | undefined;
+    const status = (request.query as Record<string, unknown>).status as string | undefined;
 
     let queryBuilder = db('patients')
       .where({ tenant_id: tenantId })
@@ -48,9 +70,9 @@ export async function registerPatientModule(app: FastifyInstance) {
 
   // Get single patient
   app.get('/api/v1/patients/:patientId', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(request: FastifyRequest, reply: FastifyReply) => (request.server as FastifyInstance & { authenticate: (r: FastifyRequest, rep: FastifyReply) => Promise<void> }).authenticate(request, reply)],
   }, async (request, reply) => {
-    const { patientId } = request.params as any;
+    const { patientId } = request.params as { patientId: string };
     const tenantId = getTenantId(request);
 
     const patient = await db('patients')
@@ -86,7 +108,7 @@ export async function registerPatientModule(app: FastifyInstance) {
 
   // Create patient
   app.post('/api/v1/patients', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(request: FastifyRequest, reply: FastifyReply) => (request.server as FastifyInstance & { authenticate: (r: FastifyRequest, rep: FastifyReply) => Promise<void> }).authenticate(request, reply)],
   }, async (request, reply) => {
     const body = createPatientSchema.parse(request.body);
     const tenantId = getTenantId(request); const userId = getCtx(request).userId;
@@ -116,9 +138,9 @@ export async function registerPatientModule(app: FastifyInstance) {
 
   // Update patient
   app.put('/api/v1/patients/:patientId', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(request: FastifyRequest, reply: FastifyReply) => (request.server as FastifyInstance & { authenticate: (r: FastifyRequest, rep: FastifyReply) => Promise<void> }).authenticate(request, reply)],
   }, async (request, reply) => {
-    const { patientId } = request.params as any;
+    const { patientId } = request.params as { patientId: string };
     const body = updatePatientSchema.parse(request.body);
     const tenantId = getTenantId(request);
 
@@ -127,7 +149,7 @@ export async function registerPatientModule(app: FastifyInstance) {
       .first();
     if (!existing) throw new PatientNotFoundError(patientId);
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (body.firstName !== undefined) updateData.first_name = body.firstName;
     if (body.lastName !== undefined) updateData.last_name = body.lastName;
     if (body.dateOfBirth !== undefined) updateData.date_of_birth = body.dateOfBirth;
@@ -150,9 +172,9 @@ export async function registerPatientModule(app: FastifyInstance) {
 
   // Delete patient (soft delete)
   app.delete('/api/v1/patients/:patientId', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(request: FastifyRequest, reply: FastifyReply) => (request.server as FastifyInstance & { authenticate: (r: FastifyRequest, rep: FastifyReply) => Promise<void> }).authenticate(request, reply)],
   }, async (request, reply) => {
-    const { patientId } = request.params as any;
+    const { patientId } = request.params as { patientId: string };
     const tenantId = getTenantId(request);
 
     const existing = await db('patients')
@@ -171,9 +193,9 @@ export async function registerPatientModule(app: FastifyInstance) {
 
   // Search patients (for autocomplete)
   app.get('/api/v1/patients/search/quick', {
-    preHandler: [(r: any, rep: any) => { (r.server as any).authenticate(r, rep); }],
+    preHandler: [(request: FastifyRequest, reply: FastifyReply) => (request.server as FastifyInstance & { authenticate: (r: FastifyRequest, rep: FastifyReply) => Promise<void> }).authenticate(request, reply)],
   }, async (request, reply) => {
-    const { q } = request.query as any;
+    const { q } = request.query as { q?: string };
     const tenantId = getTenantId(request);
 
     if (!q || q.length < 2) return sendSuccess(reply, []);
@@ -190,7 +212,7 @@ export async function registerPatientModule(app: FastifyInstance) {
       .select('id', 'first_name', 'last_name', 'medical_record_number', 'phone', 'date_of_birth', 'gender')
       .limit(10);
 
-    return sendSuccess(reply, patients.map((p: any) => ({
+    return sendSuccess(reply, patients.map((p: PatientRow) => ({
       id: p.id,
       name: `${p.first_name} ${p.last_name}`,
       mrn: p.medical_record_number,
@@ -201,7 +223,7 @@ export async function registerPatientModule(app: FastifyInstance) {
   });
 }
 
-function mapPatient(p: any) {
+function mapPatient(p: PatientRow) {
   return {
     id: p.id,
     tenantId: p.tenant_id,

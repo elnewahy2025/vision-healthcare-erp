@@ -1,5 +1,5 @@
 import './loadEnv.js';
-import Fastify from 'fastify';
+import Fastify, { type FastifyRequest, type FastifyReply } from 'fastify';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from '@fastify/cors';
@@ -123,10 +123,10 @@ async function buildApp() {
   await app.register(jwt, { secret: env.JWT_SECRET });
 
   // Decorate app with authenticate middleware
-  app.decorate("authenticate", async (request: any, reply: any) => {
+  app.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     try {
       await request.jwtVerify();
-    } catch (err) {
+    } catch {
       reply.status(401).send({ success: false, error: "Unauthorized" });
     }
   });

@@ -7,9 +7,9 @@ import { useMemo } from 'react';
 export function useFilteredData<T>(
   data: T[],
   filterFn: (item: T) => boolean,
-  deps: unknown[] = []
 ): T[] {
-  return useMemo(() => data.filter(filterFn), [data, ...deps]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => data.filter(filterFn), [data, filterFn]);
 }
 
 /**
