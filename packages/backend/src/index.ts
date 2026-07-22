@@ -77,7 +77,7 @@ import { registerPatientSchedulingModule } from './modules/patient-scheduling/in
 import { registerRbacModule } from './modules/rbac/index.js';
 import { registerMedicalContentModule } from './modules/medical-content/index.js';
 import { registerMultiBranchModule } from './modules/multi-branch/index.js';
-import { startReminderService } from './services/reminder.js';
+import { startReminderService } from './services/reminder.service.js';
 
 const env = getEnv();
 initSentry();

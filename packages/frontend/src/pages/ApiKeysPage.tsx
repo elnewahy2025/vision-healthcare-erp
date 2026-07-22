@@ -5,7 +5,7 @@ import { Plus, Activity, Copy } from 'lucide-react';
 import {
   PageLoader, EmptyState, Card, CardBody, Button, Badge, Input, Modal,
 } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 
 interface ApiKey {

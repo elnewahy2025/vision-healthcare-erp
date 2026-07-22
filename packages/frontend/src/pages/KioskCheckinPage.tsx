@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { UserCheck, Clock, CheckCircle } from 'lucide-react';
 import { Button, Card, CardBody, Input } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 import { isValidEgyptianNationalId } from '../lib/validators';
 

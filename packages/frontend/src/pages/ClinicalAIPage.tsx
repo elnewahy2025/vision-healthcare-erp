@@ -5,7 +5,7 @@ import { Bot, Sparkles, FileText, Stethoscope, Check, AlertTriangle, Info } from
 import {
   Card, CardBody, Button, Input, Select, Badge, PageLoader, EmptyState,
 } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { sanitizeString, escapeHtml } from '../lib/sanitize';
 
 /* ── Types ─────────────────────────────────────────────────────────── */

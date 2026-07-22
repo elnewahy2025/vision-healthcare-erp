@@ -7,7 +7,7 @@ import {
 import {
   PageLoader, EmptyState, Card, CardBody, Button, Badge, Input,
 } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 
 type PortalTab = 'dashboard' | 'appointments' | 'bills' | 'messages';

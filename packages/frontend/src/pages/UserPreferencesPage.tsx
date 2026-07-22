@@ -6,7 +6,7 @@ import {
   PageLoader, EmptyState, Card, CardBody, Button, Select,
 } from '../components/ui';
 import { useTheme } from '../stores/themeStore';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 
 type PrefsTab = 'appearance' | 'notifications' | 'shortcuts';

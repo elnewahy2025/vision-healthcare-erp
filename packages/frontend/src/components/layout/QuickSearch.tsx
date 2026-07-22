@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Users, CalendarCheck, UserRound, FileText, ArrowRight } from 'lucide-react';
-import api from '../../lib/api';
+import { apiClient as api } from '../../lib/api';
 
 interface SearchResult {
   patients: { type: string; id: string; label: string; subtitle: string; link: string }[];

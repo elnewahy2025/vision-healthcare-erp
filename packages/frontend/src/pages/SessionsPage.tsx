@@ -5,7 +5,7 @@ import { Monitor, Smartphone, Globe, Clock, LogOut, AlertTriangle } from 'lucide
 import {
   PageLoader, EmptyState, Card, CardBody, Button, Badge,
 } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 
 interface Session {

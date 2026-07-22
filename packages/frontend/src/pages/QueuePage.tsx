@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { Modal, Input, Select, PatientSearchField } from '../components/ui';
 import { ListOrdered, SkipForward, CheckCircle, XCircle, Plus, Loader2, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';

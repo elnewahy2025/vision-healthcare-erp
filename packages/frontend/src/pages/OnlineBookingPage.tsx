@@ -5,7 +5,7 @@ import { CalendarPlus, UserCheck, CheckCircle } from 'lucide-react';
 import {
   EmptyState, Card, CardBody, Button, Badge, Input, Select,
 } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 
 type BookingTab = 'public' | 'manage';

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardBody, Button, Spinner, Badge } from '../components/ui';
 import { Building2, ArrowLeft, Users, Calendar, DollarSign, MapPin, Phone, Mail, Edit } from 'lucide-react';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import toast from 'react-hot-toast';
 
 export default function BranchDetailPage() {

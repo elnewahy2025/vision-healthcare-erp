@@ -1,4 +1,5 @@
 import { getCtx, getTenantId } from "../../utils/route-helper.js";
+import { loginRateLimit, registerRateLimit, forgotPasswordRateLimit, refreshRateLimit } from '../../utils/rate-limiter.js';
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -12,6 +13,7 @@ import { generateSecret, verifyToken, generateQrCode } from '../../services/totp
 import { createAndSendOtp, verifyOtp, incrementOtpAttempt } from '../../services/otp.js';
 import { sendNotification } from '../../services/notification.js';
 import { logAudit } from '../../services/audit.js';
+import { generateTokenPair, rotateRefreshToken, revokeRefreshToken } from '../../services/refresh-token.js';
 import { getEnv } from '@healthcare/shared/config';
 
 const TENANT_SLUG_REGEX = /^[a-z0-9-]{3,30}$/;
@@ -19,7 +21,7 @@ const TENANT_SLUG_REGEX = /^[a-z0-9-]{3,30}$/;
 export async function registerAuthModule(app: FastifyInstance) {
 
   // ===================== REGISTER TENANT =====================
-  app.post('/api/v1/tenants', async (request, reply) => {
+  app.post('/api/v1/tenants', { preHandler: [registerRateLimit] }, async (request, reply) => {
     const schema = z.object({
       name: z.string().min(2).max(200),
       slug: z.string().regex(TENANT_SLUG_REGEX, '3-30 chars, lowercase, hyphens only'),
@@ -95,7 +97,7 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== LOGIN =====================
-  app.post('/api/v1/auth/login', async (request, reply) => {
+  app.post('/api/v1/auth/login', { preHandler: [loginRateLimit] }, async (request, reply) => {
     const { email, password, tenantSlug } = loginSchema.parse(request.body);
 
     const tenant = await db('tenants').where({ slug: tenantSlug }).first();
@@ -122,14 +124,16 @@ export async function registerAuthModule(app: FastifyInstance) {
       tenantId: tenant.id, userId: user.id,
       roles, permissions, locale: user.locale || 'en',
     }, { expiresIn: '1h' });
-    const refreshToken = app.jwt.sign(
-      { tenantId: tenant.id, userId: user.id, roles: [], permissions: [], locale: user.locale || 'en' },
-      { expiresIn: '7d' }
+
+    const { refreshToken } = await generateTokenPair(
+      user.id, tenant.id,
+      (request as unknown as { ip?: string }).ip,
+      (request as unknown as { headers?: Record<string, string> }).headers?.['user-agent'],
     );
 
     await db('users').where({ id: user.id }).update({ last_login_at: new Date() });
 
-    await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.login', ipAddress: (request as any).ip, userAgent: (request as any).headers['user-agent'] });
+    await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.login', ipAddress: request.ip, userAgent: request.headers['user-agent'] });
 
     return sendSuccess(reply, {
       user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name,
@@ -153,7 +157,7 @@ export async function registerAuthModule(app: FastifyInstance) {
     const schema = z.object({ partialToken: z.string(), code: z.string().length(6) });
     const { partialToken, code } = schema.parse(request.body);
 
-    let decoded: any;
+    let decoded: { userId?: string; tenantId?: string; mfaPending?: boolean; [key: string]: unknown };
     try { decoded = app.jwt.verify(partialToken); } catch { throw new UnauthorizedError('Invalid or expired token'); }
     if (!decoded.mfaPending) throw new UnauthorizedError('Invalid token type');
 
@@ -170,10 +174,15 @@ export async function registerAuthModule(app: FastifyInstance) {
     const token = app.jwt.sign({
       tenantId: tenant.id, userId: user.id, roles, permissions, locale: user.locale || 'en',
     }, { expiresIn: '1h' });
-    const refreshToken = app.jwt.sign({ tenantId: tenant.id, userId: user.id, roles: [], permissions: [], locale: user.locale || 'en' }, { expiresIn: '7d' });
+
+    const { refreshToken } = await generateTokenPair(
+      user.id, tenant.id,
+      (request as unknown as { ip?: string }).ip,
+      (request as unknown as { headers?: Record<string, string> }).headers?.['user-agent'],
+    );
 
     await db('users').where({ id: user.id }).update({ last_login_at: new Date() });
-    await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.login.mfa', ipAddress: (request as any).ip });
+    await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.login.mfa', ipAddress: request.ip });
 
     return sendSuccess(reply, {
       user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name,
@@ -192,18 +201,58 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== REFRESH TOKEN =====================
-  app.post('/api/v1/auth/refresh', async (request, reply) => {
-    const { refreshToken } = (request.body as any) || {};
+  app.post('/api/v1/auth/refresh', { preHandler: [refreshRateLimit] }, async (request, reply) => {
+    const body = request.body as Record<string, unknown> | undefined;
+    const refreshToken = body?.refreshToken as string | undefined;
     if (!refreshToken) throw new UnauthorizedError('Refresh token required');
-    let decoded: any;
-    try { decoded = app.jwt.verify(refreshToken); } catch { throw new UnauthorizedError('Invalid refresh token'); }
-    const user = await db('users').where({ id: decoded.userId }).first();
-    if (!user || user.status !== 'active') throw new UnauthorizedError('Account not active');
-    const tenant = await db('tenants').where({ id: decoded.tenantId }).first();
-    const permissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
-    const roles = typeof user.roles === 'string' ? JSON.parse(user.roles) : user.roles;
-    const token = app.jwt.sign({ tenantId: tenant.id, userId: user.id, roles, permissions, locale: user.locale || 'en' }, { expiresIn: '1h' });
-    return sendSuccess(reply, { accessToken: token, expiresIn: 3600 });
+
+    const result = await rotateRefreshToken(
+      refreshToken,
+      (request as unknown as { ip?: string }).ip,
+      (request as unknown as { headers?: Record<string, string> }).headers?.['user-agent'],
+    );
+
+    if (!result) throw new UnauthorizedError('Invalid or expired refresh token');
+
+    const tokenPayload = await db.raw(
+      `SELECT u.id as user_id, u.tenant_id, u.permissions, u.roles, u.locale, u.status
+       FROM refresh_tokens rt
+       JOIN users u ON rt.user_id = u.id
+       WHERE rt.token_hash = ?`,
+      [crypto.createHash('sha256').update(result.refreshToken).digest('hex')],
+    );
+
+    if (!tokenPayload?.rows?.[0]) throw new UnauthorizedError('User not found');
+    const row = tokenPayload.rows[0];
+    if (row.status !== 'active') throw new UnauthorizedError('Account not active');
+
+    const permissions = typeof row.permissions === 'string' ? JSON.parse(row.permissions) : row.permissions;
+    const roles = typeof row.roles === 'string' ? JSON.parse(row.roles) : row.roles;
+
+    const token = app.jwt.sign({
+      tenantId: row.tenant_id, userId: row.user_id,
+      roles, permissions, locale: row.locale || 'en',
+    }, { expiresIn: '1h' });
+
+    await logAudit({ tenantId: row.tenant_id, userId: row.user_id, action: 'user.token_refresh' });
+
+    return sendSuccess(reply, { accessToken: token, refreshToken: result.refreshToken, expiresIn: 3600 });
+  });
+
+
+  // ===================== LOGOUT =====================
+  app.post('/api/v1/auth/logout', { preHandler: [(r: any, rep: any) => (r.server as any).authenticate(r, rep)] }, async (request, reply) => {
+    const { userId, tenantId } = getCtx(request);
+    const body = request.body as Record<string, unknown> | undefined;
+    const refreshToken = body?.refreshToken as string | undefined;
+
+    if (refreshToken) {
+      await revokeRefreshToken(refreshToken);
+    }
+
+    await logAudit({ tenantId, userId, action: 'user.logout' });
+
+    return sendSuccess(reply, { message: 'Logged out successfully.' });
   });
 
   // ===================== CURRENT USER =====================
@@ -230,7 +279,7 @@ export async function registerAuthModule(app: FastifyInstance) {
   });
 
   // ===================== FORGOT PASSWORD =====================
-  app.post('/api/v1/auth/forgot-password', async (request, reply) => {
+  app.post('/api/v1/auth/forgot-password', { preHandler: [forgotPasswordRateLimit] }, async (request, reply) => {
     const { email, tenantSlug } = z.object({ email: z.string().email(), tenantSlug: z.string() }).parse(request.body);
 
     const tenant = await db('tenants').where({ slug: tenantSlug }).first();

@@ -5,7 +5,7 @@ import { Barcode, Scan, Plus, Printer } from 'lucide-react';
 import {
   PageLoader, EmptyState, Card, CardBody, Button, Badge, Input, Modal,
 } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 
 type BarcodeTab = 'templates' | 'labels' | 'scans';

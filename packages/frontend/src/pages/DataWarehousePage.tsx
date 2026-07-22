@@ -7,7 +7,7 @@ import {
 import {
   PageLoader, Card, CardBody, Button, Badge,
 } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 
 type DwTab = 'overview' | 'appointments' | 'revenue' | 'patients';
 

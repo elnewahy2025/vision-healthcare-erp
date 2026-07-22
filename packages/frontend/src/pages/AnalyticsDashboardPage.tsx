@@ -12,7 +12,7 @@ import { format, subDays } from 'date-fns';
 import {
   PageLoader, Card, CardBody, Button,
 } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 

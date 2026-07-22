@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { Modal, Input, Select, PatientSearchField } from '../components/ui';
 import { Plus, ExternalLink, Video, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';

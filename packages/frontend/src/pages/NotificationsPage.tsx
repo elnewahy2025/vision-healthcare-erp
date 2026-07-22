@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { Bell, CheckCheck, Loader2, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 

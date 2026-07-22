@@ -9,7 +9,7 @@ import {
   PageLoader, EmptyState, Modal,
   type Column,
 } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { escapeHtml } from '../lib/sanitize';
 
 /* ── Types ─────────────────────────────────────────────────────────── */

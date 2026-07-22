@@ -5,7 +5,7 @@ import { Send, Mail, MessageSquare, Phone, BarChart3, History } from 'lucide-rea
 import {
   PageLoader, EmptyState, Card, CardBody, Button, Badge, Input, Select,
 } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 
 type CommsTab = 'send' | 'history' | 'stats';

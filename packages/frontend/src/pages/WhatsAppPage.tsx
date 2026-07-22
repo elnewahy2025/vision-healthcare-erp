@@ -7,7 +7,7 @@ import {
   PageLoader, EmptyState,
   type Column,
 } from '../components/ui';
-import api from '../lib/api';
+import { apiClient as api } from '../lib/api';
 import { sanitizeString, escapeHtml } from '../lib/sanitize';
 import { isValidEgyptianPhone } from '../lib/validators';
 
