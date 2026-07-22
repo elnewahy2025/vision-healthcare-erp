@@ -19,8 +19,8 @@ export default function ForgotPasswordPage() {
     try {
       await securityApi.forgotPassword(email, tenantSlug);
       setSent(true);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Failed to send reset email');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }; toast.error(axiosErr?.response?.data?.error || 'Failed to send reset email');
     } finally {
       setLoading(false);
     }

@@ -27,8 +27,8 @@ export default function ResetPasswordPage() {
       await securityApi.resetPassword(token, password);
       setDone(true);
       setTimeout(() => navigate('/login'), 3000);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Reset failed. Link may be expired.');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }; toast.error(axiosErr?.response?.data?.error || 'Reset failed. Link may be expired.');
     } finally {
       setLoading(false);
     }

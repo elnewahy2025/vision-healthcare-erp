@@ -27,7 +27,8 @@ const INITIAL_FORM: PatientFormData = {
 export default function PatientsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [patients, setPatients] = useState<any[]>([]);
+  interface PatientListItem { id: string; firstName: string; lastName: string; phone: string; status: string; medicalRecordNumber?: string; dateOfBirth?: string; gender?: string; bloodType?: string; }
+  const [patients, setPatients] = useState<PatientListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -211,7 +212,7 @@ export default function PatientsPage() {
             ) : patients.length === 0 ? (
               <tr><td colSpan={9} className="text-center py-12 text-gray-500">{t('common.noData')}</td></tr>
             ) : (
-              patients.map((p: any) => (
+              patients.map((p: PatientListItem) => (
                 <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/patients/${p.id}`)}>
                   <td className="font-mono text-xs text-primary-600">{p.medicalRecordNumber}</td>
                   <td className="font-medium">{p.firstName}</td>

@@ -3,13 +3,14 @@ import { useParams, Link } from 'react-router-dom';
 import { clinicalApi } from '../lib/api';
 import { Calendar, Clock, FileText, Activity, AlertTriangle, DollarSign, Loader2, ArrowLeft, Stethoscope, Pill, AlertCircle } from 'lucide-react';
 
-const iconMap: Record<string, any> = { emr: Stethoscope, appointment: Calendar, invoice: DollarSign, document: FileText, allergy: AlertTriangle };
+const iconMap: Record<string, typeof Stethoscope> = { emr: Stethoscope, appointment: Calendar, invoice: DollarSign, document: FileText, allergy: AlertTriangle };
 
 const typeColor: Record<string, string> = { emr: 'bg-blue-100 text-blue-600', appointment: 'bg-green-100 text-green-600', invoice: 'bg-purple-100 text-purple-600', document: 'bg-gray-100 text-gray-600', allergy: 'bg-red-100 text-red-600' };
 
 export default function PatientTimelinePage() {
   const { patientId } = useParams();
-  const [timeline, setTimeline] = useState<any[]>([]);
+  interface TimelineEvent { id: string; type: string; date: string; description: string; title?: string; total?: number; status?: string; severity?: string; diagnosis?: string; }
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export default function PatientTimelinePage() {
           <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200" />
 
           <div className="space-y-4">
-            {timeline.map((event: any, i: number) => {
+            {timeline.map((event: TimelineEvent, i: number) => {
               const Icon = iconMap[event.type] || Calendar;
               const color = typeColor[event.type] || 'bg-gray-100 text-gray-600';
               return (

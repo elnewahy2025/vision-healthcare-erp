@@ -27,8 +27,8 @@ export default function RegisterPage() {
       setSuccess(true);
       toast.success('Organization created! You can now log in.');
       setTimeout(() => navigate('/login'), 2000);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Registration failed');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }; toast.error(axiosErr?.response?.data?.error || 'Registration failed');
     } finally {
       setLoading(false);
     }

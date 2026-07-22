@@ -25,7 +25,9 @@ export default function DashboardPage() {
     totalPatients: 0, totalAppointments: 0, todayAppointments: 0,
     pendingBills: 0, revenueToday: 0, activeDoctors: 0,
   });
-  const [todayData, setTodayData] = useState<any>(null);
+  interface TodayData { counts: { scheduled: number; checkedIn: number; completed: number; inProgress: number; cancelled: number; noShow: number; }; appointments: TodayAppointment[]; }
+interface TodayAppointment { id: string; patientName: string; doctorName: string; startTime: string; endTime: string; status: string; }
+  const [todayData, setTodayData] = useState<TodayData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -129,9 +131,9 @@ export default function DashboardPage() {
               <p className="text-gray-500 text-sm">{t('common.noData')}</p>
             )}
 
-            {todayData?.appointments?.length > 0 && (
+            {todayData?.appointments && todayData.appointments.length > 0 && (
               <div className="space-y-3 mt-4">
-                {todayData.appointments.slice(0, 5).map((apt: any) => (
+                {todayData.appointments.slice(0, 5).map((apt: TodayAppointment) => (
                   <div key={apt.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <div className={`w-2 h-2 rounded-full ${
                       apt.status === 'completed' ? 'bg-green-500' :

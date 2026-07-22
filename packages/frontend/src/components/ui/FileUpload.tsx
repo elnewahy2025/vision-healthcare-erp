@@ -53,8 +53,8 @@ export function FileUpload({ onUpload, categories = [], showPatientSelect, patie
       setSelectedFile(null);
       setTitle('');
       setDescription('');
-    } catch (err: any) {
-      setError(err?.message || 'Upload failed');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
     }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Users, CalendarCheck, UserRound, FileText, ArrowRight } from 'lucide-react';
 import { apiClient as api } from '../../lib/api';
 
+interface SearchResultItem { type: string; id: string; label: string; subtitle: string; link: string; }
 interface SearchResult {
   patients: { type: string; id: string; label: string; subtitle: string; link: string }[];
   appointments: { type: string; id: string; label: string; subtitle: string; link: string }[];
@@ -44,7 +45,7 @@ export default function QuickSearch({ open, onClose }: { open: boolean; onClose:
     return () => clearTimeout(timer);
   }, [query]);
 
-  const handleSelect = useCallback((item: any) => {
+  const handleSelect = useCallback((item: SearchResultItem) => {
     onClose();
     navigate(item.link);
   }, [navigate, onClose]);
@@ -108,7 +109,7 @@ export default function QuickSearch({ open, onClose }: { open: boolean; onClose:
   );
 }
 
-function SearchItem({ item, icon: Icon, selected, onSelect }: { item: any; icon: any; selected: boolean; onSelect: () => void }) {
+function SearchItem({ item, icon: Icon, selected, onSelect }: { item: SearchResultItem; icon: typeof Search; selected: boolean; onSelect: () => void }) {
   return (
     <div
       className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer ${selected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}

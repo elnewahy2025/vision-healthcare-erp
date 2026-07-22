@@ -7,7 +7,10 @@ import { ArrowLeft, User, Phone, Calendar, Droplets, Activity, FileText, Receipt
 export default function PatientDetailPage() {
   const { id } = useParams();
   const { t } = useTranslation();
-  const [patient, setPatient] = useState<any>(null);
+  interface PatientDetail { id: string; firstName: string; lastName: string; email?: string; phone: string; gender: string; dateOfBirth: string; bloodType: string; nationality: string; status: string; medicalRecordNumber: string; recentAppointments: AppointmentSummary[]; recentInvoices: InvoiceSummary[]; }
+interface AppointmentSummary { id: string; appointmentDate: string; appointment_date?: string; start_time?: string; status: string; type: string; doctorName?: string; }
+interface InvoiceSummary { id: string; total: number; status: string; createdAt: string; invoice_number?: string; }
+  const [patient, setPatient] = useState<PatientDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,7 +60,7 @@ export default function PatientDetailPage() {
             <InfoRow label={t('patient.dob')} value={patient.dateOfBirth} />
             <InfoRow label={t('patient.gender')} value={patient.gender} />
             <InfoRow label={t('patient.phone')} value={patient.phone} />
-            <InfoRow label={t('patient.email')} value={patient.email} />
+            <InfoRow label={t('patient.email')} value={patient.email || '-'} />
             <InfoRow label={t('patient.bloodType')} value={patient.bloodType} />
             <InfoRow label={t('patient.nationality')} value={patient.nationality} />
           </div>
@@ -69,7 +72,7 @@ export default function PatientDetailPage() {
           <div className="card-body">
             {patient.recentAppointments?.length > 0 ? (
               <div className="space-y-3">
-                {patient.recentAppointments.map((a: any) => (
+                {patient.recentAppointments.map((a: AppointmentSummary) => (
                   <div key={a.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <Calendar className="w-8 h-8 text-blue-500 bg-blue-50 p-1.5 rounded-lg" />
                     <div className="flex-1">
@@ -93,7 +96,7 @@ export default function PatientDetailPage() {
           <div className="card-body">
             {patient.recentInvoices?.length > 0 ? (
               <div className="space-y-3">
-                {patient.recentInvoices.map((inv: any) => (
+                {patient.recentInvoices.map((inv: InvoiceSummary) => (
                   <div key={inv.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <Receipt className="w-8 h-8 text-purple-500 bg-purple-50 p-1.5 rounded-lg" />
                     <div className="flex-1">

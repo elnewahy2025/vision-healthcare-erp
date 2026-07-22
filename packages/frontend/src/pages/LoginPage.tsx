@@ -33,14 +33,14 @@ export default function LoginPage() {
     try {
       const result = await login(email, password, tenantSlug);
       // If MFA is required and we got back a partial token
-      if ((result as any)?.mfaRequired) {
-        setPartialToken((result as any).partialToken);
+      if (((result as Record<string, unknown>)?.mfaRequired)) {
+        setPartialToken(((result as Record<string, unknown>)?.partialToken as string));
         setMfaRequired(true);
       } else {
         navigate('/', { replace: true });
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || err?.message || 'Login failed');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }; toast.error(axiosErr?.response?.data?.error || axiosErr?.message || 'Login failed');
     } finally { setLoading(false); }
   };
 
@@ -51,8 +51,8 @@ export default function LoginPage() {
       await (await import('../lib/api')).securityApi.mfaVerify(partialToken, mfaCode);
       // After MFA verification, reload to get fresh auth state
       window.location.href = '/';
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Invalid code');
+    } catch (err: unknown) {
+      const axiosErr2 = err as { response?: { data?: { error?: string } }; message?: string }; toast.error(axiosErr2?.response?.data?.error || 'Invalid code');
     } finally { setLoading(false); }
   };
 

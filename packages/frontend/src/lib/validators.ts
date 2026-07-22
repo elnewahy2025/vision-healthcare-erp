@@ -113,7 +113,7 @@ export function isValidName(name: string): boolean {
 }
 
 // Validate a value and return error message (or null if valid)
-export type ValidatorFn = (value: any) => string | null;
+export type ValidatorFn = (value: string) => string | null;
 
 export interface FieldValidation {
   required?: boolean;
@@ -121,7 +121,7 @@ export interface FieldValidation {
 }
 
 export function validateField(
-  value: any,
+  value: string,
   config: FieldValidation
 ): string | null {
   if (config.required && (!value || (typeof value === 'string' && !value.trim()))) {
@@ -140,7 +140,7 @@ export function validateField(
 export type FormConfig = Record<string, FieldValidation>;
 
 export function validateForm(
-  values: Record<string, any>,
+  values: Record<string, string>,
   config: FormConfig
 ): Record<string, string> {
   const errors: Record<string, string> = {};

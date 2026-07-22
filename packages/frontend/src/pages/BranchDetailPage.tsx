@@ -8,9 +8,12 @@ import toast from 'react-hot-toast';
 export default function BranchDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [branch, setBranch] = useState<any>(null);
-  const [staff, setStaff] = useState<any[]>([]);
-  const [patients, setPatients] = useState<any[]>([]);
+  interface Branch { id: string; name: string; code: string; type: string; address?: string; city?: string; governorate?: string; phone?: string; email?: string; manager_name?: string; capacity?: number; is_active: boolean; stats?: { patients: number; appointments: number; revenue: number; total_revenue?: number; staff: number; }; patients?: BranchPatient[]; [key: string]: unknown; }
+interface StaffMember { id: string; name: string; role: string; specialization?: string; is_active: boolean; }
+interface BranchPatient { id: string; first_name: string; last_name: string; mrn: string; phone: string; is_active: boolean; }
+  const [branch, setBranch] = useState<Branch | null>(null);
+    const [staff, setStaff] = useState<StaffMember[]>([]);
+    const [patients, setPatients] = useState<BranchPatient[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('overview');
 
@@ -100,7 +103,7 @@ export default function BranchDetailPage() {
           {staff.length === 0 ? <div className="p-6 text-center text-gray-500">No staff assigned</div> : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left">Name</th><th className="px-4 py-3 text-left">Role</th><th className="px-4 py-3 text-left">Specialization</th><th className="px-4 py-3 text-left">Status</th></tr></thead>
-              <tbody>{staff.map((s: any) => (
+              <tbody>{staff.map((s: StaffMember) => (
                 <tr key={s.id} className="border-t border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">{s.name}</td>
                   <td className="px-4 py-3"><Badge>{s.role}</Badge></td>
@@ -118,7 +121,7 @@ export default function BranchDetailPage() {
           {patients.length === 0 ? <div className="p-6 text-center text-gray-500">No patients at this branch</div> : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left">Name</th><th className="px-4 py-3 text-left">MRN</th><th className="px-4 py-3 text-left">Phone</th><th className="px-4 py-3 text-left">Status</th></tr></thead>
-              <tbody>{patients.map((p: any) => (
+              <tbody>{patients.map((p: BranchPatient) => (
                 <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/patients/${p.id}`)}>
                   <td className="px-4 py-3 font-medium">{p.first_name} {p.last_name}</td>
                   <td className="px-4 py-3 text-gray-600">{p.mrn}</td>

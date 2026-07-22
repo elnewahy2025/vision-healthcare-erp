@@ -36,7 +36,7 @@ export function useFormValidation<T extends Record<string, unknown>>(initialValu
   }, []);
 
   const validate = useCallback((): boolean => {
-    const newErrors = validateForm(values, validationConfig);
+    const newErrors = validateForm(values as Record<string, string>, validationConfig);
     setErrors(newErrors);
     // Mark all fields as touched
     const allTouched: Record<string, boolean> = {};
