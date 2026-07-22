@@ -8,13 +8,13 @@ export async function registerAutomationModule(app: FastifyInstance) {
   // ── Rules CRUD ──
   app.get('/api/v1/automation/rules', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const { category, isActive, triggerType } = request.query as any;
+    const { category, isActive, triggerType } = request.query as { category?: string; isActive?: string; triggerType?: string };
     let q = db('automation_rules').where({ tenant_id: tenantId });
     if (category) q = q.andWhere('category', category);
     if (isActive !== undefined) q = q.andWhere('is_active', isActive === 'true');
     if (triggerType) q = q.andWhere('trigger_type', triggerType);
     const rules = await q.orderBy('priority', 'desc').orderBy('name');
-    return sendSuccess(reply, rules.map((r: any) => ({
+    return sendSuccess(reply, rules.map((r: AutomationRuleRow) => ({
       id: r.id, name: r.name, slug: r.slug, category: r.category,
       triggerType: r.trigger_type, triggerEvent: r.trigger_event,
       triggerConfig: r.trigger_config, conditions: r.conditions,
@@ -28,7 +28,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
 
   app.get('/api/v1/automation/rules/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     const rule = await db('automation_rules').where({ tenant_id: tenantId, id }).first();
     if (!rule) return reply.status(404).send({ success: false, error: 'Rule not found' });
     const actions = await db('automation_rule_actions').where({ rule_id: id }).orderBy('step_order');
@@ -39,7 +39,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
       maxExecutions: rule.max_executions, cooldownMinutes: rule.cooldown_minutes,
       lastTriggeredAt: rule.last_triggered_at,
       createdAt: rule.created_at, updatedAt: rule.updated_at,
-      actions: actions.map((a: any) => ({
+      actions: actions.map((a: AutomationRuleActionRow) => ({
         id: a.id, stepOrder: a.step_order, actionType: a.action_type,
         actionName: a.action_name, actionConfig: a.action_config,
         conditionOverride: a.condition_override, isActive: a.is_active
@@ -50,7 +50,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
   app.post('/api/v1/automation/rules', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
-    const body = request.body as any;
+    const body = request.body as Record<string, unknown>;
     const slug = body.slug || body.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     const [rule] = await db('automation_rules').insert({
       tenant_id: tenantId, name: body.name, slug,
@@ -70,9 +70,9 @@ export async function registerAutomationModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/automation/rules/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any;
-    const body = request.body as any;
-    const update: any = { updated_at: new Date() };
+    const { id } = request.params as { id: string };
+    const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.name) update.name = body.name;
     if (body.category) update.category = body.category;
     if (body.triggerType) update.trigger_type = body.triggerType;
@@ -89,7 +89,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
   });
 
   app.delete('/api/v1/automation/rules/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     await db('automation_rule_actions').where({ rule_id: id }).del();
     await db('automation_rules').where({ id }).del();
     return sendSuccess(reply, null, 'Rule deleted');
@@ -97,9 +97,9 @@ export async function registerAutomationModule(app: FastifyInstance) {
 
   // ── Rule Actions ──
   app.get('/api/v1/automation/rules/:ruleId/actions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { ruleId } = request.params as any;
+    const { ruleId } = request.params as { ruleId: string };
     const actions = await db('automation_rule_actions').where({ rule_id: ruleId }).orderBy('step_order');
-    return sendSuccess(reply, actions.map((a: any) => ({
+    return sendSuccess(reply, actions.map((a: AutomationRuleActionRow) => ({
       id: a.id, ruleId: a.rule_id, stepOrder: a.step_order,
       actionType: a.action_type, actionName: a.action_name,
       actionConfig: a.action_config, conditionOverride: a.condition_override,
@@ -108,11 +108,11 @@ export async function registerAutomationModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/automation/rules/:ruleId/actions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { ruleId } = request.params as any;
-    const body = request.body as any;
+    const { ruleId } = request.params as { ruleId: string };
+    const body = request.body as Record<string, unknown>;
     const maxStep = await db('automation_rule_actions').where({ rule_id: ruleId }).max('step_order as max').first();
     const [action] = await db('automation_rule_actions').insert({
-      rule_id: ruleId, step_order: body.stepOrder ?? ((maxStep as any)?.max ?? -1) + 1,
+      rule_id: ruleId, step_order: body.stepOrder ?? ((maxStep as { max?: number })?.max ?? -1) + 1,
       action_type: body.actionType, action_name: body.actionName || null,
       action_config: JSON.stringify(body.actionConfig || {}),
       condition_override: JSON.stringify(body.conditionOverride || {}),
@@ -122,9 +122,9 @@ export async function registerAutomationModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/automation/rules/:ruleId/actions/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any;
-    const body = request.body as any;
-    const update: any = {};
+    const { id } = request.params as { id: string };
+    const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = {};
     if (body.stepOrder !== undefined) update.step_order = body.stepOrder;
     if (body.actionType) update.action_type = body.actionType;
     if (body.actionName !== undefined) update.action_name = body.actionName;
@@ -136,7 +136,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
   });
 
   app.delete('/api/v1/automation/rules/:ruleId/actions/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     await db('automation_rule_actions').where({ id }).del();
     return sendSuccess(reply, null, 'Action deleted');
   });
@@ -145,8 +145,8 @@ export async function registerAutomationModule(app: FastifyInstance) {
   app.post('/api/v1/automation/rules/:id/trigger', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
-    const { id } = request.params as any;
-    const { referenceType, referenceId, inputData } = request.body as any;
+    const { id } = request.params as { id: string };
+    const { referenceType, referenceId, inputData } = request.body as Record<string, unknown>;
 
     const rule = await db('automation_rules').where({ tenant_id: tenantId, id, is_active: true }).first();
     if (!rule) return reply.status(404).send({ success: false, error: 'Active rule not found' });
@@ -154,7 +154,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
     // Check max executions
     if (rule.max_executions > 0) {
       const count = await db('automation_execution_logs').where({ rule_id: id }).count('id as c').first();
-      if (Number((count as any)?.c || 0) >= rule.max_executions) {
+      if (Number((count as Record<string, unknown>)?.c || 0) >= rule.max_executions) {
         return reply.status(400).send({ success: false, error: 'Max executions reached for this rule' });
       }
     }
@@ -178,13 +178,13 @@ export async function registerAutomationModule(app: FastifyInstance) {
     }).returning('*');
 
     // Execute actions (simplified — in production this would use a queue)
-    const results: any[] = [];
+    const results: unknown[] = [];
     let hasError = false;
     for (const action of actions) {
       try {
         const actionConfig = typeof action.action_config === 'string' ? JSON.parse(action.action_config) : action.action_config;
         results.push({ stepOrder: action.step_order, actionType: action.action_type, status: 'completed', config: actionConfig });
-      } catch (err: any) {
+      } catch (err: unknown) {
         results.push({ stepOrder: action.step_order, actionType: action.action_type, status: 'failed', error: err.message });
         hasError = true;
       }
@@ -208,7 +208,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
   // ── Execution Logs ──
   app.get('/api/v1/automation/logs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const { ruleId, status, limit, offset } = request.query as any;
+    const { ruleId, status, limit, offset } = request.query as { ruleId?: string; status?: string; limit?: string; offset?: string };
     let q = db('automation_execution_logs').where('automation_execution_logs.tenant_id', tenantId);
     if (ruleId) q = q.andWhere('automation_execution_logs.rule_id', ruleId);
     if (status) q = q.andWhere('automation_execution_logs.status', status);
@@ -229,7 +229,7 @@ export async function registerAutomationModule(app: FastifyInstance) {
         startedAt: l.started_at, completedAt: l.completed_at,
         createdAt: l.created_at
       })),
-      total: Number((total as any)?.c || 0)
+      total: Number((total as Record<string, unknown>)?.c || 0)
     });
   });
 

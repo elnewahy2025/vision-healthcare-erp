@@ -7,12 +7,12 @@ import { authenticate } from '../auth-guard.js';
 export async function registerComplianceReportsModule(app: FastifyInstance) {
   // ── Compliance Reports ──
   app.get('/api/v1/compliance/reports', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { type, status } = request.query as any;
+    const tenantId = getTenantId(request); const { type, status } = request.query as { status?: string; type?: string };
     let q = db('compliance_reports').where('compliance_reports.tenant_id', tenantId);
     if (type) q = q.andWhere('type', type);
     if (status) q = q.andWhere('status', status);
     const reports = await q.orderBy('created_at', 'desc').limit(50);
-    return sendSuccess(reply, reports.map((r: any) => ({
+    return sendSuccess(reply, reports.map((r: Record<string, unknown>) => ({
       id: r.id, title: r.title, type: r.type, periodStart: r.period_start,
       periodEnd: r.period_end, status: r.status, findings: r.findings,
       recommendations: r.recommendations, format: r.format,
@@ -21,7 +21,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/compliance/reports', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
     const [rep] = await db('compliance_reports').insert({
       tenant_id: tenantId, title: body.title, type: body.type || 'internal',
       period_start: body.periodStart, period_end: body.periodEnd,
@@ -32,8 +32,8 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/compliance/reports/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any; const body = request.body as any;
-    const update: any = { updated_at: new Date() };
+    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.status) update.status = body.status;
     if (body.findings !== undefined) update.findings = body.findings;
     if (body.recommendations !== undefined) update.recommendations = body.recommendations;
@@ -43,7 +43,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
 
   // ── HIPAA Audit Trail ──
   app.get('/api/v1/compliance/hipaa-audit', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { entity, days, userId } = request.query as any;
+    const tenantId = getTenantId(request); const { entity, days, userId } = request.query as { days?: string; entity?: string; userId?: string };
     const since = new Date(Date.now() - (Number(days) || 90) * 86400000);
     let q = db('audit_logs').where('audit_logs.tenant_id', tenantId).where('timestamp', '>=', since);
     if (entity) q = q.andWhere('entity', entity);
@@ -56,15 +56,15 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
   });
 
   app.get('/api/v1/compliance/hipaa-summary', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { days } = request.query as any;
+    const tenantId = getTenantId(request); const { days } = request.query as { days?: string };
     const since = new Date(Date.now() - (Number(days) || 90) * 86400000);
     const totalAccess = await db('audit_logs').where({ tenant_id: tenantId }).where('timestamp', '>=', since).count('id as c').first();
     const byAction = await db('audit_logs').where({ tenant_id: tenantId }).where('timestamp', '>=', since).select('action').groupBy('action').count('id as count').orderByRaw('count desc').limit(10);
     const byEntity = await db('audit_logs').where({ tenant_id: tenantId }).where('timestamp', '>=', since).select('entity').groupBy('entity').count('id as count').orderByRaw('count desc').limit(10);
     const uniqueUsers = await db('audit_logs').where({ tenant_id: tenantId }).where('timestamp', '>=', since).distinct('user_id').count('user_id as c').first();
     return sendSuccess(reply, {
-      totalEvents: Number((totalAccess as any)?.c || 0),
-      uniqueUsers: Number((uniqueUsers as any)?.c || 0),
+      totalEvents: Number((totalAccess as Record<string, unknown>)?.c || 0),
+      uniqueUsers: Number((uniqueUsers as Record<string, unknown>)?.c || 0),
       byAction, byEntity
     });
   });
@@ -73,14 +73,14 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
   app.get('/api/v1/compliance/retention-policies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const policies = await db('data_retention_policies').where({ tenant_id: tenantId }).orderBy('entity');
-    return sendSuccess(reply, policies.map((p: any) => ({
+    return sendSuccess(reply, policies.map((p: AuditLogRow) => ({
       id: p.id, entity: p.entity, retentionDays: p.retention_days,
       action: p.action, isActive: p.is_active, lastCleanupAt: p.last_cleanup_at
     })));
   });
 
   app.post('/api/v1/compliance/retention-policies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
     const [p] = await db('data_retention_policies').insert({
       tenant_id: tenantId, entity: body.entity, retention_days: body.retentionDays || 365,
       action: body.action || 'archive', is_active: body.isActive !== false
@@ -89,8 +89,8 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/compliance/retention-policies/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any; const body = request.body as any;
-    const update: any = { updated_at: new Date() };
+    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.retentionDays) update.retention_days = body.retentionDays;
     if (body.action) update.action = body.action;
     if (body.isActive !== undefined) update.is_active = body.isActive;
@@ -102,7 +102,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
   app.get('/api/v1/compliance/baa', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const agreements = await db('business_associate_agreements').where({ tenant_id: tenantId }).orderBy('created_at', 'desc');
-    return sendSuccess(reply, agreements.map((a: any) => ({
+    return sendSuccess(reply, agreements.map((a: Record<string, unknown>) => ({
       id: a.id, organizationName: a.organization_name, contactName: a.contact_name,
       contactEmail: a.contact_email, scope: a.scope, executedDate: a.executed_date,
       expiryDate: a.expiry_date, status: a.status, terms: a.terms
@@ -110,7 +110,7 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/compliance/baa', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
     const [baa] = await db('business_associate_agreements').insert({
       tenant_id: tenantId, organization_name: body.organizationName,
       contact_name: body.contactName || null, contact_email: body.contactEmail || null,
@@ -122,8 +122,8 @@ export async function registerComplianceReportsModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/compliance/baa/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any; const body = request.body as any;
-    const update: any = { updated_at: new Date() };
+    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.status) update.status = body.status;
     if (body.scope) update.scope = body.scope;
     if (body.terms !== undefined) update.terms = body.terms;

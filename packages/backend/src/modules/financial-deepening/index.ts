@@ -109,7 +109,7 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
     const existing = await db('expenses').where({ id, tenant_id: tenantId }).first();
     if (!existing) return sendError(reply, 'Expense not found', 404);
 
-    const updates: any = {};
+    const updates: Record<string, unknown> = {};
     if (body.title) updates.title = body.title;
     if (body.amount) updates.amount = body.amount;
     if (body.categoryId !== undefined) updates.category_id = body.categoryId;
@@ -145,7 +145,7 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
     const pendingCount = await db('expenses').where({ tenant_id: tenantId, status: 'pending' }).count('id as count').first();
 
     return sendSuccess(reply, {
-      totalExpenses: Number((totalExpenses as any)?.total || 0),
+      totalExpenses: Number((totalExpenses as Record<string, unknown>)?.total || 0),
       pendingCount: Number(pendingCount?.count || 0),
       byCategory, byMonth,
     });
@@ -399,7 +399,7 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
   // ==================== ENHANCED PAYMENT ROUTES (Fawry/InstaPay) ====================
 
   app.post('/api/v1/payments/fawry/callback', async (request, reply) => {
-    const body = request.body as any;
+    const body = request.body as Record<string, unknown>;
     // Fawry callback verification
     const fawryRef = body.fawryRef || body.referenceNumber || body.merchantRefNumber;
     const status = body.status || body.paymentStatus;
@@ -413,7 +413,7 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/payments/instapay/callback', async (request, reply) => {
-    const body = request.body as any;
+    const body = request.body as Record<string, unknown>;
     const instapayRef = body.reference || body.transactionId;
     if (instapayRef) {
       await db('payment_transactions')

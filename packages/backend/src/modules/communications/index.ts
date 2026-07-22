@@ -29,7 +29,7 @@ export async function registerCommunicationsModule(app: FastifyInstance) {
     if (!existing) return reply.code(404).send({ error: 'Template not found' });
     if (existing.tenant_id && existing.tenant_id !== tenantId) return reply.code(403).send({ error: 'Forbidden' });
 
-    const update: any = { body, updated_at: new Date() };
+    const update: Record<string, unknown> = { body, updated_at: new Date() };
     if (subject !== undefined) update.subject = subject;
     if (isActive !== undefined) update.is_active = isActive;
 
@@ -82,6 +82,6 @@ export async function registerCommunicationsModule(app: FastifyInstance) {
     const logs = await db('notification_logs').where({ tenant_id: tenantId })
       .orderBy('created_at', 'desc').limit(query.limit).offset((query.page - 1) * query.limit);
 
-    return sendPaginated(reply, logs, Number((total as any)?.count || 0), query.page, query.limit);
+    return sendPaginated(reply, logs, Number((total as Record<string, unknown>)?.count || 0), query.page, query.limit);
   });
 }

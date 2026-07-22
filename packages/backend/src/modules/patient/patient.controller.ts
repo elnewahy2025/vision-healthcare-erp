@@ -65,7 +65,7 @@ export async function updatePatient(request: FastifyRequest, reply: FastifyReply
   const existing = await repo.findPatientById(patientId, tenantId);
   if (!existing) throw new PatientNotFoundError(patientId);
 
-  const updateData: any = {};
+  const updateData: Record<string, unknown> = {};
   if (body.firstName !== undefined) updateData.first_name = body.firstName;
   if (body.lastName !== undefined) updateData.last_name = body.lastName;
   if (body.dateOfBirth !== undefined) updateData.date_of_birth = body.dateOfBirth;

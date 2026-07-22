@@ -16,7 +16,7 @@ export async function registerBillingModule(app: FastifyInstance) {
   }, async (request, reply) => {
     const query = paginationSchema.parse(request.query);
     const tenantId = getTenantId(request);
-    const { status, patientId, startDate, endDate } = request.query as any;
+    const { status, patientId, startDate, endDate } = request.query as { endDate?: string; patientId?: string; startDate?: string; status?: string };
 
     let queryBuilder = db('invoices')
       .join('patients', 'invoices.patient_id', 'patients.id')
@@ -47,7 +47,7 @@ export async function registerBillingModule(app: FastifyInstance) {
   app.get('/api/v1/invoices/:invoiceId', {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
-    const { invoiceId } = request.params as any;
+    const { invoiceId } = request.params as { invoiceId: string };
     const tenantId = getTenantId(request);
 
     const invoice = await db('invoices')
@@ -117,7 +117,7 @@ export async function registerBillingModule(app: FastifyInstance) {
   app.post('/api/v1/invoices/:invoiceId/pay', {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
-    const { invoiceId } = request.params as any;
+    const { invoiceId } = request.params as { invoiceId: string };
     const tenantId = getTenantId(request);
 
     const body = z.object({
@@ -173,7 +173,7 @@ export async function registerBillingModule(app: FastifyInstance) {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const { startDate, endDate } = request.query as any;
+    const { startDate, endDate } = request.query as { endDate?: string; startDate?: string };
 
     const start = startDate || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
     const end = endDate || new Date().toISOString().split('T')[0];
@@ -203,7 +203,7 @@ export async function registerBillingModule(app: FastifyInstance) {
   app.get('/api/v1/patients/:patientId/invoices', {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
-    const { patientId } = request.params as any;
+    const { patientId } = request.params as { patientId: string };
     const tenantId = getTenantId(request);
     const query = paginationSchema.parse(request.query);
 
@@ -241,7 +241,7 @@ export async function registerBillingModule(app: FastifyInstance) {
   app.get('/api/v1/payments/link/:tenantSlug/:invoiceId', {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
-    const { invoiceId, tenantSlug } = request.params as any;
+    const { invoiceId, tenantSlug } = request.params as { invoiceId: string; tenantSlug: string };
     const { generatePaymentLink } = await import('../../services/payment.js');
     return sendSuccess(reply, { url: generatePaymentLink(invoiceId, tenantSlug) });
   });
@@ -251,7 +251,7 @@ export async function registerBillingModule(app: FastifyInstance) {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const year = parseInt((request.query as any).year) || new Date().getFullYear();
+    const year = parseInt((request.query as Record<string, unknown>)["year"]) || new Date().getFullYear();
     const monthly = await db('invoices').where('tenant_id', tenantId).whereNull('deleted_at')
       .whereRaw('EXTRACT(YEAR FROM issued_at) = ?', [year])
       .select(db.raw("TO_CHAR(issued_at, 'Mon') as month"), db.raw('EXTRACT(MONTH FROM issued_at) as m'), db.raw('COALESCE(SUM(total),0) as revenue'), db.raw('COALESCE(SUM(paid),0) as collected'))
@@ -285,7 +285,7 @@ export async function registerBillingModule(app: FastifyInstance) {
   });
 }
 
-function mapInvoice(i: any) {
+function mapInvoice(i: InvoiceRow) {
   return {
     id: i.id,
     tenantId: i.tenant_id,

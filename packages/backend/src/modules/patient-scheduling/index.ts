@@ -19,10 +19,10 @@ export async function registerPatientSchedulingModule(app: FastifyInstance) {
     const existingApts = await db('appointments').where('tenant_id', tenant.id).whereRaw("DATE(scheduled_date) = ?", [query.date])
       .where('status', '!=', 'cancelled').select('doctor_id', 'scheduled_date', 'end_time');
 
-    const slots: any[] = [];
+    const slots: unknown[] = [];
     for (const doctor of doctors) {
       for (let hour = 9; hour < 17; hour++) {
-        const isBooked = existingApts.some((a: any) => a.doctor_id === doctor.id && new Date(a.scheduled_date as string).getHours() === hour);
+        const isBooked = existingApts.some((a: Record<string, unknown>) => a.doctor_id === doctor.id && new Date(a.scheduled_date as string).getHours() === hour);
         if (!isBooked) {
           slots.push({ doctorId: doctor.id, doctorName: `${doctor.first_name} ${doctor.last_name}`, start: `${query.date}T${String(hour).padStart(2, '0')}:00:00`, end: `${query.date}T${String(hour).padStart(2, '0')}:30:00` });
         }

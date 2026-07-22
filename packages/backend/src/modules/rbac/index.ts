@@ -30,7 +30,7 @@ export async function registerRbacModule(app: FastifyInstance) {
 
   // Get all available permissions
   app.get('/api/v1/rbac/permissions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const permissions: any[] = [];
+    const permissions: unknown[] = [];
     for (const mod of PERMISSION_MODULES) {
       for (const action of PERMISSION_ACTIONS) {
         permissions.push({ module: mod, action, key: `${mod}.${action}` });
@@ -82,7 +82,7 @@ export async function registerRbacModule(app: FastifyInstance) {
       permissions: z.array(z.string()).optional(),
     }).parse(request.body);
 
-    const updates: any = {};
+    const updates: Record<string, unknown> = {};
     if (body.roles) updates.roles = JSON.stringify(body.roles);
     if (body.permissions) updates.permissions = JSON.stringify(body.permissions);
 

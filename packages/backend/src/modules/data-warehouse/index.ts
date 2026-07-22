@@ -19,10 +19,10 @@ export async function registerDataWarehouseModule(app: FastifyInstance) {
     const apptNoShow = await db('appointments').where({ tenant_id: tenantId }).where('appointment_date', today).where('status', 'no_show').count('id as c').first();
     await db('dw_appointment_stats').insert({
       tenant_id: tenantId, date: today,
-      total_appointments: Number((apptTotal as any)?.c || 0),
-      completed_appointments: Number((apptCompleted as any)?.c || 0),
-      cancelled_appointments: Number((apptCancelled as any)?.c || 0),
-      no_show_appointments: Number((apptNoShow as any)?.c || 0),
+      total_appointments: Number((apptTotal as Record<string, unknown>)?.c || 0),
+      completed_appointments: Number((apptCompleted as Record<string, unknown>)?.c || 0),
+      cancelled_appointments: Number((apptCancelled as Record<string, unknown>)?.c || 0),
+      no_show_appointments: Number((apptNoShow as Record<string, unknown>)?.c || 0),
     }).onConflict(['tenant_id', 'date']).merge();
 
     // Revenue stats
@@ -33,23 +33,23 @@ export async function registerDataWarehouseModule(app: FastifyInstance) {
     const paidInvoices = await db('invoices').where({ tenant_id: tenantId, status: 'paid' }).count('id as c').first();
     await db('dw_revenue_stats').insert({
       tenant_id: tenantId, date: today,
-      total_revenue: Number((revTotal as any)?.total || 0),
-      collected_revenue: Number((revCollected as any)?.total || 0),
-      pending_revenue: Number((revPending as any)?.total || 0),
-      invoice_count: Number((totalInvoices as any)?.c || 0),
-      paid_invoice_count: Number((paidInvoices as any)?.c || 0),
+      total_revenue: Number((revTotal as Record<string, unknown>)?.total || 0),
+      collected_revenue: Number((revCollected as Record<string, unknown>)?.total || 0),
+      pending_revenue: Number((revPending as Record<string, unknown>)?.total || 0),
+      invoice_count: Number((totalInvoices as Record<string, unknown>)?.c || 0),
+      paid_invoice_count: Number((paidInvoices as Record<string, unknown>)?.c || 0),
     }).onConflict(['tenant_id', 'date']).merge();
 
     // Patient stats
     const newPats = await db('patients').where({ tenant_id: tenantId }).where('created_at', '>=', start).where('created_at', '<=', end).count('id as c').first();
     const activePats = await db('patients').where({ tenant_id: tenantId }).whereNull('deleted_at').count('id as c').first();
     const genderDist = await db('patients').where({ tenant_id: tenantId }).whereNull('deleted_at').select('gender').groupBy('gender').count('id as count');
-    const dist: any = {};
+    const dist: Record<string, unknown> = {};
     for (const g of genderDist) dist[g.gender || 'unknown'] = Number(g.count);
     await db('dw_patient_stats').insert({
       tenant_id: tenantId, date: today,
-      new_patients: Number((newPats as any)?.c || 0),
-      total_active_patients: Number((activePats as any)?.c || 0),
+      new_patients: Number((newPats as Record<string, unknown>)?.c || 0),
+      total_active_patients: Number((activePats as Record<string, unknown>)?.c || 0),
       gender_distribution: JSON.stringify(dist),
     }).onConflict(['tenant_id', 'date']).merge();
 
@@ -58,7 +58,7 @@ export async function registerDataWarehouseModule(app: FastifyInstance) {
 
   // Get DW stats
   app.get('/api/v1/dw/appointments', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { days } = request.query as any;
+    const tenantId = getTenantId(request); const { days } = request.query as { days?: string };
     const since = new Date(Date.now() - (Number(days) || 30) * 86400000).toISOString().split('T')[0];
     const stats = await db('dw_appointment_stats').where({ tenant_id: tenantId }).where('date', '>=', since).orderBy('date');
     const totals = await db('dw_appointment_stats').where({ tenant_id: tenantId }).where('date', '>=', since)
@@ -67,7 +67,7 @@ export async function registerDataWarehouseModule(app: FastifyInstance) {
   });
 
   app.get('/api/v1/dw/revenue', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { days } = request.query as any;
+    const tenantId = getTenantId(request); const { days } = request.query as { days?: string };
     const since = new Date(Date.now() - (Number(days) || 30) * 86400000).toISOString().split('T')[0];
     const stats = await db('dw_revenue_stats').where({ tenant_id: tenantId }).where('date', '>=', since).orderBy('date');
     const totals = await db('dw_revenue_stats').where({ tenant_id: tenantId }).where('date', '>=', since)
@@ -76,7 +76,7 @@ export async function registerDataWarehouseModule(app: FastifyInstance) {
   });
 
   app.get('/api/v1/dw/patients', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { days } = request.query as any;
+    const tenantId = getTenantId(request); const { days } = request.query as { days?: string };
     const since = new Date(Date.now() - (Number(days) || 30) * 86400000).toISOString().split('T')[0];
     const stats = await db('dw_patient_stats').where({ tenant_id: tenantId }).where('date', '>=', since).orderBy('date');
     const totals = await db('dw_patient_stats').where({ tenant_id: tenantId }).where('date', '>=', since)

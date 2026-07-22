@@ -60,7 +60,7 @@ export async function updateAppointment(request: FastifyRequest, reply: FastifyR
   const existing = await repo.findAppointmentById(appointmentId, tenantId);
   if (!existing) throw new AppointmentNotFoundError(appointmentId);
 
-  const updateData: any = { updated_at: new Date() };
+  const updateData: Record<string, unknown> = { updated_at: new Date() };
   if (body.appointmentDate) updateData.appointment_date = body.appointmentDate;
   if (body.startTime) {
     updateData.start_time = body.startTime;

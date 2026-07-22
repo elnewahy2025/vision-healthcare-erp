@@ -15,7 +15,7 @@ export async function registerEmmModule(app: FastifyInstance) {
   }, async (request, reply) => {
     const query = paginationSchema.parse(request.query);
     const tenantId = getTenantId(request);
-    const { patientId, doctorId, status } = request.query as any;
+    const { patientId, doctorId, status } = request.query as { doctorId?: string; patientId?: string; status?: string };
 
     let queryBuilder = db('emr_records')
       .join('patients', 'emr_records.patient_id', 'patients.id')
@@ -46,7 +46,7 @@ export async function registerEmmModule(app: FastifyInstance) {
   app.get('/api/v1/emr/:emrId', {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
-    const { emrId } = request.params as any;
+    const { emrId } = request.params as { emrId: string };
     const tenantId = getTenantId(request);
 
     const record = await db('emr_records')
@@ -121,9 +121,9 @@ export async function registerEmmModule(app: FastifyInstance) {
   app.put('/api/v1/emr/:emrId', {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
-    const { emrId } = request.params as any;
+    const { emrId } = request.params as { emrId: string };
     const tenantId = getTenantId(request);
-    const body = request.body as any;
+    const body = request.body as Record<string, unknown>;
 
     const existing = await db('emr_records')
       .where({ id: emrId, tenant_id: tenantId })
@@ -132,7 +132,7 @@ export async function registerEmmModule(app: FastifyInstance) {
       return reply.status(404).send({ success: false, error: 'EMR record not found' });
     }
 
-    const updateData: any = { updated_at: new Date() };
+    const updateData: Record<string, unknown> = { updated_at: new Date() };
     if (body.subjective !== undefined) updateData.subjective = body.subjective;
     if (body.objective !== undefined) updateData.objective = body.objective;
     if (body.assessment !== undefined) updateData.assessment = body.assessment;
@@ -167,7 +167,7 @@ export async function registerEmmModule(app: FastifyInstance) {
   app.post('/api/v1/emr/:emrId/sign', {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
-    const { emrId } = request.params as any;
+    const { emrId } = request.params as { emrId: string };
     const tenantId = getTenantId(request);
 
     const existing = await db('emr_records')
@@ -189,7 +189,7 @@ export async function registerEmmModule(app: FastifyInstance) {
   app.post('/api/v1/emr/:emrId/diagnosis', {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
-    const { emrId } = request.params as any;
+    const { emrId } = request.params as { emrId: string };
     const body = z.object({
       code: z.string(),
       name: z.string(),
@@ -224,7 +224,7 @@ export async function registerEmmModule(app: FastifyInstance) {
   app.post('/api/v1/emr/:emrId/medications', {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
-    const { emrId } = request.params as any;
+    const { emrId } = request.params as { emrId: string };
     const body = z.object({
       drugName: z.string().min(1),
       dosage: z.string().min(1),
@@ -263,7 +263,7 @@ export async function registerEmmModule(app: FastifyInstance) {
   app.get('/api/v1/patients/:patientId/emr', {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
   }, async (request, reply) => {
-    const { patientId } = request.params as any;
+    const { patientId } = request.params as { patientId: string };
     const tenantId = getTenantId(request);
     const query = paginationSchema.parse(request.query);
 
@@ -284,7 +284,7 @@ export async function registerEmmModule(app: FastifyInstance) {
   });
 }
 
-function mapEmr(r: any) {
+function mapEmr(r: EmrRecordRow) {
   return {
     id: r.id,
     tenantId: r.tenant_id,

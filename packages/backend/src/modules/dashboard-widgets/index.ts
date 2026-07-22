@@ -29,7 +29,7 @@ export async function registerDashboardWidgetsModule(app: FastifyInstance) {
     const { tenantId, userId } = getCtx(request);
     const body = z.object({
       layout: z.array(z.object({ id: z.string(), order: z.number(), visible: z.boolean(), size: z.enum(['small', 'medium', 'large']).optional() })),
-      preferences: z.record(z.any()).optional(),
+      preferences: z.record(z.unknown()).optional(),
     }).parse(request.body);
     const existing = await db('dashboard_widgets').where({ tenant_id: tenantId, user_id: userId }).first();
     if (existing) {
@@ -43,7 +43,7 @@ export async function registerDashboardWidgetsModule(app: FastifyInstance) {
   app.get('/api/v1/dashboard/widgets/:widgetId/data', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const { widgetId } = z.object({ widgetId: z.string() }).parse(request.params);
-    let data: any = null;
+    let data: Record<string, unknown> | null = null;
     switch (widgetId) {
       case 'revenue': { const r = await db('invoices').where({ tenant_id: tenantId }).where('status', '!=', 'cancelled').sum('total as t').sum('paid as p').first(); data = { total: Number(r?.t || 0), paid: Number(r?.p || 0) }; break; }
       case 'patients_total': { const t = await db('patients').where({ tenant_id: tenantId }).count('id as c').first(); const n = await db('patients').where({ tenant_id: tenantId }).whereRaw("created_at >= CURRENT_DATE").count('id as c').first(); data = { total: Number(t?.c || 0), todayNew: Number(n?.c || 0) }; break; }

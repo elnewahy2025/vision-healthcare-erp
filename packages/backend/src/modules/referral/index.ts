@@ -6,7 +6,7 @@ import { authenticate } from '../auth-guard.js';
 
 export async function registerReferralModule(app: FastifyInstance) {
   app.get('/api/v1/referrals', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { status, patientId } = request.query as any;
+    const tenantId = getTenantId(request); const { status, patientId } = request.query as { patientId?: string; status?: string };
     let q = db('referrals').where('referrals.tenant_id', tenantId).whereNull('referrals.deleted_at');
     if (status) q = q.andWhere('referrals.status', status);
     if (patientId) q = q.andWhere('referrals.patient_id', patientId);
@@ -18,7 +18,7 @@ export async function registerReferralModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/referrals', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
     const refNum = "REF-" + Date.now().toString(36).toUpperCase();
     const [ref] = await db('referrals').insert({
       tenant_id: tenantId, patient_id: body.patientId, referring_doctor_id: ctx.userId,
@@ -33,12 +33,12 @@ export async function registerReferralModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/referrals/:id/status', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any; const body = request.body as any;
+    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
     await db('referrals').where({ id }).update({ status: body.status, feedback: body.feedback || null, updated_at: new Date() });
     return sendSuccess(reply, null, 'Referral updated');
   });
 }
-function mapRef(r: any) { return {
+function mapRef(r: Record<string, unknown>) { return {
   id: r.id, referralNumber: r.referral_number, patientId: r.patient_id,
   patientName: r.p_first + ' ' + r.p_last, referralType: r.referral_type,
   priority: r.priority, status: r.status, reason: r.reason,

@@ -173,3 +173,52 @@ export function validateProductionEnvironment(): void {
     process.exit(1);
   }
 }
+
+// ============================================
+// Development Environment Validation — Warnings Only
+// ============================================
+
+export function validateDevelopmentEnvironment(): void {
+  const envVars = getEnv();
+  if (envVars.NODE_ENV !== "development") return;
+
+  const warnings: string[] = [];
+
+  // Warn about same JWT secrets
+  if (
+    process.env.JWT_SECRET &&
+    process.env.JWT_REFRESH_SECRET &&
+    process.env.JWT_SECRET === process.env.JWT_REFRESH_SECRET
+  ) {
+    warnings.push("JWT_SECRET and JWT_REFRESH_SECRET are the same. Use different values for security.");
+  }
+
+  // Warn about CORS wildcard
+  if (envVars.CORS_ORIGIN === "*") {
+    warnings.push("CORS_ORIGIN is set to '*'. This is fine for development but restrict in production.");
+  }
+
+  // Warn about default MinIO credentials
+  if (
+    process.env.MINIO_ACCESS_KEY === "minioadmin" ||
+    process.env.MINIO_SECRET_KEY === "minioadmin"
+  ) {
+    warnings.push("MinIO is using default 'minioadmin' credentials. Change for any shared dev environment.");
+  }
+
+  // Warn about default DB password
+  if (!process.env.DB_PASSWORD || INSECURE_DEFAULTS.includes(process.env.DB_PASSWORD)) {
+    warnings.push("DB_PASSWORD is using a default value. Set a strong password if connecting to a shared database.");
+  }
+
+  // Warn about empty SMTP (email won't work)
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    warnings.push("SMTP_USER or SMTP_PASS is not set. Email sending will fail.");
+  }
+
+  if (warnings.length > 0) {
+    console.warn("⚠ Development environment warnings:");
+    warnings.forEach((w) => console.warn(`  - ${w}`));
+    console.warn("(These are warnings, not errors. The server will start.)");
+  }
+}

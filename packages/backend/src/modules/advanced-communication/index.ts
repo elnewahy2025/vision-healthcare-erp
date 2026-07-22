@@ -20,7 +20,7 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
 
   // WhatsApp Webhook verification (Meta requirement)
   app.get('/api/v1/whatsapp/webhook', async (request, reply) => {
-    const query = request.query as any;
+    const query = request.query as Record<string, unknown>;
     const verifyToken = env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'vision-hc-whatsapp-verify';
 
     if (query['hub.mode'] === 'subscribe' && query['hub.verify_token'] === verifyToken) {
@@ -63,7 +63,7 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
       }
 
       return reply.status(200).send({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('✗ WhatsApp webhook error:', error.message);
       return reply.status(200).send({ success: true }); // Always return 200 to Meta
     }
@@ -233,7 +233,7 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
   // Voice call status callback (from Twilio)
   app.post('/api/v1/voice/status', async (request, reply) => {
     try {
-      const body = request.body as any;
+      const body = request.body as Record<string, unknown>;
       const callSid = body.CallSid || body.callSid;
       const status = body.CallStatus || body.status;
       const duration = parseInt(body.CallDuration || '0', 10);
@@ -242,7 +242,7 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
         await updateCallStatus(callSid, status.toLowerCase(), duration);
       }
       return reply.status(200).send({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('✗ Voice status callback error:', error.message);
       return reply.status(200).send({ success: true });
     }
@@ -308,7 +308,7 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
     const body = z.object({
       content: z.string().min(1),
       messageType: z.enum(['text', 'image', 'file']).optional().default('text'),
-      metadata: z.any().optional(),
+      metadata: z.unknown().optional(),
     }).parse(request.body);
 
     const msg = await sendChatMessage({

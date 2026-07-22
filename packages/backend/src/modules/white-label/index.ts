@@ -29,8 +29,8 @@ export async function registerWhiteLabelModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/white-label/branding', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as any;
-    const update: any = { updated_at: new Date() };
+    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.brandName !== undefined) update.brand_name = body.brandName;
     if (body.logoUrl !== undefined) update.logo_url = body.logoUrl;
     if (body.faviconUrl !== undefined) update.favicon_url = body.faviconUrl;
@@ -56,7 +56,7 @@ export async function registerWhiteLabelModule(app: FastifyInstance) {
   app.get('/api/v1/white-label/domains', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const domains = await db('tenant_domains').where({ tenant_id: tenantId }).orderBy('is_primary', 'desc');
-    return sendSuccess(reply, domains.map((d: any) => ({
+    return sendSuccess(reply, domains.map((d: TenantDomainRow) => ({
       id: d.id, domain: d.domain, isPrimary: d.is_primary,
       isVerified: d.is_verified, sslStatus: d.ssl_status,
       verifiedAt: d.verified_at, createdAt: d.created_at
@@ -64,7 +64,7 @@ export async function registerWhiteLabelModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/white-label/domains', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
     const token = Math.random().toString(36).substring(2, 15) + '.' + Math.random().toString(36).substring(2, 15);
     const [d] = await db('tenant_domains').insert({
       tenant_id: tenantId, domain: body.domain, is_primary: body.isPrimary || false,
@@ -74,13 +74,13 @@ export async function registerWhiteLabelModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/white-label/domains/:id/verify', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     await db('tenant_domains').where({ id }).update({ is_verified: true, verified_at: new Date(), ssl_status: 'active', updated_at: new Date() });
     return sendSuccess(reply, null, 'Domain verified');
   });
 
   app.delete('/api/v1/white-label/domains/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    await db('tenant_domains').where({ id: (request.params as any).id }).del();
+    await db('tenant_domains').where({ id: (request.params as { id: string }).id }).del();
     return sendSuccess(reply, null, 'Domain removed');
   });
 

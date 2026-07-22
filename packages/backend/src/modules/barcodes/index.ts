@@ -9,12 +9,12 @@ export async function registerBarcodesModule(app: FastifyInstance) {
   // ── Barcode Templates CRUD ──
   app.get('/api/v1/barcodes/templates', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const { category, isActive } = request.query as any;
+    const { category, isActive } = request.query as { category?: string; isActive?: string };
     let q = db('barcode_templates').where({ tenant_id: tenantId });
     if (category) q = q.andWhere('category', category);
     if (isActive !== undefined) q = q.andWhere('is_active', isActive === 'true');
     const templates = await q.orderBy('name');
-    return sendSuccess(reply, templates.map((t: any) => ({
+    return sendSuccess(reply, templates.map((t: BarcodeTemplateRow) => ({
       id: t.id, name: t.name, code: t.code, category: t.category,
       symbology: t.symbology, fields: t.fields,
       labelTemplate: t.label_template, labelConfig: t.label_config,
@@ -26,7 +26,7 @@ export async function registerBarcodesModule(app: FastifyInstance) {
 
   app.get('/api/v1/barcodes/templates/:code', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const { code } = request.params as any;
+    const { code } = request.params as { code: string };
     const t = await db('barcode_templates').where({ tenant_id: tenantId, code }).first();
     if (!t) return reply.status(404).send({ success: false, error: 'Template not found' });
     return sendSuccess(reply, {
@@ -41,7 +41,7 @@ export async function registerBarcodesModule(app: FastifyInstance) {
   app.post('/api/v1/barcodes/templates', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
-    const body = request.body as any;
+    const body = request.body as Record<string, unknown>;
     const code = body.code || body.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     const [template] = await db('barcode_templates').insert({
       tenant_id: tenantId, name: body.name, code,
@@ -60,9 +60,9 @@ export async function registerBarcodesModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/barcodes/templates/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any;
-    const body = request.body as any;
-    const update: any = { updated_at: new Date() };
+    const { id } = request.params as { id: string };
+    const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.name) update.name = body.name;
     if (body.category) update.category = body.category;
     if (body.symbology) update.symbology = body.symbology;
@@ -78,7 +78,7 @@ export async function registerBarcodesModule(app: FastifyInstance) {
   });
 
   app.delete('/api/v1/barcodes/templates/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     await db('barcode_templates').where({ id }).del();
     return sendSuccess(reply, null, 'Template deleted');
   });
@@ -87,7 +87,7 @@ export async function registerBarcodesModule(app: FastifyInstance) {
   app.post('/api/v1/barcodes/generate', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
-    const body = request.body as any;
+    const body = request.body as Record<string, unknown>;
 
     const template = await db('barcode_templates').where({ tenant_id: tenantId, code: body.templateCode }).first();
     if (!template) return reply.status(404).send({ success: false, error: 'Template not found' });
@@ -123,7 +123,7 @@ export async function registerBarcodesModule(app: FastifyInstance) {
   // ── List generated barcodes ──
   app.get('/api/v1/barcodes/labels', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const { referenceType, referenceId, status, limit } = request.query as any;
+    const { referenceType, referenceId, status, limit } = request.query as { limit?: string; referenceId?: string; referenceType?: string; status?: string };
     let q = db('barcode_labels').where('barcode_labels.tenant_id', tenantId);
     if (referenceType) q = q.andWhere('barcode_labels.reference_type', referenceType);
     if (referenceId) q = q.andWhere('barcode_labels.reference_id', referenceId);
@@ -146,7 +146,7 @@ export async function registerBarcodesModule(app: FastifyInstance) {
   app.post('/api/v1/barcodes/scan', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
-    const body = request.body as any;
+    const body = request.body as Record<string, unknown>;
 
     let labelId = null;
     if (body.barcodeData) {
@@ -176,7 +176,7 @@ export async function registerBarcodesModule(app: FastifyInstance) {
   // ── Scan logs ──
   app.get('/api/v1/barcodes/scan-logs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const { action, status, limit } = request.query as any;
+    const { action, status, limit } = request.query as { action?: string; limit?: string; status?: string };
     let q = db('barcode_scan_logs').where('barcode_scan_logs.tenant_id', tenantId);
     if (action) q = q.andWhere('barcode_scan_logs.action', action);
     if (status) q = q.andWhere('barcode_scan_logs.status', status);
@@ -197,7 +197,7 @@ export async function registerBarcodesModule(app: FastifyInstance) {
 
   // ── Print count increment ──
   app.post('/api/v1/barcodes/labels/:id/print', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     await db('barcode_labels').where({ id }).increment('print_count', 1).update({ printed_at: new Date(), status: 'printed' });
     return sendSuccess(reply, null, 'Print registered');
   });

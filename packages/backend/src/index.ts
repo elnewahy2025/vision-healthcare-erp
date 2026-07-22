@@ -11,7 +11,7 @@ import multipart from '@fastify/multipart';
 
 import websocket from '@fastify/websocket';
 import jwt from '@fastify/jwt';
-import { getEnv, validateProductionEnvironment } from '@healthcare/shared/config';
+import { getEnv, validateProductionEnvironment, validateDevelopmentEnvironment } from '@healthcare/shared/config';
 import { registerAuthModule } from './modules/auth/index.js';
 import { registerPatientModule } from './modules/patient/index.js';
 import { registerAppointmentModule } from './modules/appointment/index.js';

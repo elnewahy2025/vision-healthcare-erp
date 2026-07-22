@@ -91,7 +91,7 @@ export async function registerCommonModule(app: FastifyInstance) {
       )
       .orderBy('users.first_name');
 
-    return sendSuccess(reply, doctors.map((d: any) => ({
+    return sendSuccess(reply, doctors.map((d: RoleRow) => ({
       id: d.id,
       name: `${d.first_name} ${d.last_name}`,
       email: d.email,
@@ -110,7 +110,7 @@ export async function registerCommonModule(app: FastifyInstance) {
       .orderBy('timestamp', 'desc')
       .limit(20);
 
-    return sendSuccess(reply, activities.map((a: any) => ({
+    return sendSuccess(reply, activities.map((a: AuditLogRow) => ({
       id: a.id,
       action: a.action,
       entity: a.entity,

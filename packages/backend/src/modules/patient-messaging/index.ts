@@ -7,7 +7,7 @@ import { authenticate } from '../auth-guard.js';
 export async function registerPatientMessagingModule(app: FastifyInstance) {
   // ── Staff: Send message to patient ──
   app.post('/api/v1/patient-messages/send', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
     const [msg] = await db('patient_messages').insert({
       tenant_id: tenantId, patient_id: body.patientId,
       sender_id: ctx.userId, direction: 'outbound',
@@ -19,7 +19,7 @@ export async function registerPatientMessagingModule(app: FastifyInstance) {
 
   // ── Staff: List messages for a patient ──
   app.get('/api/v1/patient-messages/:patientId', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { patientId } = request.params as any;
+    const tenantId = getTenantId(request); const { patientId } = request.params as { patientId: string };
     const messages = await db('patient_messages').where({ tenant_id: tenantId, patient_id: patientId })
       .leftJoin('users', 'patient_messages.sender_id', 'users.id')
       .select('patient_messages.*', 'users.first_name as sender_first', 'users.last_name as sender_last')
@@ -33,7 +33,7 @@ export async function registerPatientMessagingModule(app: FastifyInstance) {
 
   // ── Staff: Mark as read ──
   app.put('/api/v1/patient-messages/:id/read', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     await db('patient_messages').where({ id }).update({ is_read: true, read_at: new Date() });
     return sendSuccess(reply, null, 'Marked as read');
   });
@@ -51,7 +51,7 @@ export async function registerPatientMessagingModule(app: FastifyInstance) {
       .groupBy('patient_messages.patient_id', 'patients.first_name', 'patients.last_name', 'patients.phone')
       .orderByRaw('max(patient_messages.created_at) desc')
       .limit(50);
-    return sendSuccess(reply, conversations.map((c: any) => ({
+    return sendSuccess(reply, conversations.map((c: PatientRow) => ({
       patientId: c.patient_id, patientName: c.first_name + ' ' + c.last_name,
       patientPhone: c.phone, lastMessageAt: c.last_message_at,
       totalMessages: Number(c.total_messages), unread: Number(c.unread || 0),
@@ -60,14 +60,14 @@ export async function registerPatientMessagingModule(app: FastifyInstance) {
 
   // ── Appointment Reminders ──
   app.get('/api/v1/patient-messages/reminders', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { status } = request.query as any;
+    const tenantId = getTenantId(request); const { status } = request.query as PaginationQuery & { status?: string };
     let q = db('appointment_reminders').where('appointment_reminders.tenant_id', tenantId);
     if (status) q = q.andWhere('status', status);
     const reminders = await q.leftJoin('appointments', 'appointment_reminders.appointment_id', 'appointments.id')
       .leftJoin('patients', 'appointments.patient_id', 'patients.id')
       .select('appointment_reminders.*', 'patients.first_name as pf', 'patients.last_name as pl', 'appointments.appointment_date')
       .orderBy('scheduled_at', 'desc').limit(50);
-    return sendSuccess(reply, reminders.map((r: any) => ({
+    return sendSuccess(reply, reminders.map((r: PatientRow) => ({
       id: r.id, appointmentId: r.appointment_id, patientName: r.pf + ' ' + r.pl,
       appointmentDate: r.appointment_date, channel: r.channel,
       status: r.status, scheduledAt: r.scheduled_at, sentAt: r.sent_at
@@ -75,7 +75,7 @@ export async function registerPatientMessagingModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/patient-messages/reminders', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
     const [rem] = await db('appointment_reminders').insert({
       tenant_id: tenantId, appointment_id: body.appointmentId,
       channel: body.channel || 'sms', scheduled_at: body.scheduledAt || new Date(),

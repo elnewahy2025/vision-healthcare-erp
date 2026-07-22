@@ -16,10 +16,10 @@ export async function registerDmsModule(app: FastifyInstance) {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
 
-    const file = await (request as any).file();
+    const file = await (request as Record<string, unknown>).file();
     if (!file) return reply.code(400).send({ error: 'No file uploaded' });
 
-    const fields = file.fields as any;
+    const fields = file.fields as Record<string, unknown>;
     const title = fields?.title?.value || file.filename;
     const category = fields?.category?.value || 'other';
     const patientId = fields?.patientId?.value || null;
@@ -75,13 +75,13 @@ export async function registerDmsModule(app: FastifyInstance) {
       .orderBy('created_at', 'desc')
       .limit(query.limit).offset((query.page - 1) * query.limit);
 
-    return sendPaginated(reply, docs.map((d: any) => ({
+    return sendPaginated(reply, docs.map((d: DocumentRow) => ({
       id: d.id, title: d.title, category: d.category, fileName: d.file_name,
       fileType: d.file_type, fileSize: d.file_size, mimeType: d.mime_type,
       patientId: d.patient_id, patientName: d.pf ? `${d.pf} ${d.pl}` : null,
       status: d.status, version: d.version, description: d.description,
       uploadedBy: d.uploaded_by, createdAt: d.created_at,
-    })), Number((total as any)?.count || 0), query.page, query.limit);
+    })), Number((total as Record<string, unknown>)?.count || 0), query.page, query.limit);
   });
 
   // ==================== GET SINGLE DOCUMENT ====================
@@ -99,7 +99,7 @@ export async function registerDmsModule(app: FastifyInstance) {
       version: doc.version, patientId: doc.patient_id, uploadedBy: doc.uploaded_by,
       isImage: isImage(doc.mime_type), isPdf: isPdf(doc.mime_type),
       createdAt: doc.created_at, updatedAt: doc.updated_at,
-      versions: versions.map((v: any) => ({ id: v.id, version: v.version, fileName: v.file_name, fileSize: v.file_size, changeNotes: v.change_notes, createdAt: v.created_at })),
+      versions: versions.map((v: DocumentVersionRow) => ({ id: v.id, version: v.version, fileName: v.file_name, fileSize: v.file_size, changeNotes: v.change_notes, createdAt: v.created_at })),
     });
   });
 
@@ -138,7 +138,7 @@ export async function registerDmsModule(app: FastifyInstance) {
   app.put('/api/v1/dms/documents/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const body = z.object({ title: z.string().optional(), category: z.string().optional(), description: z.string().optional().nullable(), status: z.string().optional() }).parse(request.body);
-    const update: any = { updated_at: new Date() };
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.title) update.title = body.title;
     if (body.category) update.category = body.category;
     if (body.description !== undefined) update.description = body.description;
@@ -170,7 +170,7 @@ export async function registerDmsModule(app: FastifyInstance) {
     const tenantId = getTenantId(request);
     const { patientId } = z.object({ patientId: z.string().uuid() }).parse(request.params);
     const docs = await db('documents').where({ tenant_id: tenantId, patient_id: patientId }).whereNull('deleted_at').orderBy('created_at', 'desc');
-    return sendSuccess(reply, docs.map((d: any) => ({
+    return sendSuccess(reply, docs.map((d: DocumentRow) => ({
       id: d.id, title: d.title, category: d.category, fileName: d.file_name,
       fileType: d.file_type, fileSize: d.file_size, mimeType: d.mime_type,
       isImage: isImage(d.mime_type), createdAt: d.created_at,

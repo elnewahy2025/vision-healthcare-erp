@@ -72,7 +72,7 @@ export async function registerMedicalContentModule(app: FastifyInstance) {
     const data = await dbQuery.clone().orderBy('code').limit(query.limit).offset((query.page - 1) * query.limit);
 
     // Merge Arabic translations
-    const enriched = data.map((item: any) => {
+    const enriched = data.map((item: Record<string, unknown>) => {
       const arabic = ICD10_ARABIC[item.code];
       return { ...item, name_ar: arabic?.name_ar || item.name, description_ar: arabic?.description_ar || '', category_ar: arabic?.category_ar || '' };
     });
@@ -92,7 +92,7 @@ export async function registerMedicalContentModule(app: FastifyInstance) {
     });
     const total = await dbQuery.clone().count('id as count').first();
     const data = await dbQuery.clone().orderBy('name').limit(query.limit).offset((query.page - 1) * query.limit);
-    const enriched = data.map((item: any) => {
+    const enriched = data.map((item: Record<string, unknown>) => {
       const arabic = MEDICATIONS_ARABIC[item.name];
       return { ...item, name_ar: arabic?.name_ar || item.name, usage_ar: arabic?.usage_ar || '' };
     });

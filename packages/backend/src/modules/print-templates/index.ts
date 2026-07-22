@@ -6,11 +6,11 @@ import { authenticate } from '../auth-guard.js';
 
 export async function registerPrintTemplatesModule(app: FastifyInstance) {
   app.get('/api/v1/print/templates', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { documentType } = request.query as any;
+    const tenantId = getTenantId(request); const { documentType } = request.query as { documentType?: string };
     let q = db('print_templates').where({ tenant_id: tenantId });
     if (documentType) q = q.andWhere('document_type', documentType);
     const templates = await q.orderBy('name');
-    return sendSuccess(reply, templates.map((t: any) => ({
+    return sendSuccess(reply, templates.map((t: Record<string, unknown>) => ({
       id: t.id, name: t.name, code: t.code, category: t.category,
       documentType: t.document_type, variables: t.variables,
       paperSize: t.paper_size, isDefault: t.is_default, isActive: t.is_active
@@ -18,7 +18,7 @@ export async function registerPrintTemplatesModule(app: FastifyInstance) {
   });
 
   app.get('/api/v1/print/templates/:code', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { code } = request.params as any;
+    const tenantId = getTenantId(request); const { code } = request.params as { code: string };
     const t = await db('print_templates').where({ tenant_id: tenantId, code }).first();
     if (!t) return reply.status(404).send({ success: false, error: 'Template not found' });
     return sendSuccess(reply, {
@@ -30,7 +30,7 @@ export async function registerPrintTemplatesModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/print/templates', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
     const [t] = await db('print_templates').insert({
       tenant_id: tenantId, name: body.name, code: body.code,
       category: body.category || 'clinical', document_type: body.documentType,
@@ -42,8 +42,8 @@ export async function registerPrintTemplatesModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/print/templates/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any; const body = request.body as any;
-    const update: any = { updated_at: new Date() };
+    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.name) update.name = body.name; if (body.contentHtml) update.content_html = body.contentHtml;
     if (body.variables) update.variables = JSON.stringify(body.variables);
     if (body.styles) update.styles = JSON.stringify(body.styles);
@@ -54,12 +54,12 @@ export async function registerPrintTemplatesModule(app: FastifyInstance) {
 
   // Render a document (returns HTML for printing)
   app.get('/api/v1/print/render/:documentType/:referenceId', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { documentType, referenceId } = request.params as any;
+    const tenantId = getTenantId(request); const { documentType, referenceId } = request.params as { documentType: string; referenceId: string };
     const template = await db('print_templates').where({ tenant_id: tenantId, document_type: documentType, is_default: true }).first();
     if (!template) return reply.status(404).send({ success: false, error: 'No default template for this document type' });
 
     // Fetch reference data based on type
-    let data: any = {};
+    const data: Record<string, unknown> = {};
     if (documentType === 'invoice') data = await db('invoices').where({ id: referenceId, tenant_id: tenantId }).first() || {};
     else if (documentType === 'prescription') data = await db('pharmacy_prescriptions').where({ id: referenceId, tenant_id: tenantId }).first() || {};
     else if (documentType === 'lab_report') data = await db('lab_orders').where({ id: referenceId, tenant_id: tenantId }).first() || {};

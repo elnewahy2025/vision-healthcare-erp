@@ -31,7 +31,7 @@ export async function registerSessionManagerModule(app: FastifyInstance) {
     const sessions = await db('user_sessions').where({ tenant_id: tenantId, user_id: ctx.userId, is_active: true })
       .where('expires_at', '>', new Date())
       .orderBy('last_activity_at', 'desc');
-    return sendSuccess(reply, sessions.map((s: any) => ({
+    return sendSuccess(reply, sessions.map((s: UserSessionRow) => ({
       id: s.id, device: s.device, ipAddress: s.ip_address,
       userAgent: s.user_agent?.substring(0, 100),
       location: s.location, lastActivityAt: s.last_activity_at,
@@ -42,7 +42,7 @@ export async function registerSessionManagerModule(app: FastifyInstance) {
 
   // ── Force logout a session ──
   app.post('/api/v1/sessions/:id/logout', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const { id } = request.params as any;
+    const tenantId = getTenantId(request); const ctx = getCtx(request); const { id } = request.params as { id: string };
     const session = await db('user_sessions').where({ id, tenant_id: tenantId, user_id: ctx.userId }).first();
     if (!session) return reply.status(404).send({ success: false, error: 'Session not found' });
     await db('user_sessions').where({ id }).update({ is_active: false });
@@ -65,7 +65,7 @@ export async function registerSessionManagerModule(app: FastifyInstance) {
     const activeSessions = await db('user_sessions').where({ tenant_id: tenantId, user_id: ctx.userId, is_active: true }).count('id as c').first();
     const lastSession = await db('user_sessions').where({ tenant_id: tenantId, user_id: ctx.userId }).orderBy('created_at', 'desc').first();
     return sendSuccess(reply, {
-      activeSessions: Number((activeSessions as any)?.c || 0),
+      activeSessions: Number((activeSessions as Record<string, unknown>)?.c || 0),
       lastLogin: lastSession?.created_at || null,
       lastIp: lastSession?.ip_address || null,
       lastDevice: lastSession?.device || null,

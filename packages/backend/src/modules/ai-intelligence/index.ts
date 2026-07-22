@@ -5,6 +5,7 @@ import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated, sendError } from '../../utils/response.js';
 import { logAudit } from '../../services/audit.js';
 import { authenticate } from '../auth-guard.js';
+import type { DbRow } from '../db-types.js';
 
 // ==================== AI CLINICAL NOTES ====================
 
@@ -66,7 +67,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
     const existing = await db('ai_clinical_notes').where({ id, tenant_id: tenantId }).first();
     if (!existing) return sendError(reply, 'Note not found', 404);
 
-    const updates: any = {};
+    const updates: Record<string, unknown> = {};
     if (body.status) updates.status = body.status;
     if (body.doctorCorrections !== undefined) updates.doctor_corrections = body.doctorCorrections;
     if (body.generatedNote) updates.generated_note = body.generatedNote;
@@ -132,7 +133,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
       .where('appointments.status', 'scheduled')
       .select('appointments.*', 'patients.first_name', 'patients.last_name');
 
-    const predictions = appointments.map((apt: any) => {
+    const predictions = appointments.map((apt: PatientRow) => {
       const risk = predictNoShow(apt);
       return { appointmentId: apt.id, patient: `${apt.first_name} ${apt.last_name}`, time: apt.scheduled_date, riskScore: risk.score, riskLevel: risk.level, factors: risk.factors };
     });
@@ -162,7 +163,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
       .groupByRaw("to_char(created_at, 'YYYY-MM')")
       .orderBy('month', 'desc').limit(12);
 
-    const revenueHistory = historical.map((h: any) => ({ month: h.month, revenue: Number(h.revenue), count: Number(h.invoice_count) }));
+    const revenueHistory = historical.map((h: InvoiceRow) => ({ month: h.month, revenue: Number(h.revenue), count: Number(h.invoice_count) }));
 
     // Simple moving average forecast
     const forecast = generateRevenueForecast(revenueHistory, query.months);
@@ -267,14 +268,14 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
 
 // ==================== HELPER FUNCTIONS ====================
 
-function generateClinicalNoteFromRaw(raw: string, noteType: string, patient: any, allergies: any[], medications: any[], lang: string): string {
+function generateClinicalNoteFromRaw(raw: string, noteType: string, patient: Record<string, unknown>, allergies: Record<string, unknown>[], medications: Record<string, unknown>[], lang: string): string {
   const lines: string[] = [];
   const now = new Date();
 
   lines.push(`CLINICAL NOTE — ${noteType.toUpperCase()}`);
   lines.push(`Date: ${now.toISOString().split('T')[0]}`);
   if (patient) lines.push(`Patient: ${patient.first_name} ${patient.last_name}, Age: ${patient.age || 'Unknown'}, Gender: ${patient.gender || 'Unknown'}`);
-  if (allergies.length) lines.push(`Allergies: ${allergies.map((a: any) => a.allergen).join(', ')}`);
+  if (allergies.length) lines.push(`Allergies: ${allergies.map((a: AiSmartScheduleRow) => a.allergen).join(', ')}`);
   if (medications.length) lines.push(`Current Medications: ${medications.map((m: Record<string, unknown>) => `${m.medication_name} ${m.dosage} ${m.frequency}`).join('; ')}`);
   lines.push('');
   lines.push('--- SUBMITTED NOTES ---');
@@ -285,11 +286,11 @@ function generateClinicalNoteFromRaw(raw: string, noteType: string, patient: any
   lines.push(`HISTORY OF PRESENT ILLNESS: ${raw.substring(0, 200)}...`);
   lines.push(`ASSESSMENT: Based on the clinical presentation, the patient's symptoms warrant further evaluation.`);
   lines.push(`PLAN: Continue monitoring and follow-up as appropriate.`);
-  if (allergies.length) lines.push(`⚠ ALLERGY ALERT: Patient has documented allergies: ${allergies.map((a: any) => `${a.allergen} (${a.severity})`).join(', ')}`);
+  if (allergies.length) lines.push(`⚠ ALLERGY ALERT: Patient has documented allergies: ${allergies.map((a: Record<string, unknown>) => `${a.allergen} (${a.severity})`).join(', ')}`);
   return lines.join('\n');
 }
 
-function extractStructuredData(raw: string): any {
+function extractStructuredData(raw: string): Record<string, unknown> {
   return {
     keywords: raw.split(/\s+/).filter((w: string) => w.length > 3).slice(0, 10),
     wordCount: raw.split(/\s+/).length,
@@ -302,8 +303,8 @@ function generateBriefSummary(note: string, noteType: string): string {
   return `[${noteType.toUpperCase()}] Clinical note generated from raw input. ${note.split('\n').length} lines, auto-generated assessment included.`;
 }
 
-function generateDiagnosisSuggestions(symptoms: string, age: number | undefined, gender: string | undefined, history: string | undefined, allergies: any[], encounters: any[]): any[] {
-  const suggestions: any[] = [];
+function generateDiagnosisSuggestions(symptoms: string, age: number | undefined, gender: string | undefined, history: string | undefined, allergies: Record<string, unknown>[], encounters: Record<string, unknown>[]): Record<string, unknown> {
+  const suggestions: unknown[] = [];
   const symLower = symptoms.toLowerCase();
 
   const diagnosisMap: Array<{ keywords: string[]; label: string; icd10: string; description: string }> = [
@@ -350,10 +351,10 @@ function generateDiagnosisSuggestions(symptoms: string, age: number | undefined,
     });
   }
 
-  return suggestions.sort((a: any, b: any) => b.confidence - a.confidence);
+  return suggestions.sort((a: Record<string, unknown>, b: Record<string, unknown>) => b.confidence - a.confidence);
 }
 
-function predictNoShow(apt: any): { score: number; level: string; factors: string[] } {
+function predictNoShow(apt: Record<string, unknown>): { score: number; level: string; factors: string[] } {
   const factors: string[] = [];
   let score = 0.2; // base risk
 
@@ -377,9 +378,9 @@ function predictNoShow(apt: any): { score: number; level: string; factors: strin
   return { score: Number(score.toFixed(2)), level, factors };
 }
 
-function generateRevenueForecast(history: any[], months: number): any[] {
+function generateRevenueForecast(history: Record<string, unknown>[], months: number): Record<string, unknown> {
   if (history.length === 0) return [];
-  const avgRevenue = history.reduce((a: number, h: any) => a + h.revenue, 0) / history.length;
+  const avgRevenue = history.reduce((a: number, h: Record<string, unknown>) => a + (h.revenue as number), 0) / history.length;
   const trend = history.length > 1 ? (history[0].revenue - history[history.length - 1].revenue) / history.length : 0;
 
   const forecast = [];
@@ -394,8 +395,8 @@ function generateRevenueForecast(history: any[], months: number): any[] {
   return forecast;
 }
 
-function assessPatientRisks(patient: any, visits: number, allergies: number, medications: number, lastVisit: any): any[] {
-  const risks: any[] = [];
+function assessPatientRisks(patient: Record<string, unknown>, visits: number, allergies: number, medications: number, lastVisit: Record<string, unknown> | null): Record<string, unknown>[] {
+  const risks: unknown[] = [];
   const daysSinceLastVisit = lastVisit ? Math.floor((Date.now() - new Date(lastVisit.scheduled_date).getTime()) / 86400000) : 365;
 
   // Readmission risk
@@ -425,17 +426,17 @@ function assessPatientRisks(patient: any, visits: number, allergies: number, med
   return risks;
 }
 
-function optimizeSchedule(doctors: any[], existingAppointments: any[], date: string): any[] {
-  const slots: any[] = [];
+function optimizeSchedule(doctors: Record<string, unknown>[], existingAppointments: Record<string, unknown>[], date: string): Record<string, unknown> {
+  const slots: unknown[] = [];
   const workStart = 9; // 9 AM
   const workEnd = 17; // 5 PM
 
   for (const doctor of doctors) {
-    const doctorAppts = existingAppointments.filter((a: any) => a.doctor_id === doctor.id);
+    const doctorAppts = existingAppointments.filter((a: Record<string, unknown>) => a.doctor_id === doctor.id);
     const bookedHours = doctorAppts.length * 0.5; // 30min per appointment
 
     for (let hour = workStart; hour < workEnd; hour++) {
-      const isBooked = doctorAppts.some((a: any) => {
+      const isBooked = doctorAppts.some((a: Record<string, unknown>) => {
         const aptHour = new Date(a.scheduled_date).getHours();
         return aptHour === hour;
       });
@@ -452,12 +453,12 @@ function optimizeSchedule(doctors: any[], existingAppointments: any[], date: str
   return slots;
 }
 
-function calculateUtilization(slots: any[]): number {
-  const booked = slots.filter((s: any) => s.priority === 'booked').length;
+function calculateUtilization(slots: DbRow[]): number {
+  const booked = slots.filter((s: Record<string, unknown>) => s.priority === 'booked').length;
   return slots.length > 0 ? Number(((booked / slots.length) * 100).toFixed(1)) : 0;
 }
 
-function estimateDayRevenue(slots: any[]): number {
-  const booked = slots.filter((s: any) => s.priority === 'booked').length;
+function estimateDayRevenue(slots: DbRow[]): number {
+  const booked = slots.filter((s: Record<string, unknown>) => s.priority === 'booked').length;
   return booked * 500; // Estimated 500 EGP per consultation
 }

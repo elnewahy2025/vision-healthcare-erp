@@ -7,7 +7,7 @@ import { authenticate } from '../auth-guard.js';
 export async function registerOnlineBookingModule(app: FastifyInstance) {
   // ── Public: Get available slots (no auth) ──
   app.get('/api/v1/booking/slots', async (request, reply) => {
-    const { doctorId, date, tenantSlug } = request.query as any;
+    const { doctorId, date, tenantSlug } = request.query as { date?: string; doctorId?: string; tenantSlug?: string };
     if (!tenantSlug) return reply.status(400).send({ success: false, error: 'Tenant slug required' });
     const tenant = await db('tenants').where({ slug: tenantSlug, status: 'active' }).first();
     if (!tenant) return reply.status(404).send({ success: false, error: 'Organization not found' });
@@ -18,7 +18,7 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
     else q = q.andWhere('date', '>=', new Date().toISOString().split('T')[0]);
 
     const slots = await q.orderBy('date').orderBy('start_time').limit(100);
-    return sendSuccess(reply, slots.map((s: any) => ({
+    return sendSuccess(reply, slots.map((s: BookingSlotRow) => ({
       id: s.id, doctorId: s.doctor_id, branchId: s.branch_id,
       date: s.date, startTime: s.start_time, endTime: s.end_time,
       slotType: s.slot_type,
@@ -27,7 +27,7 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
 
   // ── Public: Get doctors for booking (no auth) ──
   app.get('/api/v1/booking/doctors', async (request, reply) => {
-    const { tenantSlug } = request.query as any;
+    const { tenantSlug } = request.query as { tenantSlug?: string };
     if (!tenantSlug) return reply.status(400).send({ success: false, error: 'Tenant slug required' });
     const tenant = await db('tenants').where({ slug: tenantSlug, status: 'active' }).first();
     if (!tenant) return reply.status(404).send({ success: false, error: 'Organization not found' });
@@ -36,14 +36,14 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
       .where('users.tenant_id', tenant.id).where('users.status', 'active')
       .where('roles.slug', 'doctor')
       .select('users.id', 'users.first_name', 'users.last_name', 'users.email');
-    return sendSuccess(reply, doctors.map((d: any) => ({
+    return sendSuccess(reply, doctors.map((d: UserRow) => ({
       id: d.id, name: d.first_name + ' ' + d.last_name, email: d.email,
     })));
   });
 
   // ── Public: Submit booking request (no auth) ──
   app.post('/api/v1/booking/request', async (request, reply) => {
-    const { slotId, patientName, patientPhone, patientEmail, reason, tenantSlug } = request.body as any;
+    const { slotId, patientName, patientPhone, patientEmail, reason, tenantSlug } = request.body as Record<string, unknown>;
     if (!slotId || !patientName || !patientPhone || !tenantSlug) {
       return reply.status(400).send({ success: false, error: 'Missing required fields' });
     }
@@ -74,7 +74,7 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
 
   // ── Authenticated: Manage booking slots ──
   app.get('/api/v1/booking/manage/slots', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { date, doctorId } = request.query as any;
+    const tenantId = getTenantId(request); const { date, doctorId } = request.query as { date?: string; doctorId?: string };
     let q = db('booking_slots').where('booking_slots.tenant_id', tenantId);
     if (date) q = q.andWhere('date', date);
     if (doctorId) q = q.andWhere('doctor_id', doctorId);
@@ -83,7 +83,7 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/booking/manage/slots', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
     // Bulk create slots for a date range
     const { doctorId, date, startTime, endTime, intervalMinutes, branchId } = body;
     const slots = [];
@@ -112,7 +112,7 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
 
   // ── Authenticated: View booking requests ──
   app.get('/api/v1/booking/manage/requests', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { status } = request.query as any;
+    const tenantId = getTenantId(request); const { status } = request.query as PaginationQuery & { status?: string };
     let q = db('booking_requests').where('booking_requests.tenant_id', tenantId);
     if (status) q = q.andWhere('status', status);
     const requests = await q.leftJoin('booking_slots', 'booking_requests.slot_id', 'booking_slots.id')
@@ -120,7 +120,7 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
       .select('booking_requests.*', 'booking_slots.date as slot_date', 'booking_slots.start_time', 'booking_slots.end_time',
         'users.first_name as doc_first', 'users.last_name as doc_last')
       .orderBy('created_at', 'desc').limit(50);
-    return sendSuccess(reply, requests.map((r: any) => ({
+    return sendSuccess(reply, requests.map((r: BookingRequestRow) => ({
       id: r.id, patientName: r.patient_name, patientPhone: r.patient_phone,
       patientEmail: r.patient_email, reason: r.reason, status: r.status,
       source: r.source, slotDate: r.slot_date, slotTime: r.start_time,
@@ -130,8 +130,8 @@ export async function registerOnlineBookingModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/booking/manage/requests/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any; const ctx = getCtx(request); const body = request.body as any;
-    const update: any = { updated_at: new Date() };
+    const { id } = request.params as { id: string }; const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.status) update.status = body.status;
     if (body.status === 'confirmed') {
       update.confirmed_by = ctx.userId;

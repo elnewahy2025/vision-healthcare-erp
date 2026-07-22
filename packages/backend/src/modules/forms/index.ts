@@ -7,7 +7,7 @@ import { authenticate } from '../auth-guard.js';
 export async function registerFormsModule(app: FastifyInstance) {
   // Form Definitions
   app.get('/api/v1/forms/definitions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { category, isActive } = request.query as any;
+    const tenantId = getTenantId(request); const { category, isActive } = request.query as { category?: string; isActive?: string };
     let q = db('form_definitions').where('form_definitions.tenant_id', tenantId);
     if (category) q = q.andWhere('category', category);
     if (isActive !== undefined) q = q.andWhere('is_active', isActive === 'true');
@@ -21,7 +21,7 @@ export async function registerFormsModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/forms/definitions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
     const slug = body.slug || body.name.toLowerCase().replace(/\s+/g, '_');
     const [def] = await db('form_definitions').insert({
       tenant_id: tenantId, name: body.name, slug, category: body.category || 'general',
@@ -33,8 +33,8 @@ export async function registerFormsModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/forms/definitions/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any; const body = request.body as any;
-    const update: any = { updated_at: new Date() };
+    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.name) update.name = body.name;
     if (body.category) update.category = body.category;
     if (body.schema) update.schema = JSON.stringify(body.schema);
@@ -46,7 +46,7 @@ export async function registerFormsModule(app: FastifyInstance) {
   });
 
   app.get('/api/v1/forms/definitions/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { id } = request.params as any;
+    const tenantId = getTenantId(request); const { id } = request.params as { id: string };
     const def = await db('form_definitions').where({ id, tenant_id: tenantId }).first();
     if (!def) return reply.status(404).send({ success: false, error: 'Form definition not found' });
     return sendSuccess(reply, {
@@ -59,7 +59,7 @@ export async function registerFormsModule(app: FastifyInstance) {
 
   // Form Submissions
   app.get('/api/v1/forms/submissions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { formId, patientId } = request.query as any;
+    const tenantId = getTenantId(request); const { formId, patientId } = request.query as { formId?: string; patientId?: string };
     let q = db('form_submissions').where('form_submissions.tenant_id', tenantId);
     if (formId) q = q.andWhere('form_id', formId);
     if (patientId) q = q.andWhere('form_submissions.patient_id', patientId);
@@ -67,7 +67,7 @@ export async function registerFormsModule(app: FastifyInstance) {
       .leftJoin('patients', 'form_submissions.patient_id', 'patients.id')
       .select('form_submissions.*', 'form_definitions.name as form_name', 'patients.first_name as pf', 'patients.last_name as pl')
       .orderBy('created_at', 'desc').limit(50);
-    return sendSuccess(reply, subs.map((s: any) => ({
+    return sendSuccess(reply, subs.map((s: FormSubmissionRow) => ({
       id: s.id, formId: s.form_id, formName: s.form_name,
       patientId: s.patient_id, patientName: s.pf ? s.pf + ' ' + s.pl : null,
       data: s.data, status: s.status, submittedBy: s.submitted_by,
@@ -76,7 +76,7 @@ export async function registerFormsModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/forms/submissions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
     const [sub] = await db('form_submissions').insert({
       tenant_id: tenantId, form_id: body.formId, patient_id: body.patientId || null,
       appointment_id: body.appointmentId || null, data: JSON.stringify(body.data),

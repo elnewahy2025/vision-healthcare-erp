@@ -9,7 +9,7 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
   app.get('/api/v1/lab/catalog', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const catalog = await db('lab_catalog').where({ tenant_id: tenantId, is_active: true }).orderBy('test_name');
-    return sendSuccess(reply, catalog.map((c: any) => ({
+    return sendSuccess(reply, catalog.map((c: LabCatalogRow) => ({
       id: c.id, testCode: c.test_code, testName: c.test_name,
       category: c.category, specimenType: c.specimen_type,
       referenceRange: c.reference_range, unit: c.unit, price: Number(c.price),
@@ -18,7 +18,7 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
 
   app.post('/api/v1/lab/catalog', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const body = request.body as any;
+    const body = request.body as Record<string, unknown>;
     const [item] = await db('lab_catalog').insert({
       tenant_id: tenantId, test_code: body.testCode, test_name: body.testName,
       category: body.category, specimen_type: body.specimenType,
@@ -29,7 +29,7 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
 
   app.get('/api/v1/lab/orders', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const { status, patientId } = request.query as any;
+    const { status, patientId } = request.query as { patientId?: string; status?: string };
     let q = db('lab_orders').where('lab_orders.tenant_id', tenantId).whereNull('lab_orders.deleted_at');
     if (status) q = q.andWhere('lab_orders.status', status);
     if (patientId) q = q.andWhere('lab_orders.patient_id', patientId);
@@ -42,7 +42,7 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
   app.post('/api/v1/lab/orders', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
-    const body = request.body as any;
+    const body = request.body as Record<string, unknown>;
     const patient = await db('patients').where({ id: body.patientId, tenant_id: tenantId }).first();
     if (!patient) throw new PatientNotFoundError(body.patientId);
     const orderNum = "LAB-" + Date.now().toString(36).toUpperCase();
@@ -53,7 +53,7 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
       clinical_notes: body.clinicalNotes, created_by: ctx.userId,
     }).returning('*');
     if (body.tests?.length) {
-      const testRows = body.tests.map((t: any) => ({
+      const testRows = body.tests.map((t: LabOrderRow) => ({
         order_id: order.id, test_code: t.testCode || t.code, test_name: t.testName || t.name,
         specimen_type: t.specimenType, reference_range: t.referenceRange, result_unit: t.unit,
       }));
@@ -63,9 +63,9 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/lab/orders/:id/status', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any;
-    const body = request.body as any;
-    const update: any = { status: body.status, updated_at: new Date() };
+    const { id } = request.params as { id: string };
+    const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { status: body.status, updated_at: new Date() };
     if (body.status === "collected") update.collected_at = new Date();
     if (body.status === "completed") update.completed_at = new Date();
     if (body.resultsSummary) update.results_summary = body.resultsSummary;
@@ -74,8 +74,8 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/lab/orders/:id/results', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any;
-    const { tests } = request.body as any;
+    const { id } = request.params as { id: string };
+    const { tests } = request.body as Record<string, unknown>;
     if (tests?.length) {
       for (const t of tests) {
         await db('lab_tests').where({ id: t.id }).update({ result_value: t.resultValue, status: t.status || 'completed', notes: t.notes });
@@ -86,7 +86,7 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
   });
 }
 
-function mapLabOrder(o: any) { return {
+function mapLabOrder(o: LabOrderRow) { return {
   id: o.id, orderNumber: o.order_number, patientId: o.patient_id,
   patientName: o.p_first + " " + o.p_last, patientMrn: o.medical_record_number,
   doctorId: o.doctor_id, status: o.status, priority: o.priority,

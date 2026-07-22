@@ -14,7 +14,7 @@ export async function registerClinicalModule(app: FastifyInstance) {
     if (q.q) { const s = `%${q.q}%`; qb.where(function() { this.where('code', 'ilike', s).orWhere('description', 'ilike', s).orWhere('full_description', 'ilike', s); }); }
     const total = await qb.clone().count('id as count').first();
     const codes = await qb.orderBy('code').limit(q.limit).offset((q.page - 1) * q.limit);
-    return sendPaginated(reply, codes.map((c: any) => ({ id: c.id, code: c.code, description: c.description, fullDescription: c.full_description, isChronic: c.is_chronic })), Number((total as any)?.count || 0), q.page, q.limit);
+    return sendPaginated(reply, codes.map((c: Record<string, unknown>) => ({ id: c.id, code: c.code, description: c.description, fullDescription: c.full_description, isChronic: c.is_chronic })), Number((total as Record<string, unknown>)?.count || 0), q.page, q.limit);
   });
 
   app.get('/api/v1/medications/search', async (request, reply) => {
@@ -28,13 +28,13 @@ export async function registerClinicalModule(app: FastifyInstance) {
 
   app.get('/api/v1/medications/categories', async (request, reply) => {
     const cats = await db('medication_database').where('status', 'active').distinct('category').orderBy('category');
-    return sendSuccess(reply, cats.map((c: any) => c.category));
+    return sendSuccess(reply, cats.map((c: Record<string, unknown>) => c.category));
   });
 
   app.get('/api/v1/patients/:patientId/allergies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { patientId } = z.object({ patientId: z.string().uuid() }).parse(request.params);
     const allergies = await db('patient_allergies').where({ patient_id: patientId }).orderBy('created_at', 'desc');
-    return sendSuccess(reply, allergies.map((a: any) => ({ id: a.id, allergen: a.allergen, severity: a.severity, reaction: a.reaction, notes: a.notes, createdAt: a.created_at })));
+    return sendSuccess(reply, allergies.map((a: PatientAllergyRow) => ({ id: a.id, allergen: a.allergen, severity: a.severity, reaction: a.reaction, notes: a.notes, createdAt: a.created_at })));
   });
 
   app.post('/api/v1/patients/:patientId/allergies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
@@ -57,7 +57,7 @@ export async function registerClinicalModule(app: FastifyInstance) {
     const { medication } = z.object({ medication: z.string().optional() }).parse(request.query);
     const allergies = await db('patient_allergies').where({ patient_id: patientId }).select('allergen', 'severity', 'reaction');
     if (!medication) return sendSuccess(reply, { allergies, alerts: [] });
-    const alerts: any[] = [];
+    const alerts: unknown[] = [];
     for (const allergy of allergies) {
       const ml = medication.toLowerCase(); const al = allergy.allergen.toLowerCase();
       if (ml.includes(al) || al.includes(ml)) alerts.push({ allergen: allergy.allergen, severity: allergy.severity, reaction: allergy.reaction, message: `Patient has ${allergy.severity} allergy to "${allergy.allergen}"` });
@@ -77,7 +77,7 @@ export async function registerClinicalModule(app: FastifyInstance) {
       db('documents').where({ patient_id: patientId, tenant_id: tenantId }).whereNull('deleted_at').select(db.raw("'document' as type"), 'id', 'created_at as date', 'title', 'category'),
       db('patient_allergies').where({ patient_id: patientId }).select(db.raw("'allergy' as type"), 'id', 'created_at as date', 'allergen as title', 'severity'),
     ]);
-    const timeline = [...emr, ...appts, ...invs, ...docs, ...allergies].map((e: any) => ({ ...e, date: e.date })).filter((e: any) => e.date).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const timeline = [...emr, ...appts, ...invs, ...docs, ...allergies].map((e: Record<string, unknown>) => ({ ...e, date: e.date })).filter((e: Record<string, unknown>) => e.date).sort((a: Record<string, unknown>, b: Record<string, unknown>) => new Date(b.date).getTime() - new Date(a.date).getTime());
     return sendSuccess(reply, timeline);
   });
 }

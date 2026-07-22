@@ -33,7 +33,7 @@ export async function registerBulkImportModule(app: FastifyInstance) {
 
   // ── Start import job ──
   app.post('/api/v1/import/start', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
     const { module, rows, columnMapping } = body;
 
     if (!module || !rows || !Array.isArray(rows) || rows.length === 0) {
@@ -52,12 +52,12 @@ export async function registerBulkImportModule(app: FastifyInstance) {
 
     let successful = 0;
     let failed = 0;
-    const errors: any[] = [];
+    const errors: unknown[] = [];
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       try {
-        const insertData: any = { tenant_id: tenantId };
+        const insertData: Record<string, unknown> = { tenant_id: tenantId };
         for (const col of modConfig.columns) {
           if (row[col] !== undefined && row[col] !== null && row[col] !== '') {
             insertData[col] = row[col];
@@ -70,7 +70,7 @@ export async function registerBulkImportModule(app: FastifyInstance) {
 
         await db(modConfig.table).insert(insertData);
         successful++;
-      } catch (err: any) {
+      } catch (err: unknown) {
         failed++;
         errors.push({ row: i + 1, error: err.message });
       }
@@ -91,12 +91,12 @@ export async function registerBulkImportModule(app: FastifyInstance) {
 
   // ── Import job history ──
   app.get('/api/v1/import/jobs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { status, module } = request.query as any;
+    const tenantId = getTenantId(request); const { status, module } = request.query as { module?: string; status?: string };
     let q = db('import_jobs').where('import_jobs.tenant_id', tenantId);
     if (status) q = q.andWhere('status', status);
     if (module) q = q.andWhere('module', module);
     const jobs = await q.orderBy('created_at', 'desc').limit(50);
-    return sendSuccess(reply, jobs.map((j: any) => ({
+    return sendSuccess(reply, jobs.map((j: ImportJobRow) => ({
       id: j.id, module: j.module, fileName: j.file_name, format: j.format,
       status: j.status, totalRows: j.total_rows, successfulRows: j.successful_rows,
       failedRows: j.failed_rows, errors: j.errors?.slice(0, 5),
@@ -106,7 +106,7 @@ export async function registerBulkImportModule(app: FastifyInstance) {
 
   // ── Import template (column list for each module) ──
   app.get('/api/v1/import/template/:module', async (request, reply) => {
-    const { module } = request.params as any;
+    const { module } = request.params as { module: string };
     const config = IMPORT_MODULES[module];
     if (!config) return reply.status(404).send({ success: false, error: `Unknown module: ${module}` });
     return sendSuccess(reply, {

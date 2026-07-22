@@ -5,9 +5,9 @@ import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated, sendError } from '../../utils/response.js';
 import { authenticate } from '../auth-guard.js';
 
-let queueWsClients = new Set<any>();
+let queueWsClients = new Set<Record<string, unknown>>();
 
-function broadcastQueueUpdate(data: any): void {
+function broadcastQueueUpdate(data: Record<string, unknown>): void {
   const msg = JSON.stringify(data);
   for (const client of queueWsClients) {
     try { client.send(msg); } catch { queueWsClients.delete(client); }
@@ -70,7 +70,7 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
   app.put('/api/v1/kiosk/checkins/:id/status', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const body = z.object({ status: z.enum(['checked_in', 'waiting', 'in_progress', 'completed', 'no_show', 'called']) }).parse(request.body);
-    const updates: any = { status: body.status };
+    const updates: Record<string, unknown> = { status: body.status };
     if (body.status === 'in_progress' || body.status === 'called') updates.called_at = db.fn.now();
     if (body.status === 'completed') updates.completed_at = db.fn.now();
     await db('kiosk_checkins').where({ id }).update(updates);
@@ -81,7 +81,7 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
   // ==================== QUEUE DISPLAY ====================
 
   app.get('/api/v1/queue/display/:branchId?', async (request, reply) => {
-    const { branchId } = request.params as any;
+    const { branchId } = request.params as { branchId: string };
     const query = z.object({ tenantSlug: z.string() }).parse(request.query);
     const tenant = await db('tenants').where({ slug: query.tenantSlug }).first();
     if (!tenant) return sendError(reply, 'Tenant not found', 404);
@@ -121,7 +121,7 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
   app.post('/api/v1/surveys/:surveyId/respond', async (request, reply) => {
     const { surveyId } = z.object({ surveyId: z.string().uuid() }).parse(request.params);
     const body = z.object({
-      tenantSlug: z.string(), responses: z.record(z.any()),
+      tenantSlug: z.string(), responses: z.record(z.unknown()),
       patientId: z.string().uuid().optional(), patientComment: z.string().optional(),
     }).parse(request.body);
     const tenant = await db('tenants').where({ slug: body.tenantSlug }).first();
@@ -159,13 +159,13 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
     const bySurvey = await db('survey_responses').join('surveys', 'survey_responses.survey_id', 'surveys.id').where('survey_responses.tenant_id', tenantId)
       .select('surveys.name', 'surveys.type').count('survey_responses.id as count').avg('survey_responses.overall_score as avg_score').groupBy('surveys.name', 'surveys.type');
     const todayCount = await db('survey_responses').where({ tenant_id: tenantId }).whereRaw("DATE(created_at) = CURRENT_DATE").count('id as count').first();
-    return sendSuccess(reply, { totalResponses: Number(totalResponses?.count || 0), averageScore: Number((avgScore as any)?.avg || 0).toFixed(1), bySurvey, todayCount: Number(todayCount?.count || 0) });
+    return sendSuccess(reply, { totalResponses: Number(totalResponses?.count || 0), averageScore: Number((avgScore as Record<string, unknown>)?.avg || 0).toFixed(1), bySurvey, todayCount: Number(todayCount?.count || 0) });
   });
 
   // ==================== QUEUE WEBSOCKET ====================
 
-  if ((app as any).websocket) {
-    (app as any).websocket('/api/v1/queue/ws', { options: { maxPayload: 65536 } }, async (socket: any, req: any) => {
+  if ((app as Record<string, unknown>).websocket) {
+    (app as Record<string, unknown>).websocket('/api/v1/queue/ws', { options: { maxPayload: 65536 } }, async (socket: Record<string, unknown>, req: Record<string, unknown>) => {
       queueWsClients.add(socket);
       const url = new URL(req.url, 'http://localhost');
       const slug = url.searchParams.get('tenant');

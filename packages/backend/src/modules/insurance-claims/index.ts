@@ -11,7 +11,7 @@ export async function registerInsuranceClaimsModule(app: FastifyInstance) {
   app.get('/api/v1/insurance-companies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const companies = await db('insurance_companies').where({ tenant_id: tenantId, is_active: true }).orderBy('name');
-    return sendSuccess(reply, companies.map((c: any) => ({
+    return sendSuccess(reply, companies.map((c: InsuranceCompanyRow) => ({
       id: c.id, name: c.name, code: c.code, contractType: c.contract_type,
       discountRate: Number(c.discount_rate), coveragePlans: c.coverage_plans,
     })));
@@ -40,14 +40,14 @@ export async function registerInsuranceClaimsModule(app: FastifyInstance) {
     if (query.patientId) qb.andWhere('insurance_claims.patient_id', query.patientId);
     const total = await qb.clone().count('insurance_claims.id as count').first();
     const claims = await qb.select('insurance_claims.*', 'patients.first_name as pf', 'patients.last_name as pl', 'patients.medical_record_number as mrn', 'insurance_companies.name as cname', 'invoices.invoice_number', 'invoices.total as inv_total').orderBy('insurance_claims.created_at', 'desc').limit(query.limit).offset((query.page - 1) * query.limit);
-    return sendPaginated(reply, claims.map((c: any) => ({ id: c.id, claimNumber: c.claim_number, status: c.status, patientName: c.pf ? `${c.pf} ${c.pl}` : null, patientMrn: c.mrn, companyName: c.cname, invoiceNumber: c.invoice_number, claimedAmount: Number(c.claimed_amount), approvedAmount: Number(c.approved_amount), paidAmount: Number(c.paid_amount), submissionDate: c.submission_date, responseDate: c.response_date, denialReason: c.denial_reason, notes: c.notes, createdAt: c.created_at })), Number((total as any)?.count || 0), query.page, query.limit);
+    return sendPaginated(reply, claims.map((c: InsuranceClaimRow) => ({ id: c.id, claimNumber: c.claim_number, status: c.status, patientName: c.pf ? `${c.pf} ${c.pl}` : null, patientMrn: c.mrn, companyName: c.cname, invoiceNumber: c.invoice_number, claimedAmount: Number(c.claimed_amount), approvedAmount: Number(c.approved_amount), paidAmount: Number(c.paid_amount), submissionDate: c.submission_date, responseDate: c.response_date, denialReason: c.denial_reason, notes: c.notes, createdAt: c.created_at })), Number((total as Record<string, unknown>)?.count || 0), query.page, query.limit);
   });
 
   app.post('/api/v1/insurance-claims', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request);
     const body = z.object({ patientId: z.string().uuid(), invoiceId: z.string().uuid(), insuranceId: z.string().uuid(), claimedAmount: z.number().positive(), notes: z.string().optional() }).parse(request.body);
     const count = await db('insurance_claims').where({ tenant_id: tenantId }).count('id as c').first();
-    const claimNumber = `CLM-${new Date().getFullYear()}-${String(Number((count as any)?.c || 0) + 1).padStart(5, '0')}`;
+    const claimNumber = `CLM-${new Date().getFullYear()}-${String(Number((count as Record<string, unknown>)?.c || 0) + 1).padStart(5, '0')}`;
     const [claim] = await db('insurance_claims').insert({ tenant_id: tenantId, patient_id: body.patientId, invoice_id: body.invoiceId, insurance_id: body.insuranceId, claim_number: claimNumber, status: 'draft', claimed_amount: body.claimedAmount, notes: body.notes, created_by: ctx.userId }).returning('*');
     await db('invoices').where({ id: body.invoiceId }).update({ insurance_claim: claimNumber });
     await logAudit({ tenantId, userId: ctx.userId, action: 'claim.create', entityType: 'insurance_claim', entityId: claim.id });
@@ -66,7 +66,7 @@ export async function registerInsuranceClaimsModule(app: FastifyInstance) {
   app.patch('/api/v1/insurance-claims/:id/status', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const { status, approvedAmount, paidAmount, denialReason } = z.object({ status: z.enum(['acknowledged', 'in_review', 'approved', 'denied', 'paid']), approvedAmount: z.number().optional(), paidAmount: z.number().optional(), denialReason: z.string().optional() }).parse(request.body);
-    const update: any = { status, updated_at: new Date() };
+    const update: Record<string, unknown> = { status, updated_at: new Date() };
     if (approvedAmount !== undefined) update.approved_amount = approvedAmount;
     if (paidAmount !== undefined) update.paid_amount = paidAmount;
     if (denialReason) update.denial_reason = denialReason;

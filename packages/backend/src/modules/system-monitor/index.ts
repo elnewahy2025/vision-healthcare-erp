@@ -42,7 +42,7 @@ export async function registerSystemMonitorModule(app: FastifyInstance) {
 
   // ── System Metrics (record from tenant) ──
   app.post('/api/v1/system/metrics', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
     await db('system_metrics').insert({
       tenant_id: tenantId, metric: body.metric, value: body.value || 0,
       labels: JSON.stringify(body.labels || {})
@@ -51,7 +51,7 @@ export async function registerSystemMonitorModule(app: FastifyInstance) {
   });
 
   app.get('/api/v1/system/metrics', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { metric, hours } = request.query as any;
+    const tenantId = getTenantId(request); const { metric, hours } = request.query as { hours?: string; metric?: string };
     const since = new Date(Date.now() - (Number(hours) || 24) * 3600000);
     let q = db('system_metrics').where({ tenant_id: tenantId }).where('recorded_at', '>=', since);
     if (metric) q = q.andWhere('metric', metric);
@@ -64,7 +64,7 @@ export async function registerSystemMonitorModule(app: FastifyInstance) {
 
   // ── Performance overview (recorded metrics) ──
   app.get('/api/v1/system/performance', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { hours } = request.query as any;
+    const tenantId = getTenantId(request); const { hours } = request.query as { hours?: string };
     const since = new Date(Date.now() - (Number(hours) || 24) * 3600000);
 
     const apiLatency = await db('system_metrics').where({ tenant_id: tenantId, metric: 'api_latency_ms' })
@@ -77,22 +77,22 @@ export async function registerSystemMonitorModule(app: FastifyInstance) {
       .where('recorded_at', '>=', since).avg('value as avg').first();
 
     return sendSuccess(reply, {
-      apiLatency: { avg: Number((apiLatency as any)?.avg || 0).toFixed(2), max: Number((apiLatency as any)?.max || 0).toFixed(2) },
-      requestCount: Number((requestCount as any)?.total || 0),
-      errorRate: Number((errorRate as any)?.total || 0),
-      dbLatency: { avg: Number((dbLatency as any)?.avg || 0).toFixed(2) },
+      apiLatency: { avg: Number((apiLatency as Record<string, unknown>)?.avg || 0).toFixed(2), max: Number((apiLatency as Record<string, unknown>)?.max || 0).toFixed(2) },
+      requestCount: Number((requestCount as Record<string, unknown>)?.total || 0),
+      errorRate: Number((errorRate as Record<string, unknown>)?.total || 0),
+      dbLatency: { avg: Number((dbLatency as Record<string, unknown>)?.avg || 0).toFixed(2) },
       period: `${hours}h`,
     });
   });
 
   // ── Alerts ──
   app.get('/api/v1/system/alerts', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { severity, acknowledged } = request.query as any;
+    const tenantId = getTenantId(request); const { severity, acknowledged } = request.query as { acknowledged?: string; severity?: string };
     let q = db('system_alerts').where('system_alerts.tenant_id', tenantId);
     if (severity) q = q.andWhere('severity', severity);
     if (acknowledged === 'false') q = q.andWhere('is_acknowledged', false);
     const alerts = await q.orderBy('created_at', 'desc').limit(50);
-    return sendSuccess(reply, alerts.map((a: any) => ({
+    return sendSuccess(reply, alerts.map((a: SystemAlertRow) => ({
       id: a.id, severity: a.severity, source: a.source, message: a.message,
       metadata: a.metadata, isAcknowledged: a.is_acknowledged,
       acknowledgedAt: a.acknowledged_at, acknowledgedBy: a.acknowledged_by, createdAt: a.created_at
@@ -100,7 +100,7 @@ export async function registerSystemMonitorModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/system/alerts', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
     const [alert] = await db('system_alerts').insert({
       tenant_id: tenantId, severity: body.severity || 'info',
       source: body.source, message: body.message,
@@ -110,7 +110,7 @@ export async function registerSystemMonitorModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/system/alerts/:id/acknowledge', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any; const ctx = getCtx(request);
+    const { id } = request.params as { id: string }; const ctx = getCtx(request);
     await db('system_alerts').where({ id }).update({
       is_acknowledged: true, acknowledged_at: new Date(), acknowledged_by: ctx.userId
     });
@@ -121,11 +121,11 @@ export async function registerSystemMonitorModule(app: FastifyInstance) {
   app.get('/api/v1/system/storage', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const tables = ['patients', 'appointments', 'emr_records', 'invoices', 'lab_orders', 'pharmacy_prescriptions', 'employees', 'documents'];
-    const stats: any[] = [];
+    const stats: unknown[] = [];
     for (const table of tables) {
       try {
         const count = await db(table).where({ tenant_id: tenantId }).count('id as c').first();
-        stats.push({ table, recordCount: Number((count as any)?.c || 0) });
+        stats.push({ table, recordCount: Number((count as Record<string, unknown>)?.c || 0) });
       } catch { stats.push({ table, recordCount: 0 }); }
     }
     return sendSuccess(reply, stats);
@@ -133,7 +133,7 @@ export async function registerSystemMonitorModule(app: FastifyInstance) {
 
   // ── Audit Log Explorer ──
   app.get('/api/v1/system/audit-log', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { action, entity, days } = request.query as any;
+    const tenantId = getTenantId(request); const { action, entity, days } = request.query as { action?: string; days?: string; entity?: string };
     const since = new Date(Date.now() - (Number(days) || 7) * 86400000);
     let q = db('audit_logs').where('audit_logs.tenant_id', tenantId).where('timestamp', '>=', since);
     if (action) q = q.andWhere('action', action);

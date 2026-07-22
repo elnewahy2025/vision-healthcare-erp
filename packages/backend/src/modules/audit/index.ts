@@ -30,7 +30,7 @@ export async function registerAuditModule(app: FastifyInstance) {
     const total = await qb.clone().count('id as count').first();
     const logs = await qb.orderBy('created_at', 'desc').limit(query.limit).offset((query.page - 1) * query.limit);
 
-    return sendPaginated(reply, logs, Number((total as any)?.count || 0), query.page, query.limit);
+    return sendPaginated(reply, logs, Number((total as Record<string, unknown>)?.count || 0), query.page, query.limit);
   });
 
   // Get audit log detail
@@ -46,7 +46,7 @@ export async function registerAuditModule(app: FastifyInstance) {
   app.get('/api/v1/audit-logs/actions/types', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const actions = await db('audit_logs').where({ tenant_id: tenantId }).distinct('action').orderBy('action');
-    return sendSuccess(reply, actions.map((a: any) => a.action));
+    return sendSuccess(reply, actions.map((a: AuditLogRow) => a.action));
   });
 
   // Export audit logs (CSV/JSON)

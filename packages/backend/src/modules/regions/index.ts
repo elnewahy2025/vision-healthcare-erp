@@ -8,7 +8,7 @@ export async function registerRegionsModule(app: FastifyInstance) {
   // ── Regions (system catalog) ──
   app.get('/api/v1/regions', async (request, reply) => {
     const regions = await db('regions').where({ is_active: true }).orderBy('name');
-    return sendSuccess(reply, regions.map((r: any) => ({
+    return sendSuccess(reply, regions.map((r: Record<string, unknown>) => ({
       id: r.id, code: r.code, name: r.name, provider: r.provider,
       location: r.location, config: r.config, complianceFlags: r.compliance_flags
     })));
@@ -36,9 +36,9 @@ export async function registerRegionsModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/regions/residency', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
     const existing = await db('tenant_data_residency').where({ tenant_id: tenantId }).first();
-    const data: any = { updated_at: new Date() };
+    const data: Record<string, unknown> = { updated_at: new Date() };
     if (body.primaryRegionId) data.primary_region_id = body.primaryRegionId;
     if (body.backupRegionId !== undefined) data.backup_region_id = body.backupRegionId;
     if (body.complianceFramework) data.compliance_framework = body.complianceFramework;
@@ -54,7 +54,7 @@ export async function registerRegionsModule(app: FastifyInstance) {
   // ── Seed default regions on first call ──
   app.post('/api/v1/regions/seed', async (request, reply) => {
     const existing = await db('regions').count('id as c').first();
-    if (Number((existing as any)?.c || 0) > 0) return sendSuccess(reply, null, 'Regions already seeded');
+    if (Number((existing as Record<string, unknown>)?.c || 0) > 0) return sendSuccess(reply, null, 'Regions already seeded');
     const defaultRegions = [
       { code: 'me-south-1', name: 'Middle East (Bahrain)', provider: 'aws', location: 'Bahrain', compliance_flags: '["hipaa","gdpr"]' },
       { code: 'eu-central-1', name: 'Europe (Frankfurt)', provider: 'aws', location: 'Germany', compliance_flags: '["gdpr"]' },

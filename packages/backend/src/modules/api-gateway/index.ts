@@ -10,7 +10,7 @@ export async function registerApiGatewayModule(app: FastifyInstance) {
   app.get('/api/v1/api-keys', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const keys = await db('api_keys').where({ tenant_id: tenantId }).orderBy('created_at', 'desc');
-    return sendSuccess(reply, keys.map((k: any) => ({
+    return sendSuccess(reply, keys.map((k: ApiKeyRow) => ({
       id: k.id, name: k.name, keyPrefix: k.key_prefix,
       permissions: k.permissions, allowedIps: k.allowed_ips,
       rateLimit: k.rate_limit, expiresAt: k.expires_at,
@@ -19,7 +19,7 @@ export async function registerApiGatewayModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/api-keys', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
     const rawKey = 'vh_' + crypto.randomBytes(32).toString('base64url');
     const prefix = rawKey.slice(0, 12);
     const hash = crypto.createHash('sha256').update(rawKey).digest('hex');
@@ -37,8 +37,8 @@ export async function registerApiGatewayModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/api-keys/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any; const body = request.body as any;
-    const update: any = { updated_at: new Date() };
+    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.name) update.name = body.name;
     if (body.permissions) update.permissions = body.permissions;
     if (body.isActive !== undefined) update.is_active = body.isActive;
@@ -49,14 +49,14 @@ export async function registerApiGatewayModule(app: FastifyInstance) {
   });
 
   app.delete('/api/v1/api-keys/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    await db('api_key_logs').where({ api_key_id: (request.params as any).id }).del();
-    await db('api_keys').where({ id: (request.params as any).id }).del();
+    await db('api_key_logs').where({ api_key_id: (request.params as { id: string }).id }).del();
+    await db('api_keys').where({ id: (request.params as { id: string }).id }).del();
     return sendSuccess(reply, null, 'API key deleted');
   });
 
   // ── API Key Usage Logs ──
   app.get('/api/v1/api-keys/:id/logs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { id } = request.params as any;
+    const tenantId = getTenantId(request); const { id } = request.params as { id: string };
     const logs = await db('api_key_logs').where({ tenant_id: tenantId, api_key_id: id })
       .orderBy('created_at', 'desc').limit(100);
     return sendSuccess(reply, logs.map((l: Record<string, unknown>) => ({
@@ -84,14 +84,14 @@ export async function registerApiGatewayModule(app: FastifyInstance) {
   app.get('/api/v1/cache-configs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const configs = await db('cache_configs').where({ tenant_id: tenantId }).orderBy('endpoint_pattern');
-    return sendSuccess(reply, configs.map((c: any) => ({
+    return sendSuccess(reply, configs.map((c: ApiKeyRow) => ({
       id: c.id, endpointPattern: c.endpoint_pattern,
       ttlSeconds: c.ttl_seconds, isActive: c.is_active
     })));
   });
 
   app.post('/api/v1/cache-configs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
     const [c] = await db('cache_configs').insert({
       tenant_id: tenantId, endpoint_pattern: body.endpointPattern,
       ttl_seconds: body.ttlSeconds || 300, is_active: body.isActive !== false
@@ -100,8 +100,8 @@ export async function registerApiGatewayModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/cache-configs/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any; const body = request.body as any;
-    const update: any = { updated_at: new Date() };
+    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.ttlSeconds) update.ttl_seconds = body.ttlSeconds;
     if (body.isActive !== undefined) update.is_active = body.isActive;
     await db('cache_configs').where({ id }).update(update);

@@ -8,13 +8,13 @@ const startTime = Date.now();
 
 export async function registerHealthModule(app: FastifyInstance) {
   app.get('/api/v1/health', async (request, reply) => {
-    const checks: Record<string, any> = {};
+    const checks: Record<string, unknown> = {};
 
     try {
       const dbStart = Date.now();
       await db.raw('SELECT 1');
       checks.database = { status: 'healthy', latency: `${Date.now() - dbStart}ms` };
-    } catch (err: any) {
+    } catch (err: unknown) {
       checks.database = { status: 'unhealthy', error: err.message };
     }
 
@@ -22,11 +22,11 @@ export async function registerHealthModule(app: FastifyInstance) {
       const redisStart = Date.now();
       await redis.ping();
       checks.redis = { status: 'healthy', latency: `${Date.now() - redisStart}ms` };
-    } catch (err: any) {
+    } catch (err: unknown) {
       checks.redis = { status: 'degraded', error: err.message };
     }
 
-    const allHealthy = Object.values(checks).every((c: any) => c.status === 'healthy');
+    const allHealthy = Object.values(checks).every((c: Record<string, unknown>) => c.status === 'healthy');
     const env = getEnv();
 
     return reply.status(allHealthy ? 200 : 503).send({

@@ -8,7 +8,7 @@ import { authenticate } from '../auth-guard.js';
 export async function registerTelemedicineModule(app: FastifyInstance) {
   app.get('/api/v1/telemedicine/sessions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const ctx = getCtx(request); const tenantId = getTenantId(request);
-    const { status } = request.query as any;
+    const { status } = request.query as PaginationQuery & { status?: string };
     let q = db('telemedicine_sessions').where('telemedicine_sessions.tenant_id', tenantId).whereNull('telemedicine_sessions.deleted_at');
     if (status) q = q.andWhere('telemedicine_sessions.status', status);
     const sessions = await q.join('patients', 'telemedicine_sessions.patient_id', 'patients.id')
@@ -16,7 +16,7 @@ export async function registerTelemedicineModule(app: FastifyInstance) {
       .select('telemedicine_sessions.*', 'patients.first_name as p_first', 'patients.last_name as p_last',
         'users.first_name as d_first', 'users.last_name as d_last')
       .orderBy('created_at', 'desc').limit(50);
-    return sendSuccess(reply, sessions.map((s: any) => ({
+    return sendSuccess(reply, sessions.map((s: PatientRow) => ({
       id: s.id, sessionId: s.session_id, roomName: s.room_name, status: s.status,
       provider: s.provider, meetingLink: s.meeting_link, patientId: s.patient_id,
       patientName: s.p_first + ' ' + s.p_last, doctorId: s.doctor_id,
@@ -28,7 +28,7 @@ export async function registerTelemedicineModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/telemedicine/sessions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as any;
+    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
     const sid = crypto.randomUUID();
     const roomName = 'room-' + sid.slice(0, 8);
     const meetingLink = body.meetingLink || (process.env.APP_URL || 'http://localhost:5173') + '/telemedicine/' + roomName;
@@ -43,8 +43,8 @@ export async function registerTelemedicineModule(app: FastifyInstance) {
   });
 
   app.put('/api/v1/telemedicine/sessions/:id/status', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as any; const body = request.body as any;
-    const update: any = { status: body.status, updated_at: new Date() };
+    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const update: Record<string, unknown> = { status: body.status, updated_at: new Date() };
     if (body.status === 'active') update.started_at = new Date();
     if (body.status === 'completed') { update.ended_at = new Date(); update.duration_seconds = body.durationSeconds || 0; }
     await db('telemedicine_sessions').where({ id }).update(update);

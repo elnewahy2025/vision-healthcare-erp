@@ -1,4 +1,8 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
+import pino from 'pino';
+import { loggerOptions } from './logger.js';
+
+const log = pino(loggerOptions);
 
 interface RateLimitConfig {
   maxRequests: number;
@@ -65,6 +69,10 @@ export function createRateLimiter(config: RateLimitConfig) {
 
     if (entry.count > config.maxRequests) {
       const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+      log.warn(
+        { ip, route, count: entry.count, maxRequests: config.maxRequests, windowMs: config.windowMs },
+        'Rate limit exceeded',
+      );
       reply.code(429).header('Retry-After', String(retryAfter)).send({
         statusCode: 429,
         error: 'Too Many Requests',
