@@ -2,6 +2,10 @@ import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from '@healthcare/shared/errors';
 import { captureError } from '../services/sentry.js';
 import { ZodError } from 'zod';
+import { getEnv } from '@healthcare/shared/config';
+
+const env = getEnv();
+const isProduction = env.NODE_ENV === 'production';
 
 export function errorHandler(
   error: FastifyError | AppError | Error,
@@ -64,9 +68,11 @@ export function errorHandler(
     });
   }
 
+  // Generic 500 — never leak internal details
   return reply.status(500).send({
     success: false,
-    error: 'Internal server error',
+    error: isProduction ? 'Internal server error' : error.message,
+    ...(isProduction ? {} : { stack: error.stack }),
     timestamp: new Date().toISOString(),
   });
 }

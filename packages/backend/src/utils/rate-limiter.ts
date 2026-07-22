@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import pino from 'pino';
+import { redis } from '../core/redis.js';
 import { loggerOptions } from './logger.js';
+import pino from 'pino';
 
 const log = pino(loggerOptions);
 
@@ -9,33 +10,7 @@ interface RateLimitConfig {
   windowMs: number;
 }
 
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
-const store = new Map<string, RateLimitEntry>();
-
-function cleanup(): void {
-  const now = Date.now();
-  for (const [key, entry] of store.entries()) {
-    if (now > entry.resetAt) {
-      store.delete(key);
-    }
-  }
-}
-
-const CLEANUP_INTERVAL = 60_000;
-let cleanupTimer: ReturnType<typeof setInterval> | null = null;
-
-function ensureCleanup(): void {
-  if (cleanupTimer === null) {
-    cleanupTimer = setInterval(cleanup, CLEANUP_INTERVAL);
-    if (cleanupTimer.unref) {
-      cleanupTimer.unref();
-    }
-  }
-}
+const DEFAULT_FALLBACK_MAX = 1000;
 
 function getClientIp(request: FastifyRequest): string {
   const forwarded = request.headers['x-forwarded-for'];
@@ -48,20 +23,84 @@ function getClientIp(request: FastifyRequest): string {
   return request.ip ?? '127.0.0.1';
 }
 
-export function createRateLimiter(config: RateLimitConfig) {
-  ensureCleanup();
+function buildKey(ip: string, route: string): string {
+  return `ratelimit:${ip}:${route}`;
+}
 
+/**
+ * Distributed rate limiter backed by Redis.
+ * Uses INCR + EXPIRE for atomic sliding window counter.
+ * Falls back to in-memory Map if Redis is unavailable.
+ */
+
+// Fallback in-memory store (only used when Redis is down)
+const fallbackStore = new Map<string, { count: number; resetAt: number }>();
+let redisAvailable = true;
+
+async function checkRedis(): Promise<boolean> {
+  try {
+    await redis.ping();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function createRateLimiter(config: RateLimitConfig) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const ip = getClientIp(request);
     const route = request.routeOptions?.url ?? request.url;
-    const key = `${ip}:${route}`;
-    const now = Date.now();
+    const key = buildKey(ip, route);
+    const windowSeconds = Math.ceil(config.windowMs / 1000);
 
-    let entry = store.get(key);
+    try {
+      // Try Redis-backed rate limiting
+      if (redisAvailable) {
+        const count = await redis.incr(key);
+        if (count === 1) {
+          await redis.expire(key, windowSeconds);
+        }
+
+        if (count > config.maxRequests) {
+          const ttl = await redis.ttl(key);
+          const retryAfter = ttl > 0 ? ttl : windowSeconds;
+
+          log.warn(
+            { ip, route, count, maxRequests: config.maxRequests, windowMs: config.windowMs, backend: 'redis' },
+            'Rate limit exceeded',
+          );
+
+          reply.code(429).header('Retry-After', String(retryAfter)).send({
+            statusCode: 429,
+            error: 'Too Many Requests',
+            message: `Rate limit exceeded. Try again in ${retryAfter} seconds.`,
+          });
+          return;
+        }
+        return;
+      }
+    } catch (err) {
+      // Redis is down — log once and fall back to in-memory
+      if (redisAvailable) {
+        log.error({ err }, 'Redis unavailable for rate limiting, falling back to in-memory');
+        redisAvailable = false;
+        // Re-check Redis periodically
+        setTimeout(async () => {
+          redisAvailable = await checkRedis();
+          if (redisAvailable) {
+            log.info('Redis reconnected, resuming distributed rate limiting');
+          }
+        }, 30_000);
+      }
+    }
+
+    // ── Fallback: in-memory rate limiting ──
+    const now = Date.now();
+    let entry = fallbackStore.get(key);
 
     if (!entry || now > entry.resetAt) {
       entry = { count: 1, resetAt: now + config.windowMs };
-      store.set(key, entry);
+      fallbackStore.set(key, entry);
       return;
     }
 
@@ -70,8 +109,8 @@ export function createRateLimiter(config: RateLimitConfig) {
     if (entry.count > config.maxRequests) {
       const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
       log.warn(
-        { ip, route, count: entry.count, maxRequests: config.maxRequests, windowMs: config.windowMs },
-        'Rate limit exceeded',
+        { ip, route, count: entry.count, maxRequests: config.maxRequests, windowMs: config.windowMs, backend: 'memory-fallback' },
+        'Rate limit exceeded (Redis unavailable)',
       );
       reply.code(429).header('Retry-After', String(retryAfter)).send({
         statusCode: 429,
