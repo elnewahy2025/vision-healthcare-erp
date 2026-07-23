@@ -7,14 +7,6 @@ function enforceLimit(limit: number): number {
   return Math.min(Math.max(limit, 1), MAX_PAGE_LIMIT);
 }
 
-/**
- * Set the PostgreSQL session variable for Row Level Security.
- * Must be called before any query in a request lifecycle.
- */
-export async function setRlsContext(tenantId: string): Promise<void> {
-  await db.raw("SET LOCAL app.current_tenant = ?", [tenantId]);
-}
-
 export async function findPatients(tenantId: string, options: {
   search?: string;
   status?: string;
@@ -146,6 +138,30 @@ export async function quickSearchPatients(tenantId: string, q: string): Promise<
     })
     .select('id', 'first_name', 'last_name', 'medical_record_number', 'phone', 'date_of_birth', 'gender')
     .limit(10);
+}
+
+
+// ── #7: Trigram-based search using pg_trgm GIN index ──
+// This uses similarity() which works with the GIN trigram index.
+// Returns patients where combined name similarity exceeds threshold.
+export async function trigramSearchPatients(
+  tenantId: string,
+  q: string,
+  limit: number = 10,
+): Promise<PatientRow[]> {
+  return db('patients')
+    .where({ tenant_id: tenantId })
+    .whereNull('deleted_at')
+    .whereRaw(
+      "(first_name || ' ' || last_name) % ?",
+      [q]
+    )
+    .orderByRaw(
+      "similarity(first_name || ' ' || last_name, ?) DESC",
+      [q]
+    )
+    .select('*')
+    .limit(enforceLimit(limit));
 }
 
 // ── #9: Patient merge ──

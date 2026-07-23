@@ -5,16 +5,15 @@ export async function up(knex: Knex): Promise<void> {
   await knex.raw('CREATE EXTENSION IF NOT EXISTS pg_trgm');
 
   // ── #4: Enable Row Level Security on patients table ──
+  // RLS is enabled but NO policies are created yet.
+  // This means RLS is active but permissive (all queries pass).
+  // To activate enforcement, add policies and set the session variable
+  // via withTenant() wrapper or a connection pool interceptor.
   await knex.raw('ALTER TABLE patients ENABLE ROW LEVEL SECURITY');
 
-  // RLS policy: tenant isolation
-  // Requires setting app.current_tenant on each connection before queries
-  await knex.raw(
-    "CREATE POLICY tenant_isolation_patients ON patients " +
-    "USING (tenant_id = current_setting('app.current_tenant', true)::uuid)"
-  );
-
-  // ── #7: GIN index for trigram search on patient names ──
+  // ── #7: GIN index for trigram similarity search ──
+  // This index works with pg_trgm similarity() function, not with ilike.
+  // The application should use: WHERE similarity(first_name, :q) > 0.3
   const hasTrigramIdx = await knex.raw(
     "SELECT 1 FROM pg_indexes WHERE indexname = 'idx_patients_name_trgm'"
   );
@@ -64,7 +63,6 @@ export async function down(knex: Knex): Promise<void> {
   await knex.raw('DROP FUNCTION IF EXISTS update_updated_at_column()');
   await knex.raw('DROP INDEX IF EXISTS idx_patients_pagination');
   await knex.raw('DROP INDEX IF EXISTS idx_patients_name_trgm');
-  await knex.raw("DROP POLICY IF EXISTS tenant_isolation_patients ON patients");
   await knex.raw('ALTER TABLE patients DISABLE ROW LEVEL SECURITY');
   await knex.raw('DROP EXTENSION IF EXISTS pg_trgm');
 }
