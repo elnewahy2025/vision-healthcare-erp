@@ -22,15 +22,19 @@ import {
 
 export async function listSuppliers(request: FastifyRequest, reply: FastifyReply) {
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
   const suppliers = await repo.findSuppliers(tenantId);
+  try { await logAudit({ tenantId, userId, action: 'inventory.supplier.list', entityType: 'supplier' }); } catch {}
   return sendSuccess(reply, suppliers.map(mapSupplier));
 }
 
 export async function getSupplier(request: FastifyRequest, reply: FastifyReply) {
   const { supplierId } = request.params as { supplierId: string };
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
   const supplier = await repo.findSupplierById(supplierId, tenantId);
   if (!supplier) throw new NotFoundError('Supplier', supplierId);
+  try { await logAudit({ tenantId, userId, action: 'inventory.supplier.view', entityType: 'supplier', entityId: supplierId }); } catch {}
   return sendSuccess(reply, mapSupplier(supplier));
 }
 
@@ -76,7 +80,9 @@ export async function updateSupplier(request: FastifyRequest, reply: FastifyRepl
 
 export async function listWarehouses(request: FastifyRequest, reply: FastifyReply) {
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
   const warehouses = await repo.findWarehouses(tenantId);
+  try { await logAudit({ tenantId, userId, action: 'inventory.warehouse.list', entityType: 'warehouse' }); } catch {}
   return sendSuccess(reply, warehouses.map(mapWarehouse));
 }
 
@@ -95,16 +101,20 @@ export async function createWarehouse(request: FastifyRequest, reply: FastifyRep
 
 export async function listItems(request: FastifyRequest, reply: FastifyReply) {
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
   const { category, warehouseId, search } = request.query as Record<string, string | undefined>;
   const items = await repo.findInventoryItems(tenantId, { category, warehouseId, search });
+  try { await logAudit({ tenantId, userId, action: 'inventory.item.list', entityType: 'inventory_item' }); } catch {}
   return sendSuccess(reply, items.map(mapInventoryItem));
 }
 
 export async function getItem(request: FastifyRequest, reply: FastifyReply) {
   const { itemId } = request.params as { itemId: string };
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
   const item = await repo.findInventoryItemById(itemId, tenantId);
   if (!item) throw new NotFoundError('Inventory item', itemId);
+  try { await logAudit({ tenantId, userId, action: 'inventory.item.view', entityType: 'inventory_item', entityId: itemId }); } catch {}
   return sendSuccess(reply, mapInventoryItem(item));
 }
 
@@ -193,8 +203,10 @@ export async function updateStock(request: FastifyRequest, reply: FastifyReply) 
 // ── Transactions ──
 export async function listTransactions(request: FastifyRequest, reply: FastifyReply) {
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
   const { itemId, type } = request.query as Record<string, string | undefined>;
   const transactions = await repo.findTransactions(tenantId, { itemId, type });
+  try { await logAudit({ tenantId, userId, action: 'inventory.transaction.list', entityType: 'inventory_item' }); } catch {}
   return sendSuccess(reply, transactions.map(mapInventoryTransaction));
 }
 
@@ -303,7 +315,9 @@ export async function getLowStockAlerts(request: FastifyRequest, reply: FastifyR
 // ── #2: Expired items ──
 export async function getExpiredItems(request: FastifyRequest, reply: FastifyReply) {
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
   const items = await repo.findExpiredItems(tenantId);
+  try { await logAudit({ tenantId, userId, action: 'inventory.alert.expired', entityType: 'inventory_item' }); } catch {}
   return sendSuccess(reply, items.map(mapInventoryItem));
 }
 
@@ -438,14 +452,16 @@ export async function bulkStockReceipt(request: FastifyRequest, reply: FastifyRe
 
 export async function listPurchaseOrders(request: FastifyRequest, reply: FastifyReply) {
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
   const { status } = request.query as { status?: string };
   const pos = await repo.findPurchaseOrders(tenantId, status);
   const posWithItems = await Promise.all(
     pos.map(async (po) => {
-      const items = await repo.findPurchaseOrderItems(po.id);
+      const items = await repo.findPurchaseOrderItems(po.id, tenantId);
       return mapPurchaseOrder(po, items);
     }),
   );
+  try { await logAudit({ tenantId, userId, action: 'inventory.po.list', entityType: 'purchase_order' }); } catch {}
   return sendSuccess(reply, posWithItems);
 }
 
@@ -479,8 +495,8 @@ export async function receivePurchaseOrder(request: FastifyRequest, reply: Fasti
   const { userId } = getCtx(request);
 
   for (const received of body.items) {
-    await repo.updatePurchaseOrderItem(received.id, { quantity_received: received.quantityReceived });
-    const poi = await repo.findPurchaseOrderItemById(received.id);
+    await repo.updatePurchaseOrderItem(received.id, tenantId, { quantity_received: received.quantityReceived });
+    const poi = await repo.findPurchaseOrderItemById(received.id, tenantId);
     if (poi?.item_id) {
       const result = await repo.atomicStockUpdate(poi.item_id, tenantId, received.quantityReceived);
       if (result) {
@@ -492,7 +508,7 @@ export async function receivePurchaseOrder(request: FastifyRequest, reply: Fasti
       }
     }
   }
-  await repo.updatePurchaseOrder(poId, {
+  await repo.updatePurchaseOrder(poId, tenantId, {
     status: 'received', received_date: new Date().toISOString().split('T')[0], updated_at: new Date(),
   });
   await logAudit({ tenantId, userId, action: 'inventory.po.received', entityType: 'purchase_order', entityId: poId });

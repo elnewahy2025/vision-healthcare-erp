@@ -316,12 +316,16 @@ export async function findPurchaseOrders(
   return query.orderBy('created_at', 'desc').limit(50);
 }
 
-export async function findPurchaseOrderById(poId: string): Promise<PurchaseOrderRow | undefined> {
-  return db('purchase_orders').where({ id: poId }).first();
+export async function findPurchaseOrderById(poId: string, tenantId: string): Promise<PurchaseOrderRow | undefined> {
+  return db('purchase_orders').where({ id: poId, tenant_id: tenantId }).first();
 }
 
-export async function findPurchaseOrderItems(poId: string): Promise<PurchaseOrderItemRow[]> {
-  return db('purchase_order_items').where({ po_id: poId });
+export async function findPurchaseOrderItems(poId: string, tenantId: string): Promise<PurchaseOrderItemRow[]> {
+  return db('purchase_order_items')
+    .join('purchase_orders', 'purchase_order_items.po_id', 'purchase_orders.id')
+    .where('purchase_order_items.po_id', poId)
+    .where('purchase_orders.tenant_id', tenantId)
+    .select('purchase_order_items.*');
 }
 
 export async function createPurchaseOrder(data: Record<string, unknown>): Promise<PurchaseOrderRow> {
@@ -333,14 +337,23 @@ export async function insertPurchaseOrderItems(items: Record<string, unknown>[])
   await db('purchase_order_items').insert(items);
 }
 
-export async function updatePurchaseOrderItem(itemId: string, data: Record<string, unknown>): Promise<void> {
-  await db('purchase_order_items').where({ id: itemId }).update(data);
+export async function updatePurchaseOrderItem(itemId: string, tenantId: string, data: Record<string, unknown>): Promise<void> {
+  await db('purchase_order_items')
+    .join('purchase_orders', 'purchase_order_items.po_id', 'purchase_orders.id')
+    .where('purchase_order_items.id', itemId)
+    .where('purchase_orders.tenant_id', tenantId)
+    .update(data);
 }
 
-export async function findPurchaseOrderItemById(poItemId: string): Promise<PurchaseOrderItemRow | undefined> {
-  return db('purchase_order_items').where({ id: poItemId }).first();
+export async function findPurchaseOrderItemById(poItemId: string, tenantId: string): Promise<PurchaseOrderItemRow | undefined> {
+  return db('purchase_order_items')
+    .join('purchase_orders', 'purchase_order_items.po_id', 'purchase_orders.id')
+    .where('purchase_order_items.id', poItemId)
+    .where('purchase_orders.tenant_id', tenantId)
+    .select('purchase_order_items.*')
+    .first();
 }
 
-export async function updatePurchaseOrder(poId: string, data: Record<string, unknown>): Promise<void> {
-  await db('purchase_orders').where({ id: poId }).update(data);
+export async function updatePurchaseOrder(poId: string, tenantId: string, data: Record<string, unknown>): Promise<void> {
+  await db('purchase_orders').where({ id: poId, tenant_id: tenantId }).update(data);
 }
