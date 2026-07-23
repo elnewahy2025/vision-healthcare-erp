@@ -1,6 +1,17 @@
 import type { PatientRow, PatientResponse } from './types.js';
+import { decryptField } from '@healthcare/shared/utils';
 
 export function mapPatient(p: PatientRow): PatientResponse {
+  let decryptedNationalId: string | null = null;
+  if (p.national_id) {
+    try {
+      decryptedNationalId = decryptField(p.national_id);
+    } catch {
+      // Value may be plaintext from before encryption was added
+      decryptedNationalId = p.national_id;
+    }
+  }
+
   return {
     id: p.id,
     tenantId: p.tenant_id,
@@ -9,6 +20,7 @@ export function mapPatient(p: PatientRow): PatientResponse {
     lastName: p.last_name,
     dateOfBirth: p.date_of_birth,
     gender: p.gender,
+    nationalId: decryptedNationalId,
     nationality: p.nationality,
     bloodType: p.blood_type,
     email: p.email,

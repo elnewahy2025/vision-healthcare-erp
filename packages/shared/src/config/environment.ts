@@ -58,6 +58,9 @@ export interface Environment {
   BACKUP_ENCRYPTION_KEY?: string;
   BACKUP_RETENTION?: string;
 
+  // Encryption
+  ENCRYPTION_KEY: string;
+
   APP_URL: string;
 
   // Auth configuration
@@ -129,6 +132,7 @@ export function getEnv(): Environment {
     BACKUP_S3_BUCKET: process.env.BACKUP_S3_BUCKET,
     BACKUP_ENCRYPTION_KEY: process.env.BACKUP_ENCRYPTION_KEY,
     BACKUP_RETENTION: process.env.BACKUP_RETENTION || '7',
+    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || '',
   };
 }
 

@@ -1,5 +1,6 @@
 import { db } from '../../core/database.js';
 import type { PatientRow } from './types.js';
+import { encryptField } from '@healthcare/shared/utils';
 
 const MAX_PAGE_LIMIT = 100;
 
@@ -64,6 +65,21 @@ export async function findPatientWithRelatedData(patientId: string, tenantId: st
   return { patient, appointments, emrRecords, invoices };
 }
 
+export async function findByNationalId(nationalId: string, tenantId: string): Promise<PatientRow | undefined> {
+  const encrypted = encryptField(nationalId);
+  const patients = await db('patients')
+    .where({ tenant_id: tenantId })
+    .whereNull('deleted_at')
+    .where('national_id', encrypted);
+  // Also check for plaintext values (migration from pre-encryption)
+  const plaintextMatch = await db('patients')
+    .where({ tenant_id: tenantId, national_id: nationalId })
+    .whereNull('deleted_at')
+    .first();
+  if (plaintextMatch) return plaintextMatch;
+  return patients.first();
+}
+
 export async function insertPatient(data: {
   tenantId: string;
   medicalRecordNumber: string;
@@ -73,6 +89,7 @@ export async function insertPatient(data: {
   gender: string;
   phone: string;
   email: string | null;
+  nationalId: string | null;
   nationality: string | null;
   bloodType: string | null;
   address: string | null;
@@ -80,6 +97,8 @@ export async function insertPatient(data: {
   locale: string;
   userId: string;
 }): Promise<PatientRow> {
+  const encryptedNationalId = data.nationalId ? encryptField(data.nationalId) : null;
+
   const [patient] = await db('patients').insert({
     tenant_id: data.tenantId,
     medical_record_number: data.medicalRecordNumber,
@@ -89,6 +108,7 @@ export async function insertPatient(data: {
     gender: data.gender,
     phone: data.phone,
     email: data.email,
+    national_id: encryptedNationalId,
     nationality: data.nationality,
     blood_type: data.bloodType,
     address: data.address,
@@ -119,8 +139,8 @@ export async function updatePatientById(
   return updated;
 }
 
-export async function softDeletePatient(patientId: string): Promise<void> {
-  await db('patients').where({ id: patientId }).update({
+export async function softDeletePatient(patientId: string, tenantId: string): Promise<void> {
+  await db('patients').where({ id: patientId, tenant_id: tenantId }).update({
     status: 'inactive',
     deleted_at: new Date(),
   });
@@ -234,7 +254,7 @@ export async function mergePatients(
     movedRecords += kiResult;
 
     // Soft-delete the duplicate
-    await trx('patients').where({ id: duplicateId }).update({
+    await trx('patients').where({ id: duplicateId, tenant_id: tenantId }).update({
       status: 'merged',
       deleted_at: new Date(),
     });
@@ -254,6 +274,7 @@ export async function bulkInsertPatients(
     gender: string;
     phone: string;
     email?: string;
+    nationalId?: string;
     nationality?: string;
     bloodType?: string;
   }>,
@@ -271,13 +292,14 @@ export async function bulkInsertPatients(
       try {
         return {
           tenant_id: tenantId,
-          medical_record_number: `MRN-${Date.now().toString(36).toUpperCase()}-${String(idx).padStart(4, '0')}`,
+          medical_record_number: `MRN-${tenantId.substring(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}-${String(idx).padStart(4, '0')}`,
           first_name: p.firstName,
           last_name: p.lastName,
           date_of_birth: p.dateOfBirth,
           gender: p.gender,
           phone: p.phone,
           email: p.email || null,
+          national_id: p.nationalId ? encryptField(p.nationalId) : null,
           nationality: p.nationality || null,
           blood_type: p.bloodType || null,
           status: 'active',

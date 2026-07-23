@@ -26,7 +26,7 @@ export async function withTenant<T>(
 ): Promise<T> {
   const trx = await db.transaction();
   try {
-    await trx.raw('SET session_config.tenant_id = ?', [tenantId]);
+    await trx.raw("SET app.current_tenant = ?", [tenantId]);
     const result = await fn(trx);
     await trx.commit();
     return result;

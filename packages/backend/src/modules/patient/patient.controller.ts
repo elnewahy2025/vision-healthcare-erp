@@ -3,7 +3,7 @@ import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { createPatientSchema, updatePatientSchema, paginationSchema } from '../../utils/validation.js';
 import { PatientNotFoundError } from '@healthcare/shared/errors';
-import { generateMedicalRecordNumber } from '@healthcare/shared/utils';
+import { generateMedicalRecordNumber, encryptField } from '@healthcare/shared/utils';
 import { logAudit } from '../../services/audit.js';
 import * as repo from './patient.repository.js';
 import { mapPatient } from './patient.mapper.js';
@@ -55,6 +55,7 @@ export async function createPatient(request: FastifyRequest, reply: FastifyReply
     firstName: body.firstName, lastName: body.lastName,
     dateOfBirth: body.dateOfBirth, gender: body.gender,
     phone: body.phone, email: body.email || null,
+    nationalId: body.nationalId || null,
     nationality: body.nationality || null, bloodType: body.bloodType || null,
     address: body.address ? JSON.stringify(body.address) : null,
     emergencyContact: body.emergencyContact ? JSON.stringify(body.emergencyContact) : null,
@@ -93,6 +94,7 @@ export async function updatePatient(request: FastifyRequest, reply: FastifyReply
   if (body.gender !== undefined) updateData.gender = body.gender;
   if (body.phone !== undefined) updateData.phone = body.phone;
   if (body.email !== undefined) updateData.email = body.email;
+  if (body.nationalId !== undefined) updateData.national_id = body.nationalId ? encryptField(body.nationalId) : null;
   if (body.nationality !== undefined) updateData.nationality = body.nationality;
   if (body.bloodType !== undefined) updateData.blood_type = body.bloodType;
   if (body.address !== undefined) updateData.address = JSON.stringify(body.address);
@@ -123,7 +125,7 @@ export async function deletePatient(request: FastifyRequest, reply: FastifyReply
   const existing = await repo.findPatientById(patientId, tenantId);
   if (!existing) throw new PatientNotFoundError(patientId);
 
-  await repo.softDeletePatient(patientId);
+  await repo.softDeletePatient(patientId, tenantId);
 
   await logAudit({ tenantId, userId, action: 'patient.delete', entityType: 'patients', entityId: patientId });
 
@@ -151,65 +153,70 @@ export async function quickSearch(request: FastifyRequest, reply: FastifyReply) 
 
 // ── #9: Patient merge ──
 export async function mergePatients(request: FastifyRequest, reply: FastifyReply) {
-  const { primaryId, duplicateId } = request.body as { primaryId: string; duplicateId: string };
+  const body = request.body as { primaryId: string; duplicateId: string };
   const tenantId = getTenantId(request);
   const { userId } = getCtx(request);
 
-  if (primaryId === duplicateId) {
+  if (!body.primaryId || !body.duplicateId) {
+    return reply.status(400).send({ success: false, error: 'primaryId and duplicateId are required' });
+  }
+
+  if (body.primaryId === body.duplicateId) {
     return reply.status(400).send({ success: false, error: 'Cannot merge a patient with itself' });
   }
 
-  const result = await repo.mergePatients(primaryId, duplicateId, tenantId);
+  const result = await repo.mergePatients(body.primaryId, body.duplicateId, tenantId);
   if (!result.merged) {
-    throw new PatientNotFoundError(duplicateId);
+    throw new PatientNotFoundError(body.duplicateId);
   }
 
   await logAudit({
     tenantId, userId,
     action: 'patient.merge',
     entityType: 'patients',
-    entityId: primaryId,
-    metadata: { duplicateId, movedRecords: result.movedRecords },
+    entityId: body.primaryId,
+    metadata: { duplicateId: body.duplicateId, movedRecords: result.movedRecords },
   });
 
-  return sendSuccess(reply, { primaryId, duplicateId, movedRecords: result.movedRecords }, 'Patients merged successfully');
+  return sendSuccess(reply, { primaryId: body.primaryId, duplicateId: body.duplicateId, movedRecords: result.movedRecords }, 'Patients merged successfully');
 }
 
 // ── #16: Bulk import ──
 export async function bulkImport(request: FastifyRequest, reply: FastifyReply) {
-  const { patients } = request.body as { patients: Array<{
+  const body = request.body as { patients: Array<{
     firstName: string;
     lastName: string;
     dateOfBirth: string;
     gender: string;
     phone: string;
     email?: string;
+    nationalId?: string;
     nationality?: string;
     bloodType?: string;
   }> };
   const tenantId = getTenantId(request);
   const { userId } = getCtx(request);
 
-  if (!patients || patients.length === 0) {
+  if (!body.patients || body.patients.length === 0) {
     return reply.status(400).send({ success: false, error: 'No patients provided' });
   }
 
-  if (patients.length > 1000) {
+  if (body.patients.length > 1000) {
     return reply.status(400).send({ success: false, error: 'Maximum 1000 patients per import' });
   }
 
-  const result = await repo.bulkInsertPatients(tenantId, patients, userId);
+  const result = await repo.bulkInsertPatients(tenantId, body.patients, userId);
 
   await logAudit({
     tenantId, userId,
     action: 'patient.bulk_import',
     entityType: 'patients',
-    metadata: { total: patients.length, inserted: result.inserted, errors: result.errors.length },
+    metadata: { total: body.patients.length, inserted: result.inserted, errors: result.errors.length },
   });
 
   return sendSuccess(reply, {
     inserted: result.inserted,
-    total: patients.length,
+    total: body.patients.length,
     errors: result.errors,
-  }, `Bulk import complete: ${result.inserted}/${patients.length} inserted`);
+  }, `Bulk import complete: ${result.inserted}/${body.patients.length} inserted`);
 }

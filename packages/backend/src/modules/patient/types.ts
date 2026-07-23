@@ -6,6 +6,7 @@ export interface PatientRow {
   last_name: string;
   date_of_birth: string;
   gender: string;
+  national_id: string | null;
   nationality: string | null;
   blood_type: string | null;
   email: string | null;
@@ -30,6 +31,7 @@ export interface PatientResponse {
   lastName: string;
   dateOfBirth: string;
   gender: string;
+  nationalId: string | null;
   nationality: string | null;
   bloodType: string | null;
   email: string | null;

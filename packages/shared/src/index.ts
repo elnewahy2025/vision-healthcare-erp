@@ -36,7 +36,7 @@ export { getEnv } from './config/environment';
 export type { Environment } from './config/environment';
 
 export {
-  generateId, generateMedicalRecordNumber, generateInvoiceNumber,
+  generateId, generateMedicalRecordNumber, generateInvoiceNumber, encryptField, decryptField, isEncrypted,
   hashString, slugify, maskEmail, generateOtp,
 } from './utils/crypto';
 
