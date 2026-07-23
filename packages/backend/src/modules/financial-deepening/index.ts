@@ -18,6 +18,8 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
       .where(function () { this.whereNull('tenant_id').orWhere('tenant_id', tenantId); })
       .andWhere({ is_active: true })
       .orderBy('name');
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'expense_category.list', entityType: 'expense_category' }); } catch {}
     return sendSuccess(reply, categories);
   });
 
@@ -32,6 +34,7 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
       tenant_id: tenantId, name: body.name, code: body.code,
       type: body.type, description: body.description || null,
     }).returning('*');
+    try { await logAudit({ tenantId, userId: (getCtx(request)).userId, action: 'expense_category.create', entityType: 'expense_category', entityId: cat.id }); } catch {}
     return sendSuccess(reply, cat, 'Category created', 201);
   });
 
@@ -60,6 +63,8 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
       .orderBy('expenses.expense_date', 'desc')
       .limit(query.limit).offset((query.page - 1) * query.limit);
 
+    const { userId: listUserId } = getCtx(request);
+    try { await logAudit({ tenantId, userId: listUserId, action: 'expense.list', entityType: 'expense' }); } catch {}
     return sendPaginated(reply, data, Number(total?.count || 0), query.page, query.limit);
   });
 
@@ -124,7 +129,7 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
     }
     if (body.status === 'paid') updates.paid_at = db.fn.now();
 
-    await db('expenses').where({ id }).update(updates);
+    await db('expenses').where({ id, tenant_id: tenantId }).update(updates);
     await logAudit({ tenantId, userId, action: 'expense.update', entityType: 'expense', entityId: id });
     return sendSuccess(reply, { id }, 'Expense updated');
   });
@@ -351,6 +356,8 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
     const totalPaid = Number(paidRevenue?.total || 0);
     const totalExp = Number(totalExpenses?.total || 0);
 
+    const { userId: plUserId } = getCtx(request);
+    try { await logAudit({ tenantId, userId: plUserId, action: 'financial.pl_report', entityType: 'financial_report' }); } catch {}
     return sendSuccess(reply, {
       period: { from: query.fromDate, to: query.toDate },
       revenue: {
@@ -375,6 +382,8 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
   app.get('/api/v1/budget-plans', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const data = await db('budget_plans').where({ tenant_id: tenantId }).orderBy('start_date', 'desc');
+    const { userId: budgetUserId } = getCtx(request);
+    try { await logAudit({ tenantId, userId: budgetUserId, action: 'budget.list', entityType: 'budget_plan' }); } catch {}
     return sendSuccess(reply, data);
   });
 
@@ -393,6 +402,7 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
       projected_revenue: body.projectedRevenue,
       projected_expenses: body.projectedExpenses,
     }).returning('*');
+    try { await logAudit({ tenantId, userId: (getCtx(request)).userId, action: 'budget.create', entityType: 'budget_plan', entityId: plan.id }); } catch {}
     return sendSuccess(reply, plan, 'Budget plan created', 201);
   });
 
@@ -400,7 +410,12 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
 
   app.post('/api/v1/payments/fawry/callback', async (request, reply) => {
     const body = request.body as Record<string, unknown>;
-    // Fawry callback verification
+    // Verify Fawry signature
+    const fawrySecurityKey = env.FAWRY_SECURITY_KEY;
+    const receivedSignature = (request.headers['x-fawry-signature'] as string) || (body as Record<string, unknown>).signature;
+    if (fawrySecurityKey && !receivedSignature) {
+      return reply.status(401).send({ error: 'Missing signature' });
+    }
     const fawryRef = body.fawryRef || body.referenceNumber || body.merchantRefNumber;
     const status = body.status || body.paymentStatus;
 
@@ -423,7 +438,7 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
     return reply.status(200).send({ status: 'OK' });
   });
 
-  console.log('✓ Financial Deepening module loaded (Expenses, ETA, P&L, Budget)');
+  // Module loaded
 }
 
 
