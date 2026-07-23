@@ -4,6 +4,7 @@ import { db } from '../../core/database.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated, sendError } from '../../utils/response.js';
 import { authenticate } from '../auth-guard.js';
+import { logAudit } from '../../services/audit.js';
 
 let queueWsClients = new Set<Record<string, unknown>>();
 
@@ -64,6 +65,8 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
     if (query.status) qb = qb.andWhere('kiosk_checkins.status', query.status);
     const data = await qb.select('kiosk_checkins.*', 'patients.first_name', 'patients.last_name')
       .orderBy('kiosk_checkins.queue_number', 'asc');
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'kiosk.list', entityType: 'kiosk_checkin' }); } catch {}
     return sendSuccess(reply, data);
   });
 
@@ -73,8 +76,11 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
     const updates: Record<string, unknown> = { status: body.status };
     if (body.status === 'in_progress' || body.status === 'called') updates.called_at = db.fn.now();
     if (body.status === 'completed') updates.completed_at = db.fn.now();
-    await db('kiosk_checkins').where({ id }).update(updates);
+    const { tenantId } = getCtx(request);
+    await db('kiosk_checkins').where({ id, tenant_id: tenantId }).update(updates);
     try { broadcastQueueUpdate({ type: 'status_change', checkinId: id, newStatus: body.status }); } catch {}
+    const { userId: statusUserId } = getCtx(request);
+    try { await logAudit({ tenantId, userId: statusUserId, action: 'kiosk.status_update', entityType: 'kiosk_checkin', entityId: id, metadata: { status: body.status } }); } catch {}
     return sendSuccess(reply, { id, status: body.status }, 'Status updated');
   });
 
@@ -115,6 +121,7 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
       tenant_id: tenantId, name: body.name, type: body.type, description: body.description || null,
       questions: JSON.stringify(body.questions), auto_send: body.autoSend,
     }).returning('*');
+    try { await logAudit({ tenantId, userId: (getCtx(request)).userId, action: 'survey.create', entityType: 'survey', entityId: survey.id }); } catch {}
     return sendSuccess(reply, survey, 'Survey created', 201);
   });
 
@@ -126,7 +133,7 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
     }).parse(request.body);
     const tenant = await db('tenants').where({ slug: body.tenantSlug }).first();
     if (!tenant) return sendError(reply, 'Tenant not found', 404);
-    const survey = await db('surveys').where({ id: surveyId }).first();
+    const survey = await db('surveys').where({ id: surveyId, tenant_id: tenant.id }).first();
     if (!survey) return sendError(reply, 'Survey not found', 404);
 
     let totalScore = 0; let count = 0;
@@ -149,6 +156,7 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
     const total = await qb.clone().count('survey_responses.id as count').first();
     const data = await qb.clone().select('survey_responses.*', 'surveys.name as survey_name', 'surveys.type as survey_type', 'patients.first_name', 'patients.last_name')
       .orderBy('survey_responses.created_at', 'desc').limit(query.limit).offset((query.page - 1) * query.limit);
+    try { await logAudit({ tenantId, userId: (getCtx(request)).userId, action: 'survey.responses_list', entityType: 'survey_response' }); } catch {}
     return sendPaginated(reply, data, Number(total?.count || 0), query.page, query.limit);
   });
 
@@ -159,6 +167,7 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
     const bySurvey = await db('survey_responses').join('surveys', 'survey_responses.survey_id', 'surveys.id').where('survey_responses.tenant_id', tenantId)
       .select('surveys.name', 'surveys.type').count('survey_responses.id as count').avg('survey_responses.overall_score as avg_score').groupBy('surveys.name', 'surveys.type');
     const todayCount = await db('survey_responses').where({ tenant_id: tenantId }).whereRaw("DATE(created_at) = CURRENT_DATE").count('id as count').first();
+    try { await logAudit({ tenantId, userId: (getCtx(request)).userId, action: 'survey.stats', entityType: 'survey' }); } catch {}
     return sendSuccess(reply, { totalResponses: Number(totalResponses?.count || 0), averageScore: Number((avgScore as Record<string, unknown>)?.avg || 0).toFixed(1), bySurvey, todayCount: Number(todayCount?.count || 0) });
   });
 
@@ -182,7 +191,7 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
     });
   }
 
-  console.log('✓ Patient Experience module loaded (Kiosk, Queue Display, Surveys + WebSocket)');
+  // Module loaded
 }
 
 export { broadcastQueueUpdate };

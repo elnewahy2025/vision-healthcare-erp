@@ -49,3 +49,4 @@ deployment/nginx/ssl/*.key
 packages/frontend/public/icons/icon-192.png
 packages/frontend/public/icons/icon-512.png
 packages/frontend/public/icons/generate-icons.mjs
+.github/workflows/sbom.yml
