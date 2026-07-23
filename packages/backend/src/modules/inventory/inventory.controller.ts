@@ -465,6 +465,19 @@ export async function listPurchaseOrders(request: FastifyRequest, reply: Fastify
   return sendSuccess(reply, posWithItems);
 }
 
+export async function getPurchaseOrder(request: FastifyRequest, reply: FastifyReply) {
+  const { poId } = request.params as { poId: string };
+  const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
+
+  const po = await repo.findPurchaseOrderById(poId, tenantId);
+  if (!po) throw new NotFoundError('Purchase order', poId);
+
+  const items = await repo.findPurchaseOrderItems(poId, tenantId);
+  try { await logAudit({ tenantId, userId, action: 'inventory.po.view', entityType: 'purchase_order', entityId: poId }); } catch {}
+  return sendSuccess(reply, mapPurchaseOrder(po, items));
+}
+
 export async function createPurchaseOrder(request: FastifyRequest, reply: FastifyReply) {
   const body = createPurchaseOrderSchema.parse(request.body);
   const tenantId = getTenantId(request);

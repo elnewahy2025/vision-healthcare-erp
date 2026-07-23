@@ -7,7 +7,7 @@ import {
   listTransactions,
   createAdjustment, transferStock, dispenseStock, bulkStockReceipt,
   getLowStockAlerts, getExpiredItems, getControlledSubstances, getStockValuation,
-  listPurchaseOrders, createPurchaseOrder, receivePurchaseOrder,
+  listPurchaseOrders, getPurchaseOrder, createPurchaseOrder, receivePurchaseOrder,
 } from './inventory.controller.js';
 
 export async function registerInventoryRoutes(app: FastifyInstance) {
@@ -51,6 +51,7 @@ export async function registerInventoryRoutes(app: FastifyInstance) {
 
   // Purchase Orders
   app.get('/api/v1/inventory/pos', { preHandler: [authenticate] }, listPurchaseOrders);
+  app.get('/api/v1/inventory/pos/:poId', { preHandler: [authenticate] }, getPurchaseOrder);
   app.post('/api/v1/inventory/pos', { preHandler: [authenticate] }, createPurchaseOrder);
   app.put('/api/v1/inventory/pos/:poId/receive', { preHandler: [authenticate] }, receivePurchaseOrder);
 }
