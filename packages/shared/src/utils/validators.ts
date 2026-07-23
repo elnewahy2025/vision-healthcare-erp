@@ -39,3 +39,73 @@ export function isStrongPassword(password: string): {
   if (!/[^A-Za-z0-9]/.test(password)) errors.push('Must contain a special character');
   return { valid: errors.length === 0, errors };
 }
+
+// ── SSRF Protection ──
+
+const BLOCKED_HOSTNAMES = [
+  'localhost',
+  '0.0.0.0',
+  'metadata.google.internal',
+  'instance-data',
+];
+
+const BLOCKED_IP_PREFIXES = [
+  '127.',
+  '10.',
+  '172.',
+  '192.168.',
+  '169.254.',
+  '0.',
+];
+
+function isBlockedIp(ip: string): boolean {
+  if (ip === '::1' || ip === '::') return true;
+  for (const prefix of BLOCKED_IP_PREFIXES) {
+    if (ip.startsWith(prefix)) {
+      if (prefix === '172.') {
+        const secondOctet = parseInt(ip.split('.')[1], 10);
+        if (secondOctet >= 16 && secondOctet <= 31) return true;
+        continue;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+export function validateWebhookUrl(urlString: string): { valid: true } | { valid: false; reason: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(urlString);
+  } catch {
+    return { valid: false, reason: 'Invalid URL format' };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { valid: false, reason: `Protocol '${parsed.protocol}' not allowed. Use http or https.` };
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  if (BLOCKED_HOSTNAMES.includes(hostname)) {
+    return { valid: false, reason: `Hostname '${hostname}' is blocked` };
+  }
+
+  const cleanHostname = hostname.replace(/^\[|\]$/g, '');
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(cleanHostname)) {
+    if (isBlockedIp(cleanHostname)) {
+      return { valid: false, reason: `IP address '${cleanHostname}' is in a blocked range` };
+    }
+  }
+
+  if (cleanHostname === '::1' || cleanHostname === '::') {
+    return { valid: false, reason: 'IPv6 loopback is blocked' };
+  }
+
+  const port = parsed.port ? parseInt(parsed.port, 10) : (parsed.protocol === 'https:' ? 443 : 80);
+  const allowedPorts = [80, 443, 8080, 8443];
+  if (!allowedPorts.includes(port)) {
+    return { valid: false, reason: `Port ${port} is not allowed. Allowed: ${allowedPorts.join(', ')}` };
+  }
+
+  return { valid: true };
+}

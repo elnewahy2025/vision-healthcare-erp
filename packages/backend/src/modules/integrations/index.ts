@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { validateWebhookUrl } from '@healthcare/shared/utils';
 import { authenticate } from '../auth-guard.js';
 
 export async function registerIntegrationsModule(app: FastifyInstance) {
@@ -83,6 +84,10 @@ export async function registerIntegrationsModule(app: FastifyInstance) {
 
   app.post('/api/v1/integrations/webhooks', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
+    if (body.url) {
+      const urlCheck = validateWebhookUrl(body.url as string);
+      if (!urlCheck.valid) return reply.status(400).send({ success: false, error: urlCheck.reason });
+    }
     const [wh] = await db('webhooks').insert({
       tenant_id: tenantId, integration_id: body.integrationId || null,
       name: body.name, url: body.url,
@@ -96,7 +101,12 @@ export async function registerIntegrationsModule(app: FastifyInstance) {
   app.put('/api/v1/integrations/webhooks/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
     const update: Record<string, unknown> = { updated_at: new Date() };
-    if (body.name) update.name = body.name; if (body.url) update.url = body.url;
+    if (body.name) update.name = body.name;
+    if (body.url) {
+      const urlCheck = validateWebhookUrl(body.url as string);
+      if (!urlCheck.valid) return reply.status(400).send({ success: false, error: urlCheck.reason });
+      update.url = body.url;
+    }
     if (body.events) update.events = JSON.stringify(body.events);
     if (body.headers) update.headers = JSON.stringify(body.headers);
     if (body.status) update.status = body.status;

@@ -41,7 +41,7 @@ export {
 } from './utils/crypto';
 
 export {
-  isValidEmail, isValidPhone, isValidMrn, isValidDate,
+  isValidEmail, isValidPhone, isValidMrn, isValidDate, validateWebhookUrl,
   isValidBloodType, isValidIcd10Code, isStrongPassword,
 } from './utils/validators';
 

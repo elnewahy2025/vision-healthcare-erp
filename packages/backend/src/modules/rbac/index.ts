@@ -4,6 +4,7 @@ import { db } from '../../core/database.js';
 import { getCtx } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated, sendError } from '../../utils/response.js';
 import { authenticate } from '../auth-guard.js';
+import { requirePermission } from '../authorize-guard.js';
 
 // Fine-grained permission modules and actions
 const PERMISSION_MODULES = [
@@ -46,7 +47,7 @@ export async function registerRbacModule(app: FastifyInstance) {
   });
 
   // Get user permissions
-  app.get('/api/v1/rbac/users/:userId/permissions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
+  app.get('/api/v1/rbac/users/:userId/permissions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep), requirePermission('users.read')] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const { userId } = z.object({ userId: z.string().uuid() }).parse(request.params);
 
@@ -71,7 +72,7 @@ export async function registerRbacModule(app: FastifyInstance) {
   });
 
   // Update user permissions (admin only)
-  app.put('/api/v1/rbac/users/:userId/permissions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
+  app.put('/api/v1/rbac/users/:userId/permissions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep), requirePermission('users.update')] }, async (request, reply) => {
     const { tenantId, roles } = getCtx(request);
     if (!roles?.includes('admin') && !roles?.includes('super_admin')) {
       return sendError(reply, 'Insufficient permissions', 403);
