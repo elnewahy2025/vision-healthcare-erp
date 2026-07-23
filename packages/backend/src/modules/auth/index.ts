@@ -484,44 +484,50 @@ export async function registerAuthModule(app: FastifyInstance) {
     const ip = request.ip ?? '127.0.0.1';
     const userAgent = request.headers['user-agent'] || null;
 
-    const result = await rotateRefreshToken(refreshToken, ip, userAgent);
-    if (!result) throw new UnauthorizedError('Invalid or expired refresh token');
+    // ── Pre-rotation checks: user-agent binding + reuse detection ──
+    const oldTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    const oldRecord = await db('refresh_tokens').where({ token_hash: oldTokenHash }).first();
 
-    // Look up user to get tenant info and verify they're still active
-    const tokenRecord = await db('refresh_tokens')
-      .where({ token_hash: crypto.createHash('sha256').update(refreshToken).digest('hex') })
-      .first();
+    if (!oldRecord) {
+      throw new UnauthorizedError('Invalid refresh token');
+    }
 
-    // Validate user agent matches (token binding)
-    if (tokenRecord && tokenRecord.user_agent && userAgent && tokenRecord.user_agent !== userAgent) {
-      // User agent mismatch — possible token theft, revoke all tokens
-      await revokeAllUserTokens(tokenRecord.user_id, tokenRecord.tenant_id);
-      await logAudit({ tenantId: tokenRecord.tenant_id, userId: tokenRecord.user_id, action: 'user.token_agent_mismatch' });
+    // User agent mismatch — possible token theft
+    if (oldRecord.user_agent && userAgent && oldRecord.user_agent !== userAgent) {
+      await revokeAllUserTokens(oldRecord.user_id, oldRecord.tenant_id);
+      await logAudit({ tenantId: oldRecord.tenant_id, userId: oldRecord.user_id, action: 'user.token_agent_mismatch' });
       throw new UnauthorizedError('Session from different device. All sessions revoked for security.');
     }
 
-    // If the old token was revoked (family reuse detected), revoke ALL tokens for this family
-    if (!tokenRecord || tokenRecord.is_revoked) {
-      // This is a stolen token reuse — revoke all tokens for this user
-      if (tokenRecord) {
-        await revokeAllUserTokens(tokenRecord.user_id, tokenRecord.tenant_id);
-        await logAudit({ tenantId: tokenRecord.tenant_id, userId: tokenRecord.user_id, action: 'user.token_family_reuse_detected' });
-      }
+    // Token already revoked — family reuse detected
+    if (oldRecord.is_revoked) {
+      await revokeAllUserTokens(oldRecord.user_id, oldRecord.tenant_id);
+      await logAudit({ tenantId: oldRecord.tenant_id, userId: oldRecord.user_id, action: 'user.token_family_reuse_detected' });
       throw new UnauthorizedError('Refresh token reuse detected. All sessions revoked.');
     }
 
-    const user = await db('users').where({ id: tokenRecord.user_id }).first();
+    // ── Rotate: revoke old, create new ──
+    const result = await rotateRefreshToken(refreshToken, ip, userAgent);
+    if (!result) throw new UnauthorizedError('Invalid or expired refresh token');
+
+    const user = await db('users').where({ id: oldRecord.user_id }).first();
     if (!user || user.status !== 'active') {
       throw new UnauthorizedError('Account is not active');
     }
 
     const jwt = getJwtHelper(app);
     const accessToken = jwt.sign(
-      buildAccessTokenPayload(tokenRecord.tenant_id, user.id),
+      buildAccessTokenPayload(oldRecord.tenant_id, user.id),
       { expiresIn: env.ACCESS_TOKEN_EXPIRY },
     );
 
-    await logAudit({ tenantId: tokenRecord.tenant_id, userId: user.id, action: 'user.token_refresh' });
+    // Update session activity timestamp
+    await db('user_sessions')
+      .where({ user_id: user.id, tenant_id: oldRecord.tenant_id, is_active: true })
+      .where('token_hash', oldTokenHash)
+      .update({ last_activity_at: new Date() });
+
+    await logAudit({ tenantId: oldRecord.tenant_id, userId: user.id, action: 'user.token_refresh' });
 
     reply.setCookie('refresh_token', result.refreshToken, {
       httpOnly: true,
@@ -782,11 +788,22 @@ export async function registerAuthModule(app: FastifyInstance) {
 
     await db('users').where({ id: userId }).update({ mfa_enabled: true });
 
+    // Generate and store hashed recovery codes
     const recoveryCodes = Array.from({ length: 8 }, () => crypto.randomBytes(4).toString('hex'));
+    for (const code of recoveryCodes) {
+      const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+      await db('password_resets').insert({
+        tenant_id: tenantId,
+        user_id: userId,
+        token_hash: codeHash,
+        type: 'mfa_recovery',
+        expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+      });
+    }
 
     await logAudit({ tenantId, userId, action: 'user.mfa_enabled' });
 
-    return sendSuccess(reply, { message: 'Two-factor authentication enabled.', recoveryCodes });
+    return sendSuccess(reply, { message: 'Two-factor authentication enabled. Store these recovery codes securely.', recoveryCodes });
   });
 
   // ===================== 2FA DISABLE =====================

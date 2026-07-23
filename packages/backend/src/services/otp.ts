@@ -1,9 +1,10 @@
+import crypto from 'crypto';
 import { db } from '../core/database.js';
 import { sendSms } from './sms.js';
 import { getEnv } from '@healthcare/shared/config';
 
 function generateOtpCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 999999).toString();
 }
 
 export async function createAndSendOtp(
@@ -11,9 +12,9 @@ export async function createAndSendOtp(
   identifier: string,
   purpose: 'login' | 'verify_email' | 'verify_phone' | 'password_reset',
 ): Promise<boolean> {
-  // Delete any existing unused OTPs for this identifier+purpose
+  // Delete ALL expired OTPs for this identifier+purpose (prevents unbounded growth)
   await db('otp_codes')
-    .where({ identifier, purpose, verified_at: null })
+    .where({ identifier, purpose })
     .where('expires_at', '<', new Date())
     .delete();
 

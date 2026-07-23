@@ -170,6 +170,9 @@ export function validateProductionEnvironment(): void {
   if (!process.env.DB_PASSWORD || INSECURE_DEFAULTS.includes(process.env.DB_PASSWORD)) {
     errors.push("DB_PASSWORD is missing or set to an insecure default value.");
   }
+  if (!process.env.CSRF_SECRET || process.env.CSRF_SECRET.length < 32) {
+    errors.push("CSRF_SECRET must be set and at least 32 characters in production.");
+  }
   if (envVars.CORS_ORIGIN === "*") {
     errors.push("CORS_ORIGIN must not be '*' in production. Set specific allowed origins.");
   }
