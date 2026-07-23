@@ -9,14 +9,25 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 30000,
+  withCredentials: true, // Send cookies cross-origin
 });
+
+// Store access token in memory only (not localStorage)
+let inMemoryAccessToken: string | null = null;
+
+export function setAccessToken(token: string | null): void {
+  inMemoryAccessToken = token;
+}
+
+export function getAccessToken(): string | null {
+  return inMemoryAccessToken;
+}
 
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('accessToken');
     const tenantSlug = localStorage.getItem('tenantSlug');
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (inMemoryAccessToken && config.headers) {
+      config.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
       config.headers[VERSION_HEADER] = API_VERSION;
     }
     if (tenantSlug && config.headers) {
@@ -56,6 +67,7 @@ apiClient.interceptors.response.use(
         return new Promise<string>((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((token) => {
+          inMemoryAccessToken = token;
           if (originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${token}`;
           }
@@ -67,19 +79,13 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
-        }
-
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-          refreshToken,
+        // Refresh token is in HttpOnly cookie — sent automatically with withCredentials
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, {
+          withCredentials: true,
         });
 
-        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', newRefreshToken);
-
+        const { accessToken } = response.data.data;
+        inMemoryAccessToken = accessToken;
         processQueue(null, accessToken);
 
         if (originalRequest.headers) {
@@ -88,6 +94,7 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
+        inMemoryAccessToken = null;
         localStorage.clear();
         window.location.href = '/login';
         return Promise.reject(refreshError);

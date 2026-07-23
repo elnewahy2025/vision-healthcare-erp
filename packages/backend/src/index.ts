@@ -3,6 +3,7 @@ import Fastify, { type FastifyRequest, type FastifyReply } from 'fastify';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
@@ -92,6 +93,7 @@ async function buildApp() {
   });
 
   // Plugins
+  await app.register(cookie, { secret: env.CSRF_SECRET || 'csrf-secret', hook: 'onRequest' });
   await app.register(cors, { origin: env.CORS_ORIGIN, credentials: true });
   // Pino HTTP middleware for structured request logging with redaction
   const httpLogger = pinoHttp({ logger: pino(loggerOptions), redact: ["req.headers.authorization", "req.body.token", "req.body.password", "req.body.refreshToken"] });

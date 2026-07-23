@@ -10,7 +10,7 @@ import { UnauthorizedError, ConflictError } from '@healthcare/shared/errors';
 import type { User, Role } from '@healthcare/shared/types';
 import { generateSecret, verifyToken, generateQrCode } from '../../services/totp.js';
 import { createAndSendOtp, verifyOtp, incrementOtpAttempt } from '../../services/otp.js';
-import { sendNotification } from '../../services/notification.js';
+import { sendEmail } from '../../services/email.js';
 import { logAudit } from '../../services/audit.js';
 import { generateTokenPair, rotateRefreshToken, revokeRefreshToken, revokeAllUserTokens } from '../../services/refresh-token.js';
 import { getEnv } from '@healthcare/shared/config';
@@ -165,6 +165,44 @@ function buildAccessTokenPayload(
   };
 }
 
+
+// ── CSRF validation middleware for state-changing requests ──
+function csrfValidation(request: FastifyRequest, reply: FastifyReply): void {
+  // Skip CSRF for GET/HEAD/OPTIONS (safe methods)
+  const method = request.method.toUpperCase();
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+    return;
+  }
+
+  // Skip CSRF for public endpoints (login, register, refresh, forgot-password)
+  const url = request.url;
+  if (
+    url.includes('/auth/login') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/forgot-password') ||
+    url.includes('/auth/otp/') ||
+    url.includes('/tenants') && method === 'POST'
+  ) {
+    return;
+  }
+
+  // Validate CSRF token from header against cookie
+  const csrfHeader = request.headers['x-csrf-token'];
+  const cookies = request.cookies;
+  const csrfCookie = cookies?.csrf_token;
+
+  if (!csrfHeader || !csrfCookie) {
+    reply.code(403).send({ success: false, error: 'CSRF token missing' });
+    return;
+  }
+
+  const expected = crypto.createHash('sha256').update(csrfHeader + env.CSRF_SECRET).digest('hex');
+  if (expected !== csrfCookie) {
+    reply.code(403).send({ success: false, error: 'CSRF token invalid' });
+    return;
+  }
+}
+
 // ── Email verification ──
 function generateVerificationToken(): string {
   return crypto.randomBytes(32).toString('hex');
@@ -260,13 +298,10 @@ export async function registerAuthModule(app: FastifyInstance) {
     // Send verification email (best-effort)
     try {
       const verifyUrl = `${env.APP_URL}/verify-email?token=${result.verificationToken}`;
-      await sendNotification({
-        tenantId: result.tenant.id,
-        userId: result.user.id,
-        title: 'Verify your email',
-        message: `Please verify your email by clicking: ${verifyUrl}`,
-        type: 'email_verification',
-        channel: 'email',
+      await sendEmail({
+        to: body.adminEmail,
+        subject: 'Verify your email — Vision Healthcare',
+        html: `<p>Welcome to Vision Healthcare!</p><p>Please verify your email by clicking: <a href="${verifyUrl}">Verify Email</a></p><p>This link expires in 24 hours.</p>`,
       });
     } catch {
       // Email sending is best-effort — don't fail registration
@@ -347,6 +382,15 @@ export async function registerAuthModule(app: FastifyInstance) {
     // CSRF token for state-changing requests
     const csrfToken = generateCsrfToken();
 
+    // Set refresh token as HttpOnly cookie (not accessible via JavaScript)
+    reply.setCookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/api/v1/auth/refresh',
+      maxAge: env.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
+    });
+
     reply.setCookie('csrf_token', hashCsrfToken(csrfToken), {
       httpOnly: true,
       secure: env.NODE_ENV === 'production',
@@ -357,7 +401,6 @@ export async function registerAuthModule(app: FastifyInstance) {
 
     return sendSuccess(reply, {
       accessToken,
-      refreshToken,
       csrfToken,
       expiresIn: 3600,
       user: {
@@ -416,8 +459,16 @@ export async function registerAuthModule(app: FastifyInstance) {
 
     await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.login.mfa', ipAddress: ip });
 
+    reply.setCookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/api/v1/auth/refresh',
+      maxAge: env.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
+    });
+
     return sendSuccess(reply, {
-      accessToken, refreshToken, expiresIn: 3600,
+      accessToken, expiresIn: 3600,
       user: {
         id: user.id, email: user.email,
         firstName: user.first_name, lastName: user.last_name,
@@ -440,6 +491,14 @@ export async function registerAuthModule(app: FastifyInstance) {
     const tokenRecord = await db('refresh_tokens')
       .where({ token_hash: crypto.createHash('sha256').update(refreshToken).digest('hex') })
       .first();
+
+    // Validate user agent matches (token binding)
+    if (tokenRecord && tokenRecord.user_agent && userAgent && tokenRecord.user_agent !== userAgent) {
+      // User agent mismatch — possible token theft, revoke all tokens
+      await revokeAllUserTokens(tokenRecord.user_id, tokenRecord.tenant_id);
+      await logAudit({ tenantId: tokenRecord.tenant_id, userId: tokenRecord.user_id, action: 'user.token_agent_mismatch' });
+      throw new UnauthorizedError('Session from different device. All sessions revoked for security.');
+    }
 
     // If the old token was revoked (family reuse detected), revoke ALL tokens for this family
     if (!tokenRecord || tokenRecord.is_revoked) {
@@ -464,7 +523,15 @@ export async function registerAuthModule(app: FastifyInstance) {
 
     await logAudit({ tenantId: tokenRecord.tenant_id, userId: user.id, action: 'user.token_refresh' });
 
-    return sendSuccess(reply, { accessToken, refreshToken: result.refreshToken, expiresIn: 3600 });
+    reply.setCookie('refresh_token', result.refreshToken, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/api/v1/auth/refresh',
+      maxAge: env.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
+    });
+
+    return sendSuccess(reply, { accessToken, expiresIn: 3600 });
   });
 
   // ===================== LOGOUT =====================
@@ -483,6 +550,9 @@ export async function registerAuthModule(app: FastifyInstance) {
       .update({ is_active: false });
 
     await logAudit({ tenantId, userId, action: 'user.logout' });
+
+    reply.clearCookie('refresh_token', { path: '/api/v1/auth/refresh' });
+    reply.clearCookie('csrf_token', { path: '/' });
 
     return sendSuccess(reply, { message: 'Logged out successfully' });
   });
@@ -564,13 +634,10 @@ export async function registerAuthModule(app: FastifyInstance) {
     });
 
     const resetLink = `${env.APP_URL}/reset-password?token=${resetToken}`;
-    await sendNotification({
-      tenantId: tenant.id,
-      userId: user.id,
-      title: 'Password Reset',
-      message: `Reset your password: ${resetLink}`,
-      type: 'password_reset',
-      channel: 'email',
+    await sendEmail({
+      to: user.email,
+      subject: 'Password Reset — Vision Healthcare',
+      html: `<p>You requested a password reset.</p><p>Click: <a href="${resetLink}">Reset Password</a></p><p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>`,
     });
 
     await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.forgot_password' });
@@ -678,13 +745,10 @@ export async function registerAuthModule(app: FastifyInstance) {
 
     try {
       const verifyUrl = `${env.APP_URL}/verify-email?token=${verificationToken}`;
-      await sendNotification({
-        tenantId: tenant.id,
-        userId: user.id,
-        title: 'Verify your email',
-        message: `Please verify your email by clicking: ${verifyUrl}`,
-        type: 'email_verification',
-        channel: 'email',
+      await sendEmail({
+        to: user.email,
+        subject: 'Verify your email — Vision Healthcare',
+        html: `<p>Please verify your email by clicking: <a href="${verifyUrl}">Verify Email</a></p><p>This link expires in 24 hours.</p>`,
       });
     } catch {
       // Best-effort

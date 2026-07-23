@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authApi } from '../lib/api';
+import { setAccessToken } from '../lib/api/client';
 
 export interface User {
   id: string;
@@ -37,7 +38,7 @@ interface AuthContextType {
   tenant: Tenant | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string, tenantSlug: string) => Promise<any>;
+  login: (email: string, password: string, tenantSlug: string) => Promise<Record<string, unknown>>;
   register: (data: { name: string; slug: string; adminEmail: string; adminPassword: string; adminName: string; locale?: string }) => Promise<void>;
   logout: () => void;
   setLocale: (locale: 'ar' | 'en') => void;
@@ -49,7 +50,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('accessToken'));
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
@@ -60,43 +61,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(true);
       localStorage.setItem('locale', data.user.locale);
     } catch {
+      setAccessToken(null);
+      setIsAuthenticated(false);
       throw new Error('Failed to refresh user');
     }
   }, []);
 
+  // On mount, try to load user from session (cookie-based auth)
   useEffect(() => {
-    if (localStorage.getItem('accessToken')) {
-      authApi.me()
-        .then((data) => {
-          setUser(data.user);
-          setTenant(data.tenant);
-          setIsAuthenticated(true);
-          localStorage.setItem('locale', data.user.locale);
-        })
-        .catch(() => {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          setIsAuthenticated(false);
-        })
-        .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
-    }
+    authApi.me()
+      .then((data) => {
+        setUser(data.user);
+        setTenant(data.tenant);
+        setIsAuthenticated(true);
+        localStorage.setItem('locale', data.user.locale);
+      })
+      .catch(() => {
+        setAccessToken(null);
+        setIsAuthenticated(false);
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
-  const login = useCallback(async (email: string, password: string, tenantSlug: string) => {
+  const login = useCallback(async (email: string, password: string, tenantSlug: string): Promise<Record<string, unknown>> => {
     const data = await authApi.login({ email, password, tenantSlug });
 
-    // If MFA is required, return the partial data
+    // If MFA is required, return partial data (no tokens yet)
     if (data.mfaRequired) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
       return { mfaRequired: true, partialToken: data.partialToken, userId: data.userId };
     }
 
-    localStorage.setItem('accessToken', data.tokens.accessToken);
-    localStorage.setItem('refreshToken', data.tokens.refreshToken);
-    localStorage.setItem('tenantSlug', data.tenant.slug);
+    // Tokens set: accessToken in memory, refreshToken in HttpOnly cookie
+    localStorage.setItem('tenantSlug', tenantSlug);
     localStorage.setItem('locale', data.user.locale);
     setUser(data.user);
     setTenant(data.tenant);
@@ -109,9 +105,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    authApi.logout().catch(() => {
+      // Ignore errors — clear local state regardless
+    });
+    setAccessToken(null);
     localStorage.removeItem('tenantSlug');
+    localStorage.removeItem('locale');
     setUser(null);
     setTenant(null);
     setIsAuthenticated(false);
