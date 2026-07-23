@@ -167,7 +167,7 @@ function buildAccessTokenPayload(
 
 
 // ── CSRF validation middleware for state-changing requests ──
-function csrfValidation(request: FastifyRequest, reply: FastifyReply): void {
+export function csrfValidation(request: FastifyRequest, reply: FastifyReply): void {
   // Skip CSRF for GET/HEAD/OPTIONS (safe methods)
   const method = request.method.toUpperCase();
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
