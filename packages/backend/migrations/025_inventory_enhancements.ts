@@ -46,7 +46,6 @@ export async function up(knex: Knex): Promise<void> {
   if (!hasReason) {
     await knex.schema.alterTable('inventory_transactions', (table) => {
       table.string('reason_code', 50).nullable();
-      table.integer('unit_cost').defaultTo(0);
     });
   }
 

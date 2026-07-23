@@ -1,7 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { sendSuccess } from '../../utils/response.js';
-import { ValidationError, NotFoundError, ConflictError } from '@healthcare/shared/errors';
+import { ValidationError, NotFoundError } from '@healthcare/shared/errors';
 import { logAudit } from '../../services/audit.js';
 import * as repo from './inventory.repository.js';
 import {
