@@ -1,6 +1,20 @@
 import { db } from '../../core/database.js';
 import type { PatientRow } from './types.js';
 
+const MAX_PAGE_LIMIT = 100;
+
+function enforceLimit(limit: number): number {
+  return Math.min(Math.max(limit, 1), MAX_PAGE_LIMIT);
+}
+
+/**
+ * Set the PostgreSQL session variable for Row Level Security.
+ * Must be called before any query in a request lifecycle.
+ */
+export async function setRlsContext(tenantId: string): Promise<void> {
+  await db.raw("SET LOCAL app.current_tenant = ?", [tenantId]);
+}
+
 export async function findPatients(tenantId: string, options: {
   search?: string;
   status?: string;
@@ -9,6 +23,7 @@ export async function findPatients(tenantId: string, options: {
   limit: number;
   offset: number;
 }): Promise<{ patients: PatientRow[]; total: number }> {
+  const safeLimit = enforceLimit(options.limit);
   let query = db('patients')
     .where({ tenant_id: tenantId })
     .whereNull('deleted_at');
@@ -31,7 +46,7 @@ export async function findPatients(tenantId: string, options: {
   const total = await query.clone().count('id as count').first();
   const patients = await query
     .orderBy(options.sort || 'created_at', options.order || 'desc')
-    .limit(options.limit)
+    .limit(safeLimit)
     .offset(options.offset);
 
   return { patients, total: Number(total?.count || 0) };
@@ -94,9 +109,19 @@ export async function insertPatient(data: {
   return patient;
 }
 
-export async function updatePatientById(patientId: string, updateData: Record<string, unknown>): Promise<PatientRow | undefined> {
+/**
+ * #14: Optimistic concurrency — checks updated_at before writing.
+ * Throws if the row was modified since the client last read it.
+ */
+export async function updatePatientById(
+  patientId: string,
+  tenantId: string,
+  updateData: Record<string, unknown>,
+  expectedUpdatedAt: string,
+): Promise<PatientRow | undefined> {
   const [updated] = await db('patients')
-    .where({ id: patientId })
+    .where({ id: patientId, tenant_id: tenantId })
+    .where('updated_at', '=', expectedUpdatedAt)
     .update(updateData)
     .returning('*');
   return updated;
@@ -106,7 +131,6 @@ export async function softDeletePatient(patientId: string): Promise<void> {
   await db('patients').where({ id: patientId }).update({
     status: 'inactive',
     deleted_at: new Date(),
-    updated_at: new Date(),
   });
 }
 
@@ -122,4 +146,145 @@ export async function quickSearchPatients(tenantId: string, q: string): Promise<
     })
     .select('id', 'first_name', 'last_name', 'medical_record_number', 'phone', 'date_of_birth', 'gender')
     .limit(10);
+}
+
+// ── #9: Patient merge ──
+
+export async function mergePatients(
+  primaryId: string,
+  duplicateId: string,
+  tenantId: string,
+): Promise<{ merged: boolean; movedRecords: number }> {
+  // Verify both patients exist and belong to the same tenant
+  const primary = await findPatientById(primaryId, tenantId);
+  const duplicate = await findPatientById(duplicateId, tenantId);
+  if (!primary || !duplicate) return { merged: false, movedRecords: 0 };
+
+  let movedRecords = 0;
+
+  await db.transaction(async (trx) => {
+    // Move appointments from duplicate to primary
+    const apptResult = await trx('appointments')
+      .where({ patient_id: duplicateId })
+      .update({ patient_id: primaryId });
+    movedRecords += apptResult;
+
+    // Move EMR records
+    const emrResult = await trx('emr_records')
+      .where({ patient_id: duplicateId })
+      .update({ patient_id: primaryId });
+    movedRecords += emrResult;
+
+    // Move invoices
+    const invResult = await trx('invoices')
+      .where({ patient_id: duplicateId })
+      .update({ patient_id: primaryId });
+    movedRecords += invResult;
+
+    // Move lab orders
+    const labResult = await trx('lab_orders')
+      .where({ patient_id: duplicateId })
+      .update({ patient_id: primaryId });
+    movedRecords += labResult;
+
+    // Move prescriptions
+    const rxResult = await trx('pharmacy_prescriptions')
+      .where({ patient_id: duplicateId })
+      .update({ patient_id: primaryId });
+    movedRecords += rxResult;
+
+    // Move insurance claims
+    const claimResult = await trx('insurance_claims')
+      .where({ patient_id: duplicateId })
+      .update({ patient_id: primaryId });
+    movedRecords += claimResult;
+
+    // Move home visits
+    const hvResult = await trx('home_visits')
+      .where({ patient_id: duplicateId })
+      .update({ patient_id: primaryId });
+    movedRecords += hvResult;
+
+    // Move telemedicine sessions
+    const tsResult = await trx('telemedicine_sessions')
+      .where({ patient_id: duplicateId })
+      .update({ patient_id: primaryId });
+    movedRecords += tsResult;
+
+    // Move kiosk check-ins
+    const kiResult = await trx('kiosk_checkins')
+      .where({ patient_id: duplicateId })
+      .update({ patient_id: primaryId });
+    movedRecords += kiResult;
+
+    // Soft-delete the duplicate
+    await trx('patients').where({ id: duplicateId }).update({
+      status: 'merged',
+      deleted_at: new Date(),
+    });
+  });
+
+  return { merged: true, movedRecords };
+}
+
+// ── #16: Bulk import ──
+
+export async function bulkInsertPatients(
+  tenantId: string,
+  patients: Array<{
+    firstName: string;
+    lastName: string;
+    dateOfBirth: string;
+    gender: string;
+    phone: string;
+    email?: string;
+    nationality?: string;
+    bloodType?: string;
+  }>,
+  userId: string,
+): Promise<{ inserted: number; errors: Array<{ index: number; error: string }> }> {
+  const errors: Array<{ index: number; error: string }> = [];
+  let inserted = 0;
+
+  // Process in batches of 50
+  const BATCH_SIZE = 50;
+  for (let i = 0; i < patients.length; i += BATCH_SIZE) {
+    const batch = patients.slice(i, i + BATCH_SIZE);
+    const rows = batch.map((p, batchIdx) => {
+      const idx = i + batchIdx;
+      try {
+        return {
+          tenant_id: tenantId,
+          medical_record_number: `MRN-${Date.now().toString(36).toUpperCase()}-${String(idx).padStart(4, '0')}`,
+          first_name: p.firstName,
+          last_name: p.lastName,
+          date_of_birth: p.dateOfBirth,
+          gender: p.gender,
+          phone: p.phone,
+          email: p.email || null,
+          nationality: p.nationality || null,
+          blood_type: p.bloodType || null,
+          status: 'active',
+          created_by: userId,
+        };
+      } catch (err) {
+        errors.push({ index: idx, error: (err as Error).message });
+        return null;
+      }
+    }).filter(Boolean);
+
+    if (rows.length > 0) {
+      try {
+        await db('patients').insert(rows as Record<string, unknown>[]);
+        inserted += rows.length;
+      } catch (err) {
+        // If batch fails, record error for each row in batch
+        batch.forEach((_, batchIdx) => {
+          errors.push({ index: i + batchIdx, error: (err as Error).message });
+        });
+      }
+    }
+  }
+
+  return { inserted, errors };
 }

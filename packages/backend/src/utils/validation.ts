@@ -18,7 +18,12 @@ export const appointmentIdSchema = z.object({
 export const createPatientSchema = z.object({
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
-  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((val) => {
+    const dob = new Date(val);
+    const now = new Date();
+    const minDate = new Date('1900-01-01');
+    return dob <= now && dob >= minDate;
+  }, 'Date of birth must be between 1900 and today'),
   gender: z.enum(['male', 'female']),
   phone: z.string().min(7).max(20),
   email: z.string().email().optional(),

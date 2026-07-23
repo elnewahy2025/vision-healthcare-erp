@@ -4,6 +4,7 @@ import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { createPatientSchema, updatePatientSchema, paginationSchema } from '../../utils/validation.js';
 import { PatientNotFoundError } from '@healthcare/shared/errors';
 import { generateMedicalRecordNumber } from '@healthcare/shared/utils';
+import { logAudit } from '../../services/audit.js';
 import * as repo from './patient.repository.js';
 import { mapPatient } from './patient.mapper.js';
 import type { PatientRow, QuickSearchResult } from './types.js';
@@ -11,6 +12,7 @@ import type { PatientRow, QuickSearchResult } from './types.js';
 export async function listPatients(request: FastifyRequest, reply: FastifyReply) {
   const query = paginationSchema.parse(request.query);
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
   const search = (request.query as Record<string, unknown>).search as string | undefined;
   const status = (request.query as Record<string, unknown>).status as string | undefined;
 
@@ -19,15 +21,20 @@ export async function listPatients(request: FastifyRequest, reply: FastifyReply)
     limit: query.limit, offset: (query.page - 1) * query.limit,
   });
 
+  await logAudit({ tenantId, userId, action: 'patient.list', entityType: 'patients' });
+
   return sendPaginated(reply, patients.map(mapPatient), total, query.page, query.limit);
 }
 
 export async function getPatient(request: FastifyRequest, reply: FastifyReply) {
   const { patientId } = request.params as { patientId: string };
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
 
   const data = await repo.findPatientWithRelatedData(patientId, tenantId);
   if (!data) throw new PatientNotFoundError(patientId);
+
+  await logAudit({ tenantId, userId, action: 'patient.view', entityType: 'patients', entityId: patientId });
 
   return sendSuccess(reply, {
     ...mapPatient(data.patient),
@@ -54,6 +61,8 @@ export async function createPatient(request: FastifyRequest, reply: FastifyReply
     locale: locale || 'en', userId,
   });
 
+  await logAudit({ tenantId, userId, action: 'patient.create', entityType: 'patients', entityId: patient.id });
+
   return sendSuccess(reply, mapPatient(patient), 'Patient created successfully', 201);
 }
 
@@ -61,9 +70,21 @@ export async function updatePatient(request: FastifyRequest, reply: FastifyReply
   const { patientId } = request.params as { patientId: string };
   const body = updatePatientSchema.parse(request.body);
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
+  const expectedUpdatedAt = (body as Record<string, unknown>)._updatedAt as string | undefined;
 
   const existing = await repo.findPatientById(patientId, tenantId);
   if (!existing) throw new PatientNotFoundError(patientId);
+
+  // #14: Optimistic concurrency — if client sent _updatedAt, verify it matches
+  if (expectedUpdatedAt && existing.updated_at !== expectedUpdatedAt) {
+    return reply.status(409).send({
+      success: false,
+      error: 'Conflict',
+      message: 'Patient was modified by another user. Please refresh and try again.',
+      serverUpdatedAt: existing.updated_at,
+    });
+  }
 
   const updateData: Record<string, unknown> = {};
   if (body.firstName !== undefined) updateData.first_name = body.firstName;
@@ -76,20 +97,36 @@ export async function updatePatient(request: FastifyRequest, reply: FastifyReply
   if (body.bloodType !== undefined) updateData.blood_type = body.bloodType;
   if (body.address !== undefined) updateData.address = JSON.stringify(body.address);
   if (body.emergencyContact !== undefined) updateData.emergency_contact = JSON.stringify(body.emergencyContact);
-  updateData.updated_at = new Date();
 
-  const updated = await repo.updatePatientById(patientId, updateData);
-  return sendSuccess(reply, mapPatient(updated!), 'Patient updated successfully');
+  const updated = expectedUpdatedAt
+    ? await repo.updatePatientById(patientId, tenantId, updateData, expectedUpdatedAt)
+    : await repo.updatePatientById(patientId, tenantId, updateData, existing.updated_at);
+
+  if (!updated) {
+    return reply.status(409).send({
+      success: false,
+      error: 'Conflict',
+      message: 'Patient was modified by another user. Please refresh and try again.',
+    });
+  }
+
+  await logAudit({ tenantId, userId, action: 'patient.update', entityType: 'patients', entityId: patientId });
+
+  return sendSuccess(reply, mapPatient(updated), 'Patient updated successfully');
 }
 
 export async function deletePatient(request: FastifyRequest, reply: FastifyReply) {
   const { patientId } = request.params as { patientId: string };
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
 
   const existing = await repo.findPatientById(patientId, tenantId);
   if (!existing) throw new PatientNotFoundError(patientId);
 
   await repo.softDeletePatient(patientId);
+
+  await logAudit({ tenantId, userId, action: 'patient.delete', entityType: 'patients', entityId: patientId });
+
   return sendSuccess(reply, null, 'Patient deleted successfully');
 }
 
@@ -110,4 +147,69 @@ export async function quickSearch(request: FastifyRequest, reply: FastifyReply) 
   }));
 
   return sendSuccess(reply, results);
+}
+
+// ── #9: Patient merge ──
+export async function mergePatients(request: FastifyRequest, reply: FastifyReply) {
+  const { primaryId, duplicateId } = request.body as { primaryId: string; duplicateId: string };
+  const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
+
+  if (primaryId === duplicateId) {
+    return reply.status(400).send({ success: false, error: 'Cannot merge a patient with itself' });
+  }
+
+  const result = await repo.mergePatients(primaryId, duplicateId, tenantId);
+  if (!result.merged) {
+    throw new PatientNotFoundError(duplicateId);
+  }
+
+  await logAudit({
+    tenantId, userId,
+    action: 'patient.merge',
+    entityType: 'patients',
+    entityId: primaryId,
+    metadata: { duplicateId, movedRecords: result.movedRecords },
+  });
+
+  return sendSuccess(reply, { primaryId, duplicateId, movedRecords: result.movedRecords }, 'Patients merged successfully');
+}
+
+// ── #16: Bulk import ──
+export async function bulkImport(request: FastifyRequest, reply: FastifyReply) {
+  const { patients } = request.body as { patients: Array<{
+    firstName: string;
+    lastName: string;
+    dateOfBirth: string;
+    gender: string;
+    phone: string;
+    email?: string;
+    nationality?: string;
+    bloodType?: string;
+  }> };
+  const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
+
+  if (!patients || patients.length === 0) {
+    return reply.status(400).send({ success: false, error: 'No patients provided' });
+  }
+
+  if (patients.length > 1000) {
+    return reply.status(400).send({ success: false, error: 'Maximum 1000 patients per import' });
+  }
+
+  const result = await repo.bulkInsertPatients(tenantId, patients, userId);
+
+  await logAudit({
+    tenantId, userId,
+    action: 'patient.bulk_import',
+    entityType: 'patients',
+    metadata: { total: patients.length, inserted: result.inserted, errors: result.errors.length },
+  });
+
+  return sendSuccess(reply, {
+    inserted: result.inserted,
+    total: patients.length,
+    errors: result.errors,
+  }, `Bulk import complete: ${result.inserted}/${patients.length} inserted`);
 }
