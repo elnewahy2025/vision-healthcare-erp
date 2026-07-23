@@ -9,7 +9,6 @@ import {
   StatusTransitionError,
   WorkingHoursError,
   CancellationPolicyError,
-  ConflictError,
   ValidationError,
 } from '@healthcare/shared/errors';
 import * as repo from './appointment.repository.js';
@@ -119,6 +118,8 @@ export async function createAppointment(request: FastifyRequest, reply: FastifyR
 
   // ── #11: Wire reminder service — send confirmation ──
   try {
+    const doctor = await repo.findUserForDoctorValidation(body.doctorId, tenantId);
+    const doctorDisplayName = doctor ? `Dr. ${doctor.first_name} ${doctor.last_name}` : 'Dr.';
     await sendAppointmentConfirmation({
       tenantId,
       appointmentId: appointment.id,
@@ -126,7 +127,7 @@ export async function createAppointment(request: FastifyRequest, reply: FastifyR
       patientName: `${patient.first_name} ${patient.last_name}`,
       patientPhone: patient.phone || '',
       patientEmail: patient.email || undefined,
-      doctorName: body.doctorId,
+      doctorName: doctorDisplayName,
       appointmentTime: `${body.appointmentDate} ${body.startTime}`,
     });
   } catch {

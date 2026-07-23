@@ -58,6 +58,7 @@ export const createAppointmentSchema = z.object({
   notes: z.string().optional(),
   isWalkIn: z.boolean().default(false),
   isVirtual: z.boolean().default(false),
+  timezone: z.string().max(50).default('Africa/Cairo'),
 });
 
 export const updateAppointmentSchema = createAppointmentSchema.partial();

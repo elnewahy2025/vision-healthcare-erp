@@ -130,10 +130,10 @@ export async function findOverlappingAppointment(
 export async function findUserForDoctorValidation(
   userId: string,
   tenantId: string,
-): Promise<{ id: string; status: string; role_id: string | null } | undefined> {
+): Promise<{ id: string; status: string; role_id: string | null; first_name: string; last_name: string } | undefined> {
   return db('users')
     .where({ id: userId, tenant_id: tenantId })
-    .select('id', 'status', 'role_id')
+    .select('id', 'status', 'role_id', 'first_name', 'last_name')
     .first();
 }
 
