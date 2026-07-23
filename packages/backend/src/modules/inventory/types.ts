@@ -1,5 +1,23 @@
 // ── Database Row Types ──
 
+export interface SupplierRow {
+  id: string;
+  tenant_id: string;
+  name: string;
+  code: string;
+  contact_person: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  tax_id: string | null;
+  payment_terms: string | null;
+  credit_limit: number;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WarehouseRow {
   id: string;
   tenant_id: string;
@@ -29,7 +47,11 @@ export interface InventoryItemRow {
   serial_number: string | null;
   manufacturer: string | null;
   supplier: string | null;
+  supplier_id: string | null;
   description: string | null;
+  barcode: string | null;
+  qr_code: string | null;
+  controlled_substance_class: string | null;
   status: string;
   last_restocked_at: string | null;
   deleted_at: string | null;
@@ -48,6 +70,10 @@ export interface InventoryTransactionRow {
   reference_type: string | null;
   reference_id: string | null;
   notes: string | null;
+  reason_code: string | null;
+  unit_cost: number;
+  from_warehouse_id: string | null;
+  to_warehouse_id: string | null;
   created_by: string | null;
   created_at: string;
 }
@@ -85,6 +111,21 @@ export interface PurchaseOrderItemRow {
 
 // ── API Response Types ──
 
+export interface SupplierResponse {
+  id: string;
+  name: string;
+  code: string;
+  contactPerson: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  taxId: string | null;
+  paymentTerms: string | null;
+  creditLimit: number;
+  status: string;
+  notes: string | null;
+}
+
 export interface WarehouseResponse {
   id: string;
   name: string;
@@ -109,6 +150,9 @@ export interface InventoryItemResponse {
   supplier: string | null;
   warehouseId: string;
   warehouseName: string | null;
+  barcode: string | null;
+  qrCode: string | null;
+  controlledSubstanceClass: string | null;
   status: string;
   lastRestockedAt: string | null;
 }
@@ -121,8 +165,12 @@ export interface InventoryTransactionResponse {
   quantity: number;
   quantityBefore: number;
   quantityAfter: number;
+  unitCost: number;
+  reasonCode: string | null;
   referenceType: string | null;
   referenceId: string | null;
+  fromWarehouseId: string | null;
+  toWarehouseId: string | null;
   notes: string | null;
   createdAt: string;
 }
@@ -149,4 +197,23 @@ export interface PurchaseOrderResponse {
   notes: string | null;
   items: PurchaseOrderItemResponse[];
   createdAt: string;
+}
+
+export interface LowStockAlert {
+  itemId: string;
+  itemName: string;
+  sku: string;
+  currentQuantity: number;
+  reorderPoint: number;
+  warehouseName: string | null;
+  deficit: number;
+}
+
+export interface StockValuation {
+  itemId: string;
+  itemName: string;
+  totalQuantity: number;
+  averageCost: number;
+  totalValue: number;
+  method: string;
 }

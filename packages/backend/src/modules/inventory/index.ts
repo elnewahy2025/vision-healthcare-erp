@@ -6,8 +6,9 @@ export async function registerInventoryModule(app: FastifyInstance) {
 }
 
 export type {
-  WarehouseRow, InventoryItemRow, InventoryTransactionRow,
+  SupplierRow, WarehouseRow, InventoryItemRow, InventoryTransactionRow,
   PurchaseOrderRow, PurchaseOrderItemRow,
-  WarehouseResponse, InventoryItemResponse, InventoryTransactionResponse,
-  PurchaseOrderResponse, PurchaseOrderItemResponse,
+  SupplierResponse, WarehouseResponse, InventoryItemResponse,
+  InventoryTransactionResponse, PurchaseOrderResponse, PurchaseOrderItemResponse,
+  LowStockAlert, StockValuation,
 } from './types.js';
