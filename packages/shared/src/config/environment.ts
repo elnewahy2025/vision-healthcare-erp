@@ -59,6 +59,15 @@ export interface Environment {
   BACKUP_RETENTION?: string;
 
   APP_URL: string;
+
+  // Auth configuration
+  ACCESS_TOKEN_EXPIRY: string;
+  REFRESH_TOKEN_EXPIRY_DAYS: number;
+  BCRYPT_ROUNDS: number;
+  MAX_LOGIN_ATTEMPTS: number;
+  LOCKOUT_DURATION_MINUTES: number;
+  MAX_CONCURRENT_SESSIONS: number;
+  CSRF_SECRET: string;
 }
 
 export function getEnv(): Environment {
@@ -93,6 +102,15 @@ export function getEnv(): Environment {
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
     SUPABASE_BUCKET: process.env.SUPABASE_BUCKET || 'documents',
+
+    // Auth configuration
+    ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY || '1h',
+    REFRESH_TOKEN_EXPIRY_DAYS: parseInt(process.env.REFRESH_TOKEN_EXPIRY_DAYS || '7', 10),
+    BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS || '14', 10),
+    MAX_LOGIN_ATTEMPTS: parseInt(process.env.MAX_LOGIN_ATTEMPTS || '5', 10),
+    LOCKOUT_DURATION_MINUTES: parseInt(process.env.LOCKOUT_DURATION_MINUTES || '15', 10),
+    MAX_CONCURRENT_SESSIONS: parseInt(process.env.MAX_CONCURRENT_SESSIONS || '5', 10),
+    CSRF_SECRET: process.env.CSRF_SECRET || '',
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     FAWRY_MERCHANT_CODE: process.env.FAWRY_MERCHANT_CODE,

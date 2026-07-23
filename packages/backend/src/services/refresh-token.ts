@@ -1,5 +1,8 @@
 import crypto from 'crypto';
 import { db } from '../core/database.js';
+import { getEnv } from '@healthcare/shared/config';
+
+const env = getEnv();
 
 function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
@@ -29,7 +32,7 @@ export async function generateTokenPair(
     user_id: userId,
     token_hash: tokenHash,
     family,
-    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    expires_at: new Date(Date.now() + env.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
     ip_address: ipAddress ?? null,
     user_agent: userAgent ?? null,
   });
@@ -49,9 +52,15 @@ export async function rotateRefreshToken(
     .first();
 
   if (!existing) {
-    await db('refresh_tokens')
+    // Token reuse detected — revoke entire family
+    const revoked = await db('refresh_tokens')
       .where({ token_hash: oldHash })
-      .update({ is_revoked: true });
+      .first();
+    if (revoked) {
+      await db('refresh_tokens')
+        .where({ family: revoked.family })
+        .update({ is_revoked: true });
+    }
     return null;
   }
 
@@ -78,7 +87,7 @@ export async function rotateRefreshToken(
       user_id: existing.user_id,
       token_hash: newHash,
       family: existing.family,
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expires_at: new Date(Date.now() + env.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
       ip_address: ipAddress ?? null,
       user_agent: userAgent ?? null,
     });
