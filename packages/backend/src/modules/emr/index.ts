@@ -7,8 +7,10 @@ import { createEmrSchema, paginationSchema } from '../../utils/validation.js';
 import { PatientNotFoundError } from '@healthcare/shared/errors';
 import { calculateBMI } from '@healthcare/shared/utils';
 import { authenticate } from '../auth-guard.js';
+import { logAudit } from '../../services/audit.js';
+import type { EmrRecordRow } from '../types.js';
 
-export async function registerEmmModule(app: FastifyInstance) {
+export async function registerEmrModule(app: FastifyInstance) {
   // List EMR records
   app.get('/api/v1/emr', {
     preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
@@ -39,6 +41,8 @@ export async function registerEmmModule(app: FastifyInstance) {
       .offset((query.page - 1) * query.limit);
 
     const mapped = records.map(mapEmr);
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'emr.list', entityType: 'emr_record' }); } catch {}
     return sendPaginated(reply, mapped, Number(total?.count || 0), query.page, query.limit);
   });
 
@@ -67,6 +71,8 @@ export async function registerEmmModule(app: FastifyInstance) {
       return reply.status(404).send({ success: false, error: 'EMR record not found' });
     }
 
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'emr.view', entityType: 'emr_record', entityId: emrId }); } catch {}
     return sendSuccess(reply, mapEmr(record));
   });
 
@@ -110,10 +116,12 @@ export async function registerEmmModule(app: FastifyInstance) {
     // If linked to appointment, mark appointment as in_progress
     if (body.appointmentId) {
       await db('appointments')
-        .where({ id: body.appointmentId })
+        .where({ id: body.appointmentId, tenant_id: tenantId })
         .update({ status: 'in_progress', updated_at: new Date() });
     }
 
+    try { await logAudit({ tenantId, userId, action: 'emr.created', entityType: 'emr_record', entityId: record.id,
+      metadata: { patientId: body.patientId, encounterType: body.encounterType } }); } catch {}
     return sendSuccess(reply, mapEmr(record), 'EMR record created', 201);
   });
 
@@ -149,7 +157,7 @@ export async function registerEmmModule(app: FastifyInstance) {
     if (body.procedures !== undefined) updateData.procedures = JSON.stringify(body.procedures);
 
     const [updated] = await db('emr_records')
-      .where({ id: emrId })
+      .where({ id: emrId, tenant_id: tenantId })
       .update(updateData)
       .returning('*');
 
@@ -178,10 +186,12 @@ export async function registerEmmModule(app: FastifyInstance) {
     }
 
     const [record] = await db('emr_records')
-      .where({ id: emrId })
+      .where({ id: emrId, tenant_id: tenantId })
       .update({ status: 'signed', updated_at: new Date() })
       .returning('*');
 
+    const { userId: signUserId } = getCtx(request);
+    try { await logAudit({ tenantId, userId: signUserId, action: 'emr.signed', entityType: 'emr_record', entityId: emrId }); } catch {}
     return sendSuccess(reply, mapEmr(record), 'EMR record signed');
   });
 
@@ -211,12 +221,15 @@ export async function registerEmmModule(app: FastifyInstance) {
     currentDiagnosis.push(body);
 
     await db('emr_records')
-      .where({ id: emrId })
+      .where({ id: emrId, tenant_id: tenantId })
       .update({
         diagnosis: JSON.stringify(currentDiagnosis),
         updated_at: new Date(),
       });
 
+    const { userId: diagUserId } = getCtx(request);
+    try { await logAudit({ tenantId, userId: diagUserId, action: 'emr.diagnosis_added', entityType: 'emr_record', entityId: emrId,
+      metadata: { code: body.code, type: body.type } }); } catch {}
     return sendSuccess(reply, currentDiagnosis, 'Diagnosis added');
   });
 
@@ -250,12 +263,15 @@ export async function registerEmmModule(app: FastifyInstance) {
     currentMeds.push({ ...body, prescribedAt: new Date().toISOString() });
 
     await db('emr_records')
-      .where({ id: emrId })
+      .where({ id: emrId, tenant_id: tenantId })
       .update({
         medications: JSON.stringify(currentMeds),
         updated_at: new Date(),
       });
 
+    const { userId: medUserId } = getCtx(request);
+    try { await logAudit({ tenantId, userId: medUserId, action: 'emr.medication_prescribed', entityType: 'emr_record', entityId: emrId,
+      metadata: { drugName: body.drugName, dosage: body.dosage } }); } catch {}
     return sendSuccess(reply, currentMeds, 'Medication prescribed');
   });
 
@@ -280,6 +296,8 @@ export async function registerEmmModule(app: FastifyInstance) {
       .count('id as count')
       .first();
 
+    const { userId: histUserId } = getCtx(request);
+    try { await logAudit({ tenantId, userId: histUserId, action: 'emr.patient_history', entityType: 'emr_record', entityId: patientId }); } catch {}
     return sendPaginated(reply, records.map(mapEmr), Number(total?.count || 0), query.page, query.limit);
   });
 }
