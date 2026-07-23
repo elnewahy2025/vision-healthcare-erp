@@ -175,3 +175,9 @@ export async function createRole(data: Record<string, unknown>) {
   const [role] = await db('roles').insert(data).returning('*');
   return role;
 }
+
+// ── Refresh Tokens ──
+
+export async function findRefreshTokenByHash(tokenHash: string) {
+  return db('refresh_tokens').where({ token_hash: tokenHash }).first();
+}

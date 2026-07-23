@@ -1,10 +1,9 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { getCtx, getTenantId } from '../../utils/route-helper.js';
+import { getCtx } from '../../utils/route-helper.js';
 import { sendSuccess } from '../../utils/response.js';
 import { UnauthorizedError, ConflictError } from '@healthcare/shared/errors';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { db } from '../../core/database.js';
 import { logAudit } from '../../services/audit.js';
 import { generateTokenPair, rotateRefreshToken, revokeRefreshToken, revokeAllUserTokens } from '../../services/refresh-token.js';
 import { generateSecret, verifyToken, generateQrCode } from '../../services/totp.js';
@@ -198,7 +197,7 @@ export async function refreshToken(request: FastifyRequest, reply: FastifyReply)
   const userAgent = request.headers['user-agent'] || null;
 
   const oldTokenHash = crypto.createHash('sha256').update(oldToken).digest('hex');
-  const oldRecord = await db('refresh_tokens').where({ token_hash: oldTokenHash }).first();
+  const oldRecord = await repo.findRefreshTokenByHash(oldTokenHash);
   if (!oldRecord) throw new UnauthorizedError('Invalid refresh token');
 
   if (oldRecord.user_agent && userAgent && oldRecord.user_agent !== userAgent) {
