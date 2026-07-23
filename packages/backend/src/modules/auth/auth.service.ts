@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import bcrypt from 'bcryptjs';
 import type { FastifyInstance } from 'fastify';
 import { UnauthorizedError } from '@healthcare/shared/errors';
 import { getEnv } from '@healthcare/shared/config';
@@ -10,21 +9,6 @@ const env = getEnv();
 
 export function getJwtHelper(app: FastifyInstance): JwtHelper {
   return app.jwt as unknown as JwtHelper;
-}
-
-export async function authenticate(
-  app: FastifyInstance,
-  request: { server: FastifyInstance; [key: string]: unknown },
-  reply: unknown,
-): Promise<void> {
-  return (app as unknown as { authenticate(req: unknown, rep: unknown): Promise<void> }).authenticate(request, reply);
-}
-
-export function extractTenantSettings(raw: unknown): Record<string, unknown> {
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    return raw as Record<string, unknown>;
-  }
-  return {};
 }
 
 // ── CSRF ──

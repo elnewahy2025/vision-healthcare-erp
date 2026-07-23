@@ -17,7 +17,6 @@ import {
   logoutSchema, sessionIdSchema, forgotPasswordSchema, resetPasswordSchema,
   changePasswordSchema, verifyEmailSchema, resendVerificationSchema,
   mfaEnableSchema, mfaDisableSchema, otpSendSchema, otpVerifySchema,
-  PASSWORD_COMPLEXITY_REGEX,
 } from './auth.schema.js';
 
 const env = getEnv();
@@ -34,55 +33,22 @@ export async function registerTenant(request: FastifyRequest, reply: FastifyRepl
   const existingEmail = await repo.findUserByEmail(body.adminEmail);
   if (existingEmail) throw new ConflictError('Email already registered');
 
-  const result = await db.transaction(async (trx) => {
-    const [tenant] = await trx('tenants').insert({
-      name: body.name, slug: body.slug, locale: body.locale,
-      settings: JSON.stringify({
-        dateFormat: body.locale === 'ar' ? 'DD/MM/YYYY' : 'MM/DD/YYYY',
-        currency: 'SAR', timezone: 'Asia/Riyadh',
-        theme: { primaryColor: '#0ea5e9', brandName: body.name },
-        language: body.locale, direction: body.locale === 'ar' ? 'rtl' : 'ltr',
-        features: {},
-      }),
-      status: 'active',
-    }).returning('*');
+  const passwordHash = await bcrypt.hash(body.adminPassword, env.BCRYPT_ROUNDS);
+  const verificationToken = svc.generateVerificationToken();
 
-    const passwordHash = await bcrypt.hash(body.adminPassword, env.BCRYPT_ROUNDS);
-
-    const [adminRole] = await trx('roles').insert({
-      tenant_id: tenant.id, name: 'Super Admin', slug: 'super_admin',
-      description: 'Full system access',
-      permissions: JSON.stringify([
-        'patient:read', 'patient:write', 'patient:delete',
-        'appointment:read', 'appointment:write', 'appointment:delete',
-        'emr:read', 'emr:write', 'emr:delete',
-        'billing:read', 'billing:write', 'billing:delete',
-        'admin:access', 'admin:users', 'admin:settings',
-        'settings:read', 'settings:write', 'audit:read',
-      ]),
-      is_system: true,
-    }).returning('*');
-
-    const verificationToken = svc.generateVerificationToken();
-
-    const [user] = await trx('users').insert({
-      tenant_id: tenant.id, email: body.adminEmail, password_hash: passwordHash,
-      first_name: body.adminName.split(' ')[0],
-      last_name: body.adminName.split(' ').slice(1).join(' ') || '',
-      role_id: adminRole.id, roles: JSON.stringify(['super_admin']),
-      permissions: JSON.stringify([
-        'patient:read', 'patient:write', 'patient:delete',
-        'appointment:read', 'appointment:write', 'appointment:delete',
-        'emr:read', 'emr:write', 'emr:delete',
-        'billing:read', 'billing:write', 'billing:delete',
-        'admin:access', 'admin:users', 'admin:settings',
-        'settings:read', 'settings:write', 'audit:read',
-      ]),
-      locale: body.locale, status: 'active', mfa_enabled: false,
-      email_verification_token: verificationToken, email_verified: false,
-    }).returning('*');
-
-    return { tenant, user, adminRole, verificationToken };
+  const result = await repo.registerTenantWithAdmin({
+    name: body.name, slug: body.slug, locale: body.locale,
+    settings: JSON.stringify({
+      dateFormat: body.locale === 'ar' ? 'DD/MM/YYYY' : 'MM/DD/YYYY',
+      currency: 'SAR', timezone: 'Asia/Riyadh',
+      theme: { primaryColor: '#0ea5e9', brandName: body.name },
+      language: body.locale, direction: body.locale === 'ar' ? 'rtl' : 'ltr',
+      features: {},
+    }),
+    passwordHash, adminEmail: body.adminEmail,
+    adminFirstName: body.adminName.split(' ')[0],
+    adminLastName: body.adminName.split(' ').slice(1).join(' ') || '',
+    verificationToken,
   });
 
   await logAudit({ tenantId: result.tenant.id, userId: result.user.id, action: 'tenant.created' });

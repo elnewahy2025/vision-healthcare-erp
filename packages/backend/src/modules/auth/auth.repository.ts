@@ -11,11 +11,6 @@ export async function findTenantById(id: string) {
   return db('tenants').where({ id }).first();
 }
 
-export async function createTenant(data: Record<string, unknown>) {
-  const [tenant] = await db('tenants').insert(data).returning('*');
-  return tenant;
-}
-
 // ── Users ──
 
 export async function findUserByEmailAndTenant(email: string, tenantId: string) {
@@ -32,11 +27,6 @@ export async function findUserById(userId: string) {
 
 export async function findUserByIdAndTenant(userId: string, tenantId: string) {
   return db('users').where({ id: userId, tenant_id: tenantId }).first();
-}
-
-export async function createUser(data: Record<string, unknown>) {
-  const [user] = await db('users').insert(data).returning('*');
-  return user;
 }
 
 export async function updateUser(userId: string, data: Record<string, unknown>) {
@@ -171,13 +161,55 @@ export async function storeRecoveryCodes(tenantId: string, userId: string, codes
 
 // ── Roles ──
 
-export async function createRole(data: Record<string, unknown>) {
-  const [role] = await db('roles').insert(data).returning('*');
-  return role;
-}
-
 // ── Refresh Tokens ──
 
 export async function findRefreshTokenByHash(tokenHash: string) {
   return db('refresh_tokens').where({ token_hash: tokenHash }).first();
+}
+
+// ── Tenant Registration Transaction ──
+
+export async function registerTenantWithAdmin(data: {
+  name: string; slug: string; locale: string; settings: string;
+  passwordHash: string; adminEmail: string; adminFirstName: string;
+  adminLastName: string; verificationToken: string;
+}): Promise<{ tenant: Record<string, unknown>; user: Record<string, unknown>; verificationToken: string }> {
+  return db.transaction(async (trx) => {
+    const [tenant] = await trx('tenants').insert({
+      name: data.name, slug: data.slug, locale: data.locale,
+      settings: data.settings, status: 'active',
+    }).returning('*');
+
+    const [adminRole] = await trx('roles').insert({
+      tenant_id: tenant.id, name: 'Super Admin', slug: 'super_admin',
+      description: 'Full system access',
+      permissions: JSON.stringify([
+        'patient:read', 'patient:write', 'patient:delete',
+        'appointment:read', 'appointment:write', 'appointment:delete',
+        'emr:read', 'emr:write', 'emr:delete',
+        'billing:read', 'billing:write', 'billing:delete',
+        'admin:access', 'admin:users', 'admin:settings',
+        'settings:read', 'settings:write', 'audit:read',
+      ]),
+      is_system: true,
+    }).returning('*');
+
+    const [user] = await trx('users').insert({
+      tenant_id: tenant.id, email: data.adminEmail, password_hash: data.passwordHash,
+      first_name: data.adminFirstName, last_name: data.adminLastName,
+      role_id: adminRole.id, roles: JSON.stringify(['super_admin']),
+      permissions: JSON.stringify([
+        'patient:read', 'patient:write', 'patient:delete',
+        'appointment:read', 'appointment:write', 'appointment:delete',
+        'emr:read', 'emr:write', 'emr:delete',
+        'billing:read', 'billing:write', 'billing:delete',
+        'admin:access', 'admin:users', 'admin:settings',
+        'settings:read', 'settings:write', 'audit:read',
+      ]),
+      locale: data.locale, status: 'active', mfa_enabled: false,
+      email_verification_token: data.verificationToken, email_verified: false,
+    }).returning('*');
+
+    return { tenant, user, verificationToken: data.verificationToken };
+  });
 }
