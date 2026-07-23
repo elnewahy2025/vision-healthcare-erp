@@ -61,15 +61,26 @@ export async function listAppointments(request: FastifyRequest, reply: FastifyRe
     limit: query.limit, offset: (query.page - 1) * query.limit,
   });
 
+  const { userId } = getCtx(request);
+  try {
+    await logAudit({ tenantId, userId, action: 'appointment.list', entityType: 'appointment' });
+  } catch { /* audit failure should not block */ }
+
   return sendPaginated(reply, appointments.map(mapAppointment), total, query.page, query.limit);
 }
 
 export async function getAppointment(request: FastifyRequest, reply: FastifyReply) {
   const { appointmentId } = request.params as { appointmentId: string };
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
 
   const appointment = await repo.findAppointmentById(appointmentId, tenantId);
   if (!appointment) throw new AppointmentNotFoundError(appointmentId);
+
+  try {
+    await logAudit({ tenantId, userId, action: 'appointment.view', entityType: 'appointment', entityId: appointmentId });
+  } catch { /* audit failure should not block */ }
+
   return sendSuccess(reply, mapAppointment(appointment));
 }
 
@@ -209,7 +220,7 @@ export async function updateAppointment(request: FastifyRequest, reply: FastifyR
     }
   }
 
-  const updated = await repo.updateAppointmentById(appointmentId, updateData);
+  const updated = await repo.updateAppointmentById(appointmentId, tenantId, updateData);
 
   // ── Audit logging ──
   const { userId } = getCtx(request);
@@ -241,7 +252,7 @@ export async function checkInAppointment(request: FastifyRequest, reply: Fastify
     throw new StatusTransitionError(existing.status, 'checked_in');
   }
 
-  const updated = await repo.updateAppointmentById(appointmentId, {
+  const updated = await repo.updateAppointmentById(appointmentId, tenantId, {
     status: 'checked_in', check_in_time: new Date().toISOString(), updated_at: new Date(),
   });
 
@@ -265,7 +276,7 @@ export async function completeAppointment(request: FastifyRequest, reply: Fastif
     throw new StatusTransitionError(existing.status, 'completed');
   }
 
-  const updated = await repo.updateAppointmentById(appointmentId, {
+  const updated = await repo.updateAppointmentById(appointmentId, tenantId, {
     status: 'completed', check_out_time: new Date().toISOString(), updated_at: new Date(),
   });
 
@@ -298,7 +309,7 @@ export async function cancelAppointment(request: FastifyRequest, reply: FastifyR
     );
   }
 
-  const updated = await repo.updateAppointmentById(appointmentId, {
+  const updated = await repo.updateAppointmentById(appointmentId, tenantId, {
     status: 'cancelled', cancelled_at: new Date().toISOString(),
     cancel_reason: reason || null, updated_at: new Date(),
   });
@@ -319,9 +330,14 @@ export async function cancelAppointment(request: FastifyRequest, reply: FastifyR
 
 export async function todaySummary(request: FastifyRequest, reply: FastifyReply) {
   const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
   const today = new Date().toISOString().split('T')[0];
 
   const appointments = await repo.findTodayAppointments(tenantId, today);
+
+  try {
+    await logAudit({ tenantId, userId, action: 'appointment.today_summary', entityType: 'appointment' });
+  } catch { /* audit failure should not block */ }
 
   const counts = {
     total: appointments.length,

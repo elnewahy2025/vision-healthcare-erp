@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import type { AppointmentRow, AppointmentResponse } from './types.js';
 
 export function mapAppointment(a: AppointmentRow): AppointmentResponse {
@@ -45,6 +46,6 @@ export function calculateEndTime(startTime: string, durationMinutes: number): st
 }
 
 export function generateTelemedicineLink(): string {
-  const id = Math.random().toString(36).substring(2, 10);
+  const id = randomBytes(8).toString('hex');
   return `https://meet.visionhealthcare.com/${id}`;
 }

@@ -89,8 +89,15 @@ export async function insertAppointment(data: Record<string, unknown>): Promise<
   return appointment;
 }
 
-export async function updateAppointmentById(appointmentId: string, updateData: Record<string, unknown>): Promise<AppointmentRow | undefined> {
-  const [updated] = await db('appointments').where({ id: appointmentId }).update(updateData).returning('*');
+export async function updateAppointmentById(
+  appointmentId: string,
+  tenantId: string,
+  updateData: Record<string, unknown>,
+): Promise<AppointmentRow | undefined> {
+  const [updated] = await db('appointments')
+    .where({ id: appointmentId, tenant_id: tenantId })
+    .update(updateData)
+    .returning('*');
   return updated;
 }
 
