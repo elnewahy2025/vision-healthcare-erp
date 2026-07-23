@@ -8,6 +8,8 @@ import { PatientNotFoundError } from '@healthcare/shared/errors';
 import { getEnv } from '@healthcare/shared/config';
 import { generateInvoiceNumber } from '@healthcare/shared/utils';
 import { authenticate } from '../auth-guard.js';
+import { logAudit } from '../../services/audit.js';
+import type { InvoiceRow } from '../types.js';
 
 export async function registerBillingModule(app: FastifyInstance) {
   // List invoices
@@ -40,6 +42,9 @@ export async function registerBillingModule(app: FastifyInstance) {
       .limit(query.limit)
       .offset((query.page - 1) * query.limit);
 
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'invoice.list', entityType: 'invoice' }); } catch {}
+
     return sendPaginated(reply, invoices.map(mapInvoice), Number(total?.count || 0), query.page, query.limit);
   });
 
@@ -67,6 +72,9 @@ export async function registerBillingModule(app: FastifyInstance) {
     if (!invoice) {
       return reply.status(404).send({ success: false, error: 'Invoice not found' });
     }
+
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'invoice.view', entityType: 'invoice', entityId: invoiceId }); } catch {}
 
     return sendSuccess(reply, mapInvoice(invoice));
   });
@@ -110,6 +118,9 @@ export async function registerBillingModule(app: FastifyInstance) {
       created_by: userId,
     }).returning('*');
 
+    try { await logAudit({ tenantId, userId, action: 'invoice.created', entityType: 'invoice', entityId: invoice.id,
+      metadata: { total, patientId: body.patientId } }); } catch {}
+
     return sendSuccess(reply, mapInvoice(invoice), 'Invoice created', 201);
   });
 
@@ -144,7 +155,7 @@ export async function registerBillingModule(app: FastifyInstance) {
     }
 
     const [updated] = await db('invoices')
-      .where({ id: invoiceId })
+      .where({ id: invoiceId, tenant_id: tenantId })
       .update({
         paid: newPaid,
         due: newDue,
@@ -164,6 +175,10 @@ export async function registerBillingModule(app: FastifyInstance) {
       notes: body.notes || null,
       status: 'completed',
     });
+
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'invoice.payment', entityType: 'invoice', entityId: invoiceId,
+      metadata: { amount: body.amount, method: body.method } }); } catch {}
 
     return sendSuccess(reply, mapInvoice(updated), 'Payment recorded');
   });
@@ -193,6 +208,9 @@ export async function registerBillingModule(app: FastifyInstance) {
       )
       .first();
 
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'billing.revenue_summary', entityType: 'invoice' }); } catch {}
+
     return sendSuccess(reply, {
       period: { start, end },
       ...revenue,
@@ -220,6 +238,9 @@ export async function registerBillingModule(app: FastifyInstance) {
       .count('id as count')
       .first();
 
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'invoice.patient_list', entityType: 'invoice', entityId: patientId }); } catch {}
+
     return sendPaginated(reply, invoices.map(mapInvoice), Number(total?.count || 0), query.page, query.limit);
   });
   // Create Stripe checkout session
@@ -234,6 +255,9 @@ export async function registerBillingModule(app: FastifyInstance) {
     const { createStripePayment } = await import('../../services/payment.js');
     const result = await createStripePayment(invoiceId, amount, currency.toUpperCase(), tenantId);
     if (!result.success) return reply.code(400).send({ error: result.error });
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'payment.stripe_created', entityType: 'invoice', entityId: invoiceId,
+      metadata: { amount, currency } }); } catch {}
     return sendSuccess(reply, result);
   });
 
@@ -243,6 +267,8 @@ export async function registerBillingModule(app: FastifyInstance) {
   }, async (request, reply) => {
     const { invoiceId, tenantSlug } = request.params as { invoiceId: string; tenantSlug: string };
     const { generatePaymentLink } = await import('../../services/payment.js');
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId: tenantSlug, userId, action: 'payment.link_generated', entityType: 'invoice', entityId: invoiceId }); } catch {}
     return sendSuccess(reply, { url: generatePaymentLink(invoiceId, tenantSlug) });
   });
 
@@ -256,6 +282,8 @@ export async function registerBillingModule(app: FastifyInstance) {
       .whereRaw('EXTRACT(YEAR FROM issued_at) = ?', [year])
       .select(db.raw("TO_CHAR(issued_at, 'Mon') as month"), db.raw('EXTRACT(MONTH FROM issued_at) as m'), db.raw('COALESCE(SUM(total),0) as revenue'), db.raw('COALESCE(SUM(paid),0) as collected'))
       .groupByRaw('month, m').orderBy('m');
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'billing.revenue_monthly', entityType: 'invoice' }); } catch {}
     return sendSuccess(reply, monthly);
   });
 
@@ -268,6 +296,8 @@ export async function registerBillingModule(app: FastifyInstance) {
     const [thirty] = await db('invoices').where('tenant_id', tenantId).whereNull('deleted_at').where('due', '>', 0).whereRaw("issued_at >= NOW() - INTERVAL '60 days'").whereRaw("issued_at < NOW() - INTERVAL '30 days'").select(db.raw('COALESCE(SUM(due),0) as amount'));
     const [sixty] = await db('invoices').where('tenant_id', tenantId).whereNull('deleted_at').where('due', '>', 0).whereRaw("issued_at >= NOW() - INTERVAL '90 days'").whereRaw("issued_at < NOW() - INTERVAL '60 days'").select(db.raw('COALESCE(SUM(due),0) as amount'));
     const [overdue] = await db('invoices').where('tenant_id', tenantId).whereNull('deleted_at').where('due', '>', 0).whereRaw("issued_at < NOW() - INTERVAL '90 days'").select(db.raw('COALESCE(SUM(due),0) as amount'));
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'billing.aging_report', entityType: 'invoice' }); } catch {}
     return sendSuccess(reply, { current: Number(current.amount), thirty: Number(thirty.amount), sixty: Number(sixty.amount), overdue: Number(overdue.amount) });
   });
 
@@ -281,6 +311,8 @@ export async function registerBillingModule(app: FastifyInstance) {
       .select(db.raw("patients.first_name || ' ' || patients.last_name as name"), db.raw('COALESCE(SUM(invoices.total),0) as total'))
       .groupBy('patients.id', 'patients.first_name', 'patients.last_name')
       .orderBy('total', 'desc').limit(10);
+    const { userId } = getCtx(request);
+    try { await logAudit({ tenantId, userId, action: 'billing.top_patients', entityType: 'invoice' }); } catch {}
     return sendSuccess(reply, patients);
   });
 }
