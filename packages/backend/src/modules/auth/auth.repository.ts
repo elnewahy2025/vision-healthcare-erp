@@ -167,6 +167,23 @@ export async function findRefreshTokenByHash(tokenHash: string) {
   return db('refresh_tokens').where({ token_hash: tokenHash }).first();
 }
 
+// ── Basic CRUD (used by registration transaction and potentially other consumers) ──
+
+export async function createTenant(data: Record<string, unknown>) {
+  const [tenant] = await db('tenants').insert(data).returning('*');
+  return tenant;
+}
+
+export async function createUser(data: Record<string, unknown>) {
+  const [user] = await db('users').insert(data).returning('*');
+  return user;
+}
+
+export async function createRole(data: Record<string, unknown>) {
+  const [role] = await db('roles').insert(data).returning('*');
+  return role;
+}
+
 // ── Tenant Registration Transaction ──
 
 export async function registerTenantWithAdmin(data: {
