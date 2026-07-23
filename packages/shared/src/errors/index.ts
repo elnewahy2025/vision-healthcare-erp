@@ -69,3 +69,39 @@ export class AppointmentNotFoundError extends NotFoundError {
     super('Appointment', id);
   }
 }
+
+export class SchedulingConflictError extends AppError {
+  constructor(doctorId: string, date: string, time: string) {
+    super(
+      `Doctor ${doctorId} already has an appointment at ${date} ${time}`,
+      409,
+      'SCHEDULING_CONFLICT',
+    );
+  }
+}
+
+export class StatusTransitionError extends AppError {
+  constructor(from: string, to: string) {
+    super(
+      `Invalid status transition from '${from}' to '${to}'`,
+      400,
+      'INVALID_STATUS_TRANSITION',
+    );
+  }
+}
+
+export class WorkingHoursError extends AppError {
+  constructor(time: string, opening: string, closing: string) {
+    super(
+      `Appointment time ${time} is outside working hours (${opening} - ${closing})`,
+      400,
+      'OUTSIDE_WORKING_HOURS',
+    );
+  }
+}
+
+export class CancellationPolicyError extends AppError {
+  constructor(message: string) {
+    super(message, 400, 'CANCELLATION_POLICY_VIOLATION');
+  }
+}

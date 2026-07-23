@@ -1,0 +1,33 @@
+export interface Appointment {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  doctorId: string;
+  branchId: string;
+  appointmentDate: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  type: string;
+  status: string;
+  reason: string | null;
+  notes: string | null;
+  isWalkIn: boolean;
+  isVirtual: boolean;
+  telemedicineLink: string | null;
+  reminderSent: boolean;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  rescheduledFrom: string | null;
+  timezone: string;
+  patientName?: string;
+  patientMrn?: string;
+  patientDob?: string;
+  patientGender?: string;
+  patientPhone?: string;
+  doctorName?: string;
+  createdAt: string;
+  updatedAt: string;
+}

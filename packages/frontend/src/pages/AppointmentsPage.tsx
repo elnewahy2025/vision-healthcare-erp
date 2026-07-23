@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { Appointment } from '../types/appointment';
 import { useTranslation } from 'react-i18next';
 import { appointmentsApi } from '../lib/api';
 import { isValidTime, isFutureDate } from '../lib/validators';
@@ -45,7 +46,7 @@ const DURATION_OPTIONS = [
 
 export default function AppointmentsPage() {
   const { t } = useTranslation();
-  const [appointments, setAppointments] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });

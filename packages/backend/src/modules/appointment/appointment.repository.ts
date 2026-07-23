@@ -93,3 +93,71 @@ export async function updateAppointmentById(appointmentId: string, updateData: R
   const [updated] = await db('appointments').where({ id: appointmentId }).update(updateData).returning('*');
   return updated;
 }
+
+export async function findOverlappingAppointment(
+  tenantId: string,
+  doctorId: string,
+  appointmentDate: string,
+  startTime: string,
+  durationMinutes: number,
+  excludeAppointmentId?: string,
+): Promise<AppointmentRow | undefined> {
+  // Calculate end time from start + duration
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const totalMinutes = hours * 60 + minutes + durationMinutes;
+  const endHours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+  const endMinutes = String(totalMinutes % 60).padStart(2, '0');
+  const endTime = `${endHours}:${endMinutes}`;
+
+  let query = db('appointments')
+    .where('appointments.tenant_id', tenantId)
+    .where('appointments.doctor_id', doctorId)
+    .where('appointments.appointment_date', appointmentDate)
+    .whereNotIn('appointments.status', ['cancelled', 'no_show'])
+    .where(function () {
+      // Overlap condition: existing.start < new.end AND existing.end > new.start
+      this.where('appointments.start_time', '<', endTime)
+        .andWhere('appointments.end_time', '>', startTime);
+    });
+
+  if (excludeAppointmentId) {
+    query = query.whereNot('appointments.id', excludeAppointmentId);
+  }
+
+  return query.first();
+}
+
+export async function findUserForDoctorValidation(
+  userId: string,
+  tenantId: string,
+): Promise<{ id: string; status: string; role_id: string | null } | undefined> {
+  return db('users')
+    .where({ id: userId, tenant_id: tenantId })
+    .select('id', 'status', 'role_id')
+    .first();
+}
+
+export async function bulkCreateAppointments(
+  tenantId: string,
+  appointments: Record<string, unknown>[],
+): Promise<AppointmentRow[]> {
+  const results = await db('appointments').insert(appointments).returning('*');
+  return results;
+}
+
+export async function bulkCancelAppointments(
+  tenantId: string,
+  appointmentIds: string[],
+  cancelReason: string,
+): Promise<number> {
+  return db('appointments')
+    .where('tenant_id', tenantId)
+    .whereIn('id', appointmentIds)
+    .whereIn('status', ['scheduled', 'confirmed'])
+    .update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancel_reason: cancelReason,
+      updated_at: new Date(),
+    });
+}

@@ -2,10 +2,54 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { createAppointmentSchema, updateAppointmentSchema, paginationSchema } from '../../utils/validation.js';
-import { AppointmentNotFoundError, PatientNotFoundError } from '@healthcare/shared/errors';
+import {
+  AppointmentNotFoundError,
+  PatientNotFoundError,
+  SchedulingConflictError,
+  StatusTransitionError,
+  WorkingHoursError,
+  CancellationPolicyError,
+  ConflictError,
+  ValidationError,
+} from '@healthcare/shared/errors';
 import * as repo from './appointment.repository.js';
 import { mapAppointment, calculateEndTime, generateTelemedicineLink } from './appointment.mapper.js';
+import { sendAppointmentConfirmation } from '../../services/reminder.service.js';
+import { logAudit } from '../../services/audit.js';
 import type { AppointmentRow } from './types.js';
+
+// ── #5: Valid status transitions ──
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  scheduled: ['checked_in', 'completed', 'cancelled', 'no_show'],
+  confirmed: ['checked_in', 'completed', 'cancelled', 'no_show'],
+  checked_in: ['in_progress', 'completed', 'cancelled'],
+  in_progress: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+  no_show: [],
+};
+
+// ── #7: Default working hours (configurable per tenant in future) ──
+const WORKING_HOURS = { open: '08:00', close: '17:00' };
+
+function isWithinWorkingHours(time: string): boolean {
+  return time >= WORKING_HOURS.open && time <= WORKING_HOURS.close;
+}
+
+// ── #8: Cancellation policy — >24h free, <=24h requires reason ──
+function getCancellationPolicy(appointmentDate: string, startTime: string): { allowed: boolean; requiresReason: boolean } {
+  const appointmentStart = new Date(`${appointmentDate}T${startTime}:00`);
+  const now = new Date();
+  const hoursUntil = (appointmentStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+  if (hoursUntil <= 0) {
+    return { allowed: true, requiresReason: true };
+  }
+  if (hoursUntil <= 24) {
+    return { allowed: true, requiresReason: true };
+  }
+  return { allowed: true, requiresReason: false };
+}
 
 export async function listAppointments(request: FastifyRequest, reply: FastifyReply) {
   const query = paginationSchema.parse(request.query);
@@ -35,19 +79,79 @@ export async function createAppointment(request: FastifyRequest, reply: FastifyR
   const tenantId = getTenantId(request);
   const { userId } = getCtx(request);
 
+  // Validate patient exists
   const patient = await repo.findPatientForAppointment(body.patientId, tenantId);
   if (!patient) throw new PatientNotFoundError(body.patientId);
 
+  // ── #7: Working hours validation ──
+  if (!isWithinWorkingHours(body.startTime)) {
+    throw new WorkingHoursError(body.startTime, WORKING_HOURS.open, WORKING_HOURS.close);
+  }
+
+  // ── #4: Scheduling conflict detection ──
+  const overlap = await repo.findOverlappingAppointment(
+    tenantId, body.doctorId, body.appointmentDate, body.startTime, body.duration,
+  );
+  if (overlap) {
+    throw new SchedulingConflictError(body.doctorId, body.appointmentDate, body.startTime);
+  }
+
   const endTime = calculateEndTime(body.startTime, body.duration);
   const appointment = await repo.insertAppointment({
-    tenant_id: tenantId, patient_id: body.patientId, doctor_id: body.doctorId,
-    branch_id: body.branchId, appointment_date: body.appointmentDate,
-    start_time: body.startTime, end_time: endTime, duration: body.duration,
-    type: body.type, reason: body.reason || null, notes: body.notes || null,
-    is_walk_in: body.isWalkIn, is_virtual: body.isVirtual,
+    tenant_id: tenantId,
+    patient_id: body.patientId,
+    doctor_id: body.doctorId,
+    branch_id: body.branchId,
+    appointment_date: body.appointmentDate,
+    start_time: body.startTime,
+    end_time: endTime,
+    duration: body.duration,
+    type: body.type,
+    reason: body.reason || null,
+    notes: body.notes || null,
+    is_walk_in: body.isWalkIn,
+    is_virtual: body.isVirtual,
     telemedicine_link: body.isVirtual ? generateTelemedicineLink() : null,
-    status: 'scheduled', created_by: userId,
+    status: 'scheduled',
+    timezone: body.timezone || 'Africa/Cairo',
+    created_by: userId,
   });
+
+  // ── #11: Wire reminder service — send confirmation ──
+  try {
+    await sendAppointmentConfirmation({
+      tenantId,
+      appointmentId: appointment.id,
+      patientId: body.patientId,
+      patientName: `${patient.first_name} ${patient.last_name}`,
+      patientPhone: patient.phone || '',
+      patientEmail: patient.email || undefined,
+      doctorName: body.doctorId,
+      appointmentTime: `${body.appointmentDate} ${body.startTime}`,
+    });
+  } catch {
+    // Reminder failure should not block appointment creation
+  }
+
+  // ── Audit logging ──
+  try {
+    await logAudit({
+      tenantId,
+      userId,
+      action: 'appointment.created',
+      entityType: 'appointment',
+      entityId: appointment.id,
+      metadata: {
+        patientId: body.patientId,
+        doctorId: body.doctorId,
+        date: body.appointmentDate,
+        time: body.startTime,
+        type: body.type,
+      },
+    });
+  } catch {
+    // Audit failure should not block appointment creation
+  }
 
   return sendSuccess(reply, mapAppointment(appointment), 'Appointment created successfully', 201);
 }
@@ -60,17 +164,43 @@ export async function updateAppointment(request: FastifyRequest, reply: FastifyR
   const existing = await repo.findAppointmentById(appointmentId, tenantId);
   if (!existing) throw new AppointmentNotFoundError(appointmentId);
 
+  // ── #5: Status transition validation ──
+  if (existing.status === 'completed' || existing.status === 'cancelled') {
+    throw new StatusTransitionError(existing.status, 'update');
+  }
+
   const updateData: Record<string, unknown> = { updated_at: new Date() };
+
   if (body.appointmentDate) updateData.appointment_date = body.appointmentDate;
   if (body.startTime) {
+    // ── #7: Working hours validation ──
+    if (!isWithinWorkingHours(body.startTime)) {
+      throw new WorkingHoursError(body.startTime, WORKING_HOURS.open, WORKING_HOURS.close);
+    }
+
     updateData.start_time = body.startTime;
     updateData.end_time = calculateEndTime(body.startTime, body.duration || existing.duration);
+
+    // ── #4: Check for scheduling conflict on time change ──
+    const conflictDate = body.appointmentDate || existing.appointment_date;
+    const conflictDuration = body.duration || existing.duration;
+    const overlap = await repo.findOverlappingAppointment(
+      tenantId, body.doctorId || existing.doctor_id,
+      conflictDate, body.startTime, conflictDuration, appointmentId,
+    );
+    if (overlap) {
+      throw new SchedulingConflictError(
+        body.doctorId || existing.doctor_id, conflictDate, body.startTime,
+      );
+    }
   }
+
   if (body.duration) updateData.duration = body.duration;
   if (body.type) updateData.type = body.type;
   if (body.reason !== undefined) updateData.reason = body.reason;
   if (body.notes !== undefined) updateData.notes = body.notes;
   if (body.doctorId) updateData.doctor_id = body.doctorId;
+  if (body.timezone) updateData.timezone = body.timezone;
   if (body.isVirtual !== undefined) {
     updateData.is_virtual = body.isVirtual;
     if (body.isVirtual && !existing.telemedicine_link) {
@@ -79,6 +209,22 @@ export async function updateAppointment(request: FastifyRequest, reply: FastifyR
   }
 
   const updated = await repo.updateAppointmentById(appointmentId, updateData);
+
+  // ── Audit logging ──
+  const { userId } = getCtx(request);
+  try {
+    await logAudit({
+      tenantId,
+      userId,
+      action: 'appointment.updated',
+      entityType: 'appointment',
+      entityId: appointmentId,
+      metadata: { changes: Object.keys(updateData).filter(k => k !== 'updated_at') },
+    });
+  } catch {
+    // Audit failure should not block
+  }
+
   return sendSuccess(reply, mapAppointment(updated!), 'Appointment updated successfully');
 }
 
@@ -89,9 +235,20 @@ export async function checkInAppointment(request: FastifyRequest, reply: Fastify
   const existing = await repo.findAppointmentById(appointmentId, tenantId);
   if (!existing) throw new AppointmentNotFoundError(appointmentId);
 
+  // ── #5: Status transition validation ──
+  if (!VALID_TRANSITIONS[existing.status]?.includes('checked_in')) {
+    throw new StatusTransitionError(existing.status, 'checked_in');
+  }
+
   const updated = await repo.updateAppointmentById(appointmentId, {
     status: 'checked_in', check_in_time: new Date().toISOString(), updated_at: new Date(),
   });
+
+  const { userId } = getCtx(request);
+  try {
+    await logAudit({ tenantId, userId, action: 'appointment.checked_in', entityType: 'appointment', entityId: appointmentId });
+  } catch { /* ignore */ }
+
   return sendSuccess(reply, mapAppointment(updated!), 'Patient checked in');
 }
 
@@ -102,9 +259,20 @@ export async function completeAppointment(request: FastifyRequest, reply: Fastif
   const existing = await repo.findAppointmentById(appointmentId, tenantId);
   if (!existing) throw new AppointmentNotFoundError(appointmentId);
 
+  // ── #5: Status transition validation ──
+  if (!VALID_TRANSITIONS[existing.status]?.includes('completed')) {
+    throw new StatusTransitionError(existing.status, 'completed');
+  }
+
   const updated = await repo.updateAppointmentById(appointmentId, {
     status: 'completed', check_out_time: new Date().toISOString(), updated_at: new Date(),
   });
+
+  const { userId } = getCtx(request);
+  try {
+    await logAudit({ tenantId, userId, action: 'appointment.completed', entityType: 'appointment', entityId: appointmentId });
+  } catch { /* ignore */ }
+
   return sendSuccess(reply, mapAppointment(updated!), 'Appointment completed');
 }
 
@@ -116,10 +284,35 @@ export async function cancelAppointment(request: FastifyRequest, reply: FastifyR
   const existing = await repo.findAppointmentById(appointmentId, tenantId);
   if (!existing) throw new AppointmentNotFoundError(appointmentId);
 
+  // ── #5: Status transition validation ──
+  if (!VALID_TRANSITIONS[existing.status]?.includes('cancelled')) {
+    throw new StatusTransitionError(existing.status, 'cancelled');
+  }
+
+  // ── #8: Cancellation policy ──
+  const policy = getCancellationPolicy(existing.appointment_date, existing.start_time);
+  if (policy.requiresReason && !reason) {
+    throw new CancellationPolicyError(
+      'Cancellation within 24 hours of appointment requires a reason',
+    );
+  }
+
   const updated = await repo.updateAppointmentById(appointmentId, {
     status: 'cancelled', cancelled_at: new Date().toISOString(),
     cancel_reason: reason || null, updated_at: new Date(),
   });
+
+  const { userId } = getCtx(request);
+  try {
+    await logAudit({
+      tenantId, userId,
+      action: 'appointment.cancelled',
+      entityType: 'appointment',
+      entityId: appointmentId,
+      metadata: { reason: reason || null, within24h: policy.requiresReason },
+    });
+  } catch { /* ignore */ }
+
   return sendSuccess(reply, mapAppointment(updated!), 'Appointment cancelled');
 }
 
@@ -140,4 +333,123 @@ export async function todaySummary(request: FastifyRequest, reply: FastifyReply)
   };
 
   return sendSuccess(reply, { counts, appointments: appointments.map(mapAppointment) });
+}
+
+// ── #15: Bulk operations ──
+export async function bulkCreateAppointments(request: FastifyRequest, reply: FastifyReply) {
+  const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
+  const { appointments: appointmentsData } = request.body as {
+    appointments: Array<{
+      patientId: string;
+      doctorId: string;
+      branchId: string;
+      appointmentDate: string;
+      startTime: string;
+      duration: number;
+      type: string;
+      reason?: string;
+      notes?: string;
+      isWalkIn?: boolean;
+      isVirtual?: boolean;
+    }>;
+  };
+
+  if (!Array.isArray(appointmentsData) || appointmentsData.length === 0) {
+    throw new ValidationError('appointments array is required and must not be empty');
+  }
+
+  if (appointmentsData.length > 50) {
+    throw new ValidationError('Maximum 50 appointments per bulk operation');
+  }
+
+  const created: AppointmentRow[] = [];
+  const conflicts: string[] = [];
+
+  for (const apt of appointmentsData) {
+    // Validate patient
+    const patient = await repo.findPatientForAppointment(apt.patientId, tenantId);
+    if (!patient) {
+      conflicts.push(`Patient ${apt.patientId} not found`);
+      continue;
+    }
+
+    // Working hours
+    if (!isWithinWorkingHours(apt.startTime)) {
+      conflicts.push(`${apt.startTime} outside working hours for patient ${apt.patientId}`);
+      continue;
+    }
+
+    // Overlap check
+    const overlap = await repo.findOverlappingAppointment(
+      tenantId, apt.doctorId, apt.appointmentDate, apt.startTime, apt.duration,
+    );
+    if (overlap) {
+      conflicts.push(`Scheduling conflict for doctor ${apt.doctorId} at ${apt.appointmentDate} ${apt.startTime}`);
+      continue;
+    }
+
+    const endTime = calculateEndTime(apt.startTime, apt.duration);
+    const [inserted] = await repo.insertAppointment({
+      tenant_id: tenantId,
+      patient_id: apt.patientId,
+      doctor_id: apt.doctorId,
+      branch_id: apt.branchId,
+      appointment_date: apt.appointmentDate,
+      start_time: apt.startTime,
+      end_time: endTime,
+      duration: apt.duration,
+      type: apt.type,
+      reason: apt.reason || null,
+      notes: apt.notes || null,
+      is_walk_in: apt.isWalkIn || false,
+      is_virtual: apt.isVirtual || false,
+      telemedicine_link: apt.isVirtual ? generateTelemedicineLink() : null,
+      status: 'scheduled',
+      timezone: 'Africa/Cairo',
+      created_by: userId,
+    });
+    created.push(inserted);
+  }
+
+  try {
+    await logAudit({
+      tenantId, userId,
+      action: 'appointment.bulk_created',
+      entityType: 'appointment',
+      metadata: { count: created.length, conflicts: conflicts.length },
+    });
+  } catch { /* ignore */ }
+
+  return sendSuccess(reply, {
+    created: created.map(mapAppointment),
+    conflicts,
+    total: created.length,
+  }, 'Bulk appointment creation completed', 201);
+}
+
+export async function bulkCancelAppointments(request: FastifyRequest, reply: FastifyReply) {
+  const tenantId = getTenantId(request);
+  const { userId } = getCtx(request);
+  const { appointmentIds, reason } = request.body as {
+    appointmentIds: string[];
+    reason?: string;
+  };
+
+  if (!Array.isArray(appointmentIds) || appointmentIds.length === 0) {
+    throw new ValidationError('appointmentIds array is required');
+  }
+
+  const cancelled = await repo.bulkCancelAppointments(tenantId, appointmentIds, reason || 'Bulk cancellation');
+
+  try {
+    await logAudit({
+      tenantId, userId,
+      action: 'appointment.bulk_cancelled',
+      entityType: 'appointment',
+      metadata: { count: cancelled, reason: reason || null },
+    });
+  } catch { /* ignore */ }
+
+  return sendSuccess(reply, { cancelled }, `${cancelled} appointments cancelled`);
 }

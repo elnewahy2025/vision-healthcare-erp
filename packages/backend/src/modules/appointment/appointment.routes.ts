@@ -3,6 +3,7 @@ import { authenticate } from '../auth-guard.js';
 import {
   listAppointments, getAppointment, createAppointment, updateAppointment,
   checkInAppointment, completeAppointment, cancelAppointment, todaySummary,
+  bulkCreateAppointments, bulkCancelAppointments,
 } from './appointment.controller.js';
 
 export async function registerAppointmentRoutes(app: FastifyInstance) {
@@ -14,4 +15,6 @@ export async function registerAppointmentRoutes(app: FastifyInstance) {
   app.post('/api/v1/appointments/:appointmentId/check-in', { preHandler: [authenticate] }, checkInAppointment);
   app.post('/api/v1/appointments/:appointmentId/complete', { preHandler: [authenticate] }, completeAppointment);
   app.post('/api/v1/appointments/:appointmentId/cancel', { preHandler: [authenticate] }, cancelAppointment);
+  app.post('/api/v1/appointments/bulk', { preHandler: [authenticate] }, bulkCreateAppointments);
+  app.post('/api/v1/appointments/bulk/cancel', { preHandler: [authenticate] }, bulkCancelAppointments);
 }

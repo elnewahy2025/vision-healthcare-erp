@@ -21,6 +21,7 @@ export interface AppointmentRow {
   cancelled_at: string | null;
   cancel_reason: string | null;
   rescheduled_from: string | null;
+  timezone: string;
   created_by?: string;
   created_at: string;
   updated_at: string;
@@ -57,6 +58,7 @@ export interface AppointmentResponse {
   cancelledAt: string | null;
   cancelReason: string | null;
   rescheduledFrom: string | null;
+  timezone: string;
   patientName?: string;
   patientMrn?: string;
   patientDob?: string;

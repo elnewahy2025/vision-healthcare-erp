@@ -24,6 +24,7 @@ export function mapAppointment(a: AppointmentRow): AppointmentResponse {
     cancelledAt: a.cancelled_at,
     cancelReason: a.cancel_reason,
     rescheduledFrom: a.rescheduled_from,
+    timezone: a.timezone,
     patientName: a.patient_first_name && a.patient_last_name ? `${a.patient_first_name} ${a.patient_last_name}` : undefined,
     patientMrn: a.medical_record_number,
     patientDob: a.patient_dob,
