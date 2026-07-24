@@ -3,9 +3,19 @@ import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { authenticate } from '../auth-guard.js';
+import { logAudit } from '../../services/audit.js';
+
+interface InsuranceCompanyRow {
+  id: string;
+  tenant_id: string;
+  name: string;
+  code: string;
+  contract_type: string;
+  discount_rate: number;
+  coverage_plans: unknown;
+}
 
 export async function registerInsuranceModule(app: FastifyInstance) {
-  // Insurance Companies
   app.get('/api/v1/insurance/companies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const companies = await db('insurance_companies').where({ tenant_id: tenantId, is_active: true }).orderBy('name');
@@ -13,38 +23,50 @@ export async function registerInsuranceModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/insurance/companies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
     const [co] = await db('insurance_companies').insert({ tenant_id: tenantId, name: body.name, code: body.code, contract_type: body.contractType || 'network', discount_rate: body.discountRate || 0 }).returning('*');
-    return sendSuccess(reply, { id: co.id, name: co.name }, 'Insurance company added', 201);
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'insurance.company_created', entityType: 'insurance_company', entityId: co.id, metadata: { name: body.name }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
+    return sendSuccess(reply, co, 'Insurance company added', 201);
   });
 
-  // Claims
   app.get('/api/v1/insurance/claims', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { status, patientId } = request.query as { patientId?: string; status?: string };
+    const tenantId = getTenantId(request);
+    const { status } = request.query as { status?: string };
     let q = db('insurance_claims').where('insurance_claims.tenant_id', tenantId).whereNull('insurance_claims.deleted_at');
     if (status) q = q.andWhere('insurance_claims.status', status);
-    if (patientId) q = q.andWhere('insurance_claims.patient_id', patientId);
-    const rows = await q.join('patients', 'insurance_claims.patient_id', 'patients.id').leftJoin('insurance_companies', 'insurance_claims.insurance_id', 'insurance_companies.id')
-      .select('insurance_claims.*', 'patients.first_name as pf', 'patients.last_name as pl', 'insurance_companies.name as ins_name').orderBy('created_at', 'desc').limit(50);
-    return sendSuccess(reply, rows.map((r: PatientRow) => ({ id: r.id, claimNumber: r.claim_number, patientId: r.patient_id, patientName: r.pf + ' ' + r.pl, insuranceId: r.insurance_id, insuranceName: r.ins_name, status: r.status, claimedAmount: Number(r.claimed_amount), approvedAmount: Number(r.approved_amount), paidAmount: Number(r.paid_amount), submissionDate: r.submission_date, responseDate: r.response_date, denialReason: r.denial_reason, notes: r.notes, createdAt: r.created_at })));
+    const claims = await q.orderBy('created_at', 'desc').limit(50);
+    return sendSuccess(reply, claims);
   });
 
   app.post('/api/v1/insurance/claims', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
     const claimNum = "CLM-" + Date.now().toString(36).toUpperCase();
     const [claim] = await db('insurance_claims').insert({ tenant_id: tenantId, patient_id: body.patientId, invoice_id: body.invoiceId || null, insurance_id: body.insuranceId, claim_number: claimNum, claimed_amount: body.claimedAmount || 0, created_by: ctx.userId }).returning('*');
-    return sendSuccess(reply, { id: claim.id, claimNumber: claim.claim_number }, 'Claim created', 201);
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'insurance.claim_created', entityType: 'insurance_claim', entityId: claim.id, metadata: { claimNumber: claimNum }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
+    return sendSuccess(reply, claim, 'Claim submitted', 201);
   });
 
   app.put('/api/v1/insurance/claims/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const { id } = request.params as { id: string };
+    const body = request.body as Record<string, unknown>;
     const update: Record<string, unknown> = { updated_at: new Date() };
-    if (body.status) update.status = body.status; if (body.approvedAmount !== undefined) update.approved_amount = body.approvedAmount;
-    if (body.paidAmount !== undefined) update.paid_amount = body.paidAmount; if (body.denialReason) update.denial_reason = body.denialReason;
-    if (body.notes) update.notes = body.notes;
-    if (body.status === 'submitted') update.submission_date = new Date().toISOString().split('T')[0];
-    if (body.status === 'approved' || body.status === 'denied' || body.status === 'paid') update.response_date = new Date().toISOString().split('T')[0];
-    await db('insurance_claims').where({ id }).update(update);
+    if (body.status) update.status = body.status;
+    if (body.approvedAmount !== undefined) update.approved_amount = body.approvedAmount;
+    if (body.claimResponse) update.claim_response = body.claimResponse;
+    await db('insurance_claims').where({ id, tenant_id: tenantId }).update(update);
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'insurance.claim_updated', entityType: 'insurance_claim', entityId: id, metadata: { status: body.status }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, null, 'Claim updated');
   });
 }

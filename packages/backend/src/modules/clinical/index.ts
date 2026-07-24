@@ -34,21 +34,29 @@ export async function registerClinicalModule(app: FastifyInstance) {
   app.get('/api/v1/patients/:patientId/allergies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { patientId } = z.object({ patientId: z.string().uuid() }).parse(request.params);
     const allergies = await db('patient_allergies').where({ patient_id: patientId }).orderBy('created_at', 'desc');
-    return sendSuccess(reply, allergies.map((a: PatientAllergyRow) => ({ id: a.id, allergen: a.allergen, severity: a.severity, reaction: a.reaction, notes: a.notes, createdAt: a.created_at })));
+    return sendSuccess(reply, allergies.map((a: Record<string, unknown>) => ({ id: a.id, allergen: a.allergen, severity: a.severity, reaction: a.reaction, notes: a.notes, createdAt: a.created_at })));
   });
 
   app.post('/api/v1/patients/:patientId/allergies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request);
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
     const { patientId } = z.object({ patientId: z.string().uuid() }).parse(request.params);
     const body = z.object({ allergen: z.string().min(1), severity: z.enum(['mild', 'moderate', 'severe', 'anaphylaxis']).optional().default('moderate'), reaction: z.string().optional(), notes: z.string().optional() }).parse(request.body);
     const [allergy] = await db('patient_allergies').insert({ tenant_id: tenantId, patient_id: patientId, allergen: body.allergen, severity: body.severity, reaction: body.reaction, notes: body.notes, recorded_by: ctx.userId }).returning('*');
-    await logAudit({ tenantId, action: 'allergy.create', entityType: 'patient_allergy', entityId: allergy.id });
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'clinical.allergy_created', entityType: 'patient_allergy', entityId: allergy.id, metadata: { patientId, allergen: body.allergen }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, { id: allergy.id, allergen: allergy.allergen, severity: allergy.severity }, 'Allergy recorded', 201);
   });
 
   app.delete('/api/v1/patients/:patientId/allergies/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
     const { id } = z.object({ id: z.string().uuid(), patientId: z.string().uuid() }).parse(request.params);
-    await db('patient_allergies').where({ id }).delete();
+    await db('patient_allergies').where({ id, tenant_id: tenantId }).delete();
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'clinical.allergy_deleted', entityType: 'patient_allergy', entityId: id, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, null, 'Allergy deleted');
   });
 
@@ -75,9 +83,9 @@ export async function registerClinicalModule(app: FastifyInstance) {
       db('appointments').where({ patient_id: patientId, tenant_id: tenantId }).select(db.raw("'appointment' as type"), 'id', 'appointment_date as date', 'type as title', 'status'),
       db('invoices').where({ patient_id: patientId, tenant_id: tenantId }).whereNull('deleted_at').select(db.raw("'invoice' as type"), 'id', 'issued_at as date', 'invoice_number as title', 'total', 'status'),
       db('documents').where({ patient_id: patientId, tenant_id: tenantId }).whereNull('deleted_at').select(db.raw("'document' as type"), 'id', 'created_at as date', 'title', 'category'),
-      db('patient_allergies').where({ patient_id: patientId }).select(db.raw("'allergy' as type"), 'id', 'created_at as date', 'allergen as title', 'severity'),
+      db('patient_allergies').where({ patient_id: patientId, tenant_id: tenantId }).select(db.raw("'allergy' as type"), 'id', 'created_at as date', 'allergen as title', 'severity'),
     ]);
-    const timeline = [...emr, ...appts, ...invs, ...docs, ...allergies].map((e: Record<string, unknown>) => ({ ...e, date: e.date })).filter((e: Record<string, unknown>) => e.date).sort((a: Record<string, unknown>, b: Record<string, unknown>) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const timeline = [...emr, ...appts, ...invs, ...docs, ...allergies].map((e: Record<string, unknown>) => ({ ...e, date: e.date })).filter((e: Record<string, unknown>) => e.date).sort((a: Record<string, unknown>, b: Record<string, unknown>) => new Date(String(b.date)).getTime() - new Date(String(a.date)).getTime());
     return sendSuccess(reply, timeline);
   });
 }

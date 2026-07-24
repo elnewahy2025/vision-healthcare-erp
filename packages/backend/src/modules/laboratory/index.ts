@@ -4,6 +4,38 @@ import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { PatientNotFoundError } from '@healthcare/shared/errors';
 import { authenticate } from '../auth-guard.js';
+import { logAudit } from '../../services/audit.js';
+
+interface LabCatalogRow {
+  id: string;
+  tenant_id: string;
+  test_code: string;
+  test_name: string;
+  category: string;
+  specimen_type: string;
+  reference_range: string | null;
+  unit: string | null;
+  price: number;
+}
+
+interface LabOrderRow {
+  id: string;
+  tenant_id: string;
+  patient_id: string;
+  doctor_id: string;
+  order_number: string;
+  status: string;
+  priority: string;
+  order_date: string;
+  clinical_notes: string | null;
+  results_summary: string | null;
+  collected_at: Date | null;
+  completed_at: Date | null;
+  created_at: Date;
+  p_first?: string;
+  p_last?: string;
+  medical_record_number?: string;
+}
 
 export async function registerLaboratoryModule(app: FastifyInstance) {
   app.get('/api/v1/lab/catalog', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
@@ -18,12 +50,16 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
 
   app.post('/api/v1/lab/catalog', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
     const [item] = await db('lab_catalog').insert({
       tenant_id: tenantId, test_code: body.testCode, test_name: body.testName,
       category: body.category, specimen_type: body.specimenType,
       reference_range: body.referenceRange, unit: body.unit, price: body.price || 0,
     }).returning('*');
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'lab.catalog_created', entityType: 'lab_catalog', entityId: item.id, metadata: { testName: body.testName }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, item, 'Lab test added', 201);
   });
 
@@ -44,7 +80,7 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
     const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
     const patient = await db('patients').where({ id: body.patientId, tenant_id: tenantId }).first();
-    if (!patient) throw new PatientNotFoundError(body.patientId);
+    if (!patient) throw new PatientNotFoundError(String(body.patientId));
     const orderNum = "LAB-" + Date.now().toString(36).toUpperCase();
     const [order] = await db('lab_orders').insert({
       tenant_id: tenantId, patient_id: body.patientId, doctor_id: ctx.userId,
@@ -52,45 +88,60 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
       priority: body.priority || 'routine', order_date: new Date().toISOString().split('T')[0],
       clinical_notes: body.clinicalNotes, created_by: ctx.userId,
     }).returning('*');
-    if (body.tests?.length) {
-      const testRows = body.tests.map((t: LabOrderRow) => ({
+    if (Array.isArray(body.tests) && body.tests.length) {
+      const testRows = (body.tests as Record<string, unknown>[]).map((t) => ({
         order_id: order.id, test_code: t.testCode || t.code, test_name: t.testName || t.name,
         specimen_type: t.specimenType, reference_range: t.referenceRange, result_unit: t.unit,
       }));
       await db('lab_tests').insert(testRows);
     }
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'lab.order_created', entityType: 'lab_order', entityId: order.id, metadata: { orderNumber: orderNum }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, { id: order.id, orderNumber: order.order_number }, 'Lab order created', 201);
   });
 
   app.put('/api/v1/lab/orders/:id/status', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
     const { id } = request.params as { id: string };
     const body = request.body as Record<string, unknown>;
     const update: Record<string, unknown> = { status: body.status, updated_at: new Date() };
     if (body.status === "collected") update.collected_at = new Date();
     if (body.status === "completed") update.completed_at = new Date();
     if (body.resultsSummary) update.results_summary = body.resultsSummary;
-    await db('lab_orders').where({ id }).update(update);
+    await db('lab_orders').where({ id, tenant_id: tenantId }).update(update);
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'lab.order_status_updated', entityType: 'lab_order', entityId: id, metadata: { status: body.status }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, null, "Lab order updated");
   });
 
   app.post('/api/v1/lab/orders/:id/results', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
     const { id } = request.params as { id: string };
     const { tests } = request.body as Record<string, unknown>;
-    if (tests?.length) {
+    if (Array.isArray(tests) && tests.length) {
       for (const t of tests) {
-        await db('lab_tests').where({ id: t.id }).update({ result_value: t.resultValue, status: t.status || 'completed', notes: t.notes });
+        await db('lab_tests').where({ id: (t as Record<string, unknown>).id }).update({ result_value: (t as Record<string, unknown>).resultValue, status: (t as Record<string, unknown>).status || 'completed', notes: (t as Record<string, unknown>).notes });
       }
     }
-    await db('lab_orders').where({ id }).update({ status: 'completed', completed_at: new Date(), updated_at: new Date() });
+    await db('lab_orders').where({ id, tenant_id: tenantId }).update({ status: 'completed', completed_at: new Date(), updated_at: new Date() });
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'lab.results_saved', entityType: 'lab_order', entityId: id, metadata: { testCount: Array.isArray(tests) ? tests.length : 0 }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, null, 'Results saved');
   });
 }
 
-function mapLabOrder(o: LabOrderRow) { return {
-  id: o.id, orderNumber: o.order_number, patientId: o.patient_id,
-  patientName: o.p_first + " " + o.p_last, patientMrn: o.medical_record_number,
-  doctorId: o.doctor_id, status: o.status, priority: o.priority,
-  orderDate: o.order_date, clinicalNotes: o.clinical_notes,
-  resultsSummary: o.results_summary, collectedAt: o.collected_at,
-  completedAt: o.completed_at, createdAt: o.created_at,
-};}
+function mapLabOrder(o: LabOrderRow) {
+  return {
+    id: o.id, orderNumber: o.order_number, patientId: o.patient_id,
+    patientName: `${o.p_first || ''} ${o.p_last || ''}`.trim(), patientMrn: o.medical_record_number,
+    doctorId: o.doctor_id, status: o.status, priority: o.priority,
+    orderDate: o.order_date, clinicalNotes: o.clinical_notes,
+    resultsSummary: o.results_summary, collectedAt: o.collected_at,
+    completedAt: o.completed_at, createdAt: o.created_at,
+  };
+}

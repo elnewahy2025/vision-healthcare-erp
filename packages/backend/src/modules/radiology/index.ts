@@ -4,6 +4,7 @@ import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { PatientNotFoundError } from '@healthcare/shared/errors';
 import { authenticate } from '../auth-guard.js';
+import { logAudit } from '../../services/audit.js';
 
 export async function registerRadiologyModule(app: FastifyInstance) {
   app.get('/api/v1/radiology/orders', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
@@ -19,10 +20,11 @@ export async function registerRadiologyModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/radiology/orders', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request);
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
     const patient = await db('patients').where({ id: body.patientId, tenant_id: tenantId }).first();
-    if (!patient) throw new PatientNotFoundError(body.patientId);
+    if (!patient) throw new PatientNotFoundError(String(body.patientId));
     const orderNum = "RAD-" + Date.now().toString(36).toUpperCase();
     const [order] = await db('radiology_orders').insert({
       tenant_id: tenantId, patient_id: body.patientId, doctor_id: ctx.userId,
@@ -31,11 +33,17 @@ export async function registerRadiologyModule(app: FastifyInstance) {
       order_date: new Date().toISOString().split('T')[0], clinical_indication: body.clinicalIndication,
       created_by: ctx.userId,
     }).returning('*');
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'radiology.order_created', entityType: 'radiology_order', entityId: order.id, metadata: { orderNumber: orderNum, studyType: body.studyType }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, { id: order.id, orderNumber: order.order_number }, 'Radiology order created', 201);
   });
 
   app.put('/api/v1/radiology/orders/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const { id } = request.params as { id: string };
+    const body = request.body as Record<string, unknown>;
     const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.status) update.status = body.status;
     if (body.findings) update.findings = body.findings;
@@ -45,17 +53,22 @@ export async function registerRadiologyModule(app: FastifyInstance) {
     if (body.scheduledDate) update.scheduled_date = body.scheduledDate;
     if (body.status === 'in_progress') update.started_at = new Date();
     if (body.status === 'completed') update.completed_at = new Date();
-    await db('radiology_orders').where({ id }).update(update);
+    await db('radiology_orders').where({ id, tenant_id: tenantId }).update(update);
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'radiology.order_updated', entityType: 'radiology_order', entityId: id, metadata: { updatedFields: Object.keys(update).filter(k => k !== 'updated_at') }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, null, 'Order updated');
   });
 }
 
-function mapOrder(o: Record<string, unknown>) { return {
-  id: o.id, orderNumber: o.order_number, patientId: o.patient_id,
-  patientName: o.p_first + ' ' + o.p_last, patientMrn: o.medical_record_number,
-  studyType: o.study_type, bodyPart: o.body_part, status: o.status,
-  priority: o.priority, orderDate: o.order_date, scheduledDate: o.scheduled_date,
-  clinicalIndication: o.clinical_indication, findings: o.findings,
-  impression: o.impression, report: o.report, dicomLink: o.dicom_link,
-  createdAt: o.created_at,
-};}
+function mapOrder(o: Record<string, unknown>) {
+  return {
+    id: o.id, orderNumber: o.order_number, patientId: o.patient_id,
+    patientName: `${o.p_first || ''} ${o.p_last || ''}`.trim(), patientMrn: o.medical_record_number,
+    studyType: o.study_type, bodyPart: o.body_part, status: o.status,
+    priority: o.priority, orderDate: o.order_date, scheduledDate: o.scheduled_date,
+    clinicalIndication: o.clinical_indication, findings: o.findings,
+    impression: o.impression, report: o.report, dicomLink: o.dicom_link,
+    createdAt: o.created_at,
+  };
+}

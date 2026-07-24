@@ -3,6 +3,40 @@ import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { authenticate } from '../auth-guard.js';
+import { logAudit } from '../../services/audit.js';
+
+interface PharmacyInventoryRow {
+  id: string;
+  tenant_id: string;
+  drug_name: string;
+  generic_name: string | null;
+  brand_name: string | null;
+  dosage_form: string | null;
+  strength: string | null;
+  stock_quantity: number;
+  reorder_level: number;
+  unit_price: number;
+  batch_number: string | null;
+  expiry_date: string | null;
+  manufacturer: string | null;
+  requires_prescription: boolean;
+  status: string;
+}
+
+interface PharmacyPrescriptionItemRow {
+  id: string;
+  prescription_id: string;
+  drug_name: string;
+  dosage: string;
+  route: string | null;
+  frequency: string;
+  duration: string | null;
+  quantity: number;
+  quantity_dispensed: number;
+  refills: number;
+  instructions: string | null;
+  status: string;
+}
 
 export async function registerPharmacyModule(app: FastifyInstance) {
   // Inventory
@@ -17,7 +51,9 @@ export async function registerPharmacyModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/pharmacy/inventory', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
     const [item] = await db('pharmacy_inventory').insert({
       tenant_id: tenantId, drug_name: body.drugName, generic_name: body.genericName,
       brand_name: body.brandName, dosage_form: body.dosageForm, strength: body.strength,
@@ -26,12 +62,21 @@ export async function registerPharmacyModule(app: FastifyInstance) {
       expiry_date: body.expiryDate, manufacturer: body.manufacturer,
       requires_prescription: body.requiresPrescription !== false,
     }).returning('*');
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'pharmacy.drug_added', entityType: 'pharmacy_inventory', entityId: item.id, metadata: { drugName: body.drugName }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, mapDrug(item), 'Drug added', 201);
   });
 
   app.put('/api/v1/pharmacy/inventory/:id/stock', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as { id: string }; const { quantity } = request.body as Record<string, unknown>;
-    await db('pharmacy_inventory').where({ id }).increment('stock_quantity', quantity).update({ updated_at: new Date() });
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const { id } = request.params as { id: string };
+    const { quantity } = request.body as Record<string, unknown>;
+    await db('pharmacy_inventory').where({ id, tenant_id: tenantId }).increment('stock_quantity', quantity).update({ updated_at: new Date() });
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'pharmacy.stock_updated', entityType: 'pharmacy_inventory', entityId: id, metadata: { quantity }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, null, 'Stock updated');
   });
 
@@ -48,7 +93,7 @@ export async function registerPharmacyModule(app: FastifyInstance) {
     return sendSuccess(reply, await Promise.all(rows.map(async (r: Record<string, unknown>) => {
       const items = await db('pharmacy_prescription_items').where({ prescription_id: r.id });
       return { id: r.id, prescriptionNumber: r.prescription_number, patientId: r.patient_id,
-        patientName: r.p_first + ' ' + r.p_last, status: r.status, notes: r.notes,
+        patientName: `${r.p_first || ''} ${r.p_last || ''}`.trim(), status: r.status, notes: r.notes,
         items: items.map((i: PharmacyPrescriptionItemRow) => ({ id: i.id, drugName: i.drug_name, dosage: i.dosage,
           route: i.route, frequency: i.frequency, duration: i.duration, quantity: i.quantity,
           quantityDispensed: i.quantity_dispensed, refills: i.refills, instructions: i.instructions,
@@ -57,42 +102,56 @@ export async function registerPharmacyModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/pharmacy/prescriptions', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
     const prescNum = "RX-" + Date.now().toString(36).toUpperCase();
     const [presc] = await db('pharmacy_prescriptions').insert({
       tenant_id: tenantId, patient_id: body.patientId, doctor_id: ctx.userId,
       emr_record_id: body.emrRecordId || null, prescription_number: prescNum,
       notes: body.notes, created_by: ctx.userId,
     }).returning('*');
-    if (body.items?.length) {
-      await db('pharmacy_prescription_items').insert(body.items.map((i: PharmacyPrescriptionItemRow) => ({
+    if (Array.isArray(body.items) && body.items.length) {
+      await db('pharmacy_prescription_items').insert((body.items as Record<string, unknown>[]).map((i) => ({
         prescription_id: presc.id, drug_name: i.drugName, dosage: i.dosage,
         route: i.route, frequency: i.frequency, duration: i.duration,
         quantity: i.quantity, refills: i.refills || 0, instructions: i.instructions,
       })));
     }
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'pharmacy.prescription_created', entityType: 'pharmacy_prescription', entityId: presc.id, metadata: { prescriptionNumber: prescNum }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, { id: presc.id, prescriptionNumber: presc.prescription_number }, 'Prescription created', 201);
   });
 
   app.post('/api/v1/pharmacy/prescriptions/:id/dispense', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as { id: string }; const { items } = request.body as Record<string, unknown>;
-    if (items?.length) {
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const { id } = request.params as { id: string };
+    const { items } = request.body as Record<string, unknown>;
+    if (Array.isArray(items) && items.length) {
       for (const it of items) {
-        await db('pharmacy_prescription_items').where({ id: it.id }).update({ quantity_dispensed: it.quantityDispensed, status: it.status || 'dispensed' });
-        if (it.drugName) {
-          await db('pharmacy_inventory').where({ drug_name: it.drugName, tenant_id: getTenantId(request) }).decrement('stock_quantity', it.quantityDispensed || 0);
+        const item = it as Record<string, unknown>;
+        await db('pharmacy_prescription_items').where({ id: item.id }).update({ quantity_dispensed: item.quantityDispensed, status: item.status || 'dispensed' });
+        if (item.drugName) {
+          await db('pharmacy_inventory').where({ drug_name: item.drugName, tenant_id: tenantId }).decrement('stock_quantity', item.quantityDispensed || 0);
         }
       }
     }
-    await db('pharmacy_prescriptions').where({ id }).update({ status: 'dispensed', updated_at: new Date() });
+    await db('pharmacy_prescriptions').where({ id, tenant_id: tenantId }).update({ status: 'dispensed', updated_at: new Date() });
+
+    await logAudit({ tenantId, userId: ctx.userId, action: 'pharmacy.prescription_dispensed', entityType: 'pharmacy_prescription', entityId: id, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
+
     return sendSuccess(reply, null, 'Prescription dispensed');
   });
 }
 
-function mapDrug(d: PharmacyInventoryRow) { return {
-  id: d.id, drugName: d.drug_name, genericName: d.generic_name, brandName: d.brand_name,
-  dosageForm: d.dosage_form, strength: d.strength, stockQuantity: d.stock_quantity,
-  reorderLevel: d.reorder_level, unitPrice: Number(d.unit_price), batchNumber: d.batch_number,
-  expiryDate: d.expiry_date, manufacturer: d.manufacturer, requiresPrescription: d.requires_prescription,
-  status: d.status,
-};}
+function mapDrug(d: PharmacyInventoryRow) {
+  return {
+    id: d.id, drugName: d.drug_name, genericName: d.generic_name, brandName: d.brand_name,
+    dosageForm: d.dosage_form, strength: d.strength, stockQuantity: d.stock_quantity,
+    reorderLevel: d.reorder_level, unitPrice: Number(d.unit_price), batchNumber: d.batch_number,
+    expiryDate: d.expiry_date, manufacturer: d.manufacturer, requiresPrescription: d.requires_prescription,
+    status: d.status,
+  };
+}
