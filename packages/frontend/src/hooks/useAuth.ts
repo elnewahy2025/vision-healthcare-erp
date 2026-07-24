@@ -27,9 +27,3 @@ export function useRegister() {
       authApi.register(data),
   });
 }
-
-export function useRefreshToken() {
-  return useMutation({
-    mutationFn: (refreshToken: string) => authApi.refresh(refreshToken),
-  });
-}

@@ -151,7 +151,7 @@ export default function InventoryPage() {
   const filteredItems = items.filter((item) => {
     if (!search) return true;
     const q = search.toLowerCase();
-    return item.name.toLowerCase().includes(q) || item.sku.toLowerCase().includes(q) || item.category.toLowerCase().includes(q);
+    return item.name.toLowerCase().includes(q) || item.sku.toLowerCase().includes(q) || item.category?.toLowerCase().includes(q);
   });
 
   const filteredPos = pos.filter((po) => {
@@ -182,7 +182,7 @@ export default function InventoryPage() {
         expiryDate: itemForm.expiryDate || undefined,
         serialNumber: itemForm.serialNumber || undefined,
         manufacturer: itemForm.manufacturer || undefined,
-        supplier: itemForm.supplier || undefined,
+        supplierId: itemForm.supplier || undefined,
         description: itemForm.description || undefined,
       });
       toast.success(t('inventory.createItemSuccess'));

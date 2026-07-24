@@ -65,6 +65,7 @@ export default function PatientPortalPage() {
   const [messages, setMessages] = useState<PortalMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [portalAccessToken, setPortalAccessToken] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validateLoginForm = useCallback((): boolean => {
@@ -107,7 +108,7 @@ export default function PatientPortalPage() {
   }, [phone, tenantSlug, validateLoginForm, t]);
 
   const loadDashboardData = useCallback(async (tokenOverride?: string) => {
-    const token = tokenOverride || localStorage.getItem('portalToken');
+    const token = tokenOverride || portalAccessToken;
     if (!token) return;
     setLoggedIn(true);
     setLoading(true);
@@ -136,7 +137,7 @@ export default function PatientPortalPage() {
       setTab('dashboard');
     } catch {
       setLoggedIn(false);
-      localStorage.removeItem('portalToken');
+      setPortalAccessToken(null);
       toast.error(t('portal.sessionExpired'));
     } finally {
       setLoading(false);
@@ -150,7 +151,7 @@ export default function PatientPortalPage() {
     try {
       const r = await api.post('/portal/verify', { token: sessionToken, otp });
       const accessToken = String(r.data?.data?.accessToken ?? '');
-      localStorage.setItem('portalToken', accessToken);
+      setPortalAccessToken(accessToken);
       setLoggedIn(true);
       setStep('phone');
       await loadDashboardData(accessToken);
@@ -164,7 +165,7 @@ export default function PatientPortalPage() {
 
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('portalToken');
+    setPortalAccessToken(null);
     setLoggedIn(false);
     setTab('dashboard');
     setDashboard(null);
@@ -174,7 +175,7 @@ export default function PatientPortalPage() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('portalToken');
+    const token = portalAccessToken;
     if (!token) return;
     let cancelled = false;
     const fetchData = async () => {
@@ -204,7 +205,7 @@ export default function PatientPortalPage() {
         setTab('dashboard');
       } catch {
         setLoggedIn(false);
-        localStorage.removeItem('portalToken');
+        setPortalAccessToken(null);
         toast.error(t('portal.sessionExpired'));
       } finally {
         if (!cancelled) setLoading(false);
