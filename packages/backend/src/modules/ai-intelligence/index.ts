@@ -5,9 +5,12 @@ import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated, sendError } from '../../utils/response.js';
 import { logAudit } from '../../services/audit.js';
 import { authenticate } from '../auth-guard.js';
-import type { DbRow } from '../db-types.js';
 
-// ==================== AI CLINICAL NOTES ====================
+interface RevenueHistoryRow {
+  month: string;
+  revenue: string | number;
+  invoice_count: string | number;
+}
 
 export async function registerAiIntelligenceModule(app: FastifyInstance) {
 
@@ -20,12 +23,10 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
       language: z.string().optional().default('en'),
     }).parse(request.body);
 
-    // Fetch patient context for better generation
     const patient = await db('patients').where({ id: body.patientId }).first();
     const allergies = await db('patient_allergies').where({ patient_id: body.patientId }).select('allergen', 'severity');
     const medications = await db('patient_medications').where({ patient_id: body.patientId }).where({ is_active: true }).select('medication_name', 'dosage', 'frequency').limit(10);
 
-    // AI note generation (simulated — in production, call OpenAI/Claude API)
     const generatedNote = generateClinicalNoteFromRaw(body.rawNotes, body.noteType, patient, allergies, medications, body.language);
     const structuredData = extractStructuredData(body.rawNotes);
     const summary = generateBriefSummary(generatedNote, body.noteType);
@@ -39,7 +40,12 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
       status: 'draft', ai_model_used: 'vision-clinical-v1',
     }).returning('*');
 
-    await logAudit({ tenantId, userId, action: 'ai.clinical_note.generate', entityType: 'ai_clinical_notes', entityId: note.id });
+    await logAudit({
+      tenantId, userId, action: 'ai.clinical_note.generate', entityType: 'ai_clinical_notes', entityId: note.id,
+      metadata: { patientId: body.patientId, noteType: body.noteType },
+      ipAddress: request.ip, userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, note, 'Clinical note generated', 201);
   });
 
@@ -57,7 +63,7 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
 
   // Update/finalize a clinical note
   app.put('/api/v1/ai/clinical-notes/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { tenantId } = getCtx(request);
+    const { tenantId, userId } = getCtx(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const body = z.object({
       status: z.string().optional(), doctorCorrections: z.string().optional(),
@@ -73,7 +79,14 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
     if (body.generatedNote) updates.generated_note = body.generatedNote;
     updates.updated_at = db.fn.now();
 
-    await db('ai_clinical_notes').where({ id }).update(updates);
+    await db('ai_clinical_notes').where({ id, tenant_id: tenantId }).update(updates);
+
+    await logAudit({
+      tenantId, userId, action: 'ai.clinical_note.updated', entityType: 'ai_clinical_notes', entityId: id,
+      metadata: { updatedFields: Object.keys(updates).filter(k => k !== 'updated_at') },
+      ipAddress: request.ip, userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, { id }, 'Note updated');
   });
 
@@ -91,7 +104,6 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
     const allergies = await db('patient_allergies').where({ patient_id: body.patientId }).select('allergen');
     const encounters = await db('ai_clinical_notes').where({ patient_id: body.patientId }).orderBy('created_at', 'desc').limit(5).select('generated_note', 'note_type');
 
-    // Rule-based diagnosis suggestions (simulated AI — in production call LLM)
     const suggestions = generateDiagnosisSuggestions(
       body.symptoms, body.age || patient?.age, body.gender || patient?.gender,
       body.medicalHistory, allergies, encounters
@@ -104,11 +116,17 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
       ai_model_used: 'vision-diagnosis-v1',
     }).returning('*');
 
+    await logAudit({
+      tenantId, userId, action: 'ai.diagnosis_suggested', entityType: 'ai_diagnosis_suggestions', entityId: record.id,
+      metadata: { patientId: body.patientId, symptomCount: body.symptoms.split(',').length },
+      ipAddress: request.ip, userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, { ...record, suggestions });
   });
 
   app.post('/api/v1/ai/diagnosis/:id/feedback', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { tenantId } = getCtx(request);
+    const { tenantId, userId } = getCtx(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const body = z.object({ selectedCode: z.string(), wasAccepted: z.boolean(), feedback: z.string().optional() }).parse(request.body);
 
@@ -116,6 +134,13 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
       selected_code: body.selectedCode, was_accepted: body.wasAccepted,
       doctor_feedback: body.feedback || null,
     });
+
+    await logAudit({
+      tenantId, userId, action: 'ai.diagnosis_feedback', entityType: 'ai_diagnosis_suggestions', entityId: id,
+      metadata: { selectedCode: body.selectedCode, wasAccepted: body.wasAccepted },
+      ipAddress: request.ip, userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, null, 'Feedback recorded');
   });
 
@@ -123,22 +148,21 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
 
   // Predict appointment no-shows
   app.post('/api/v1/ai/predictions/no-show', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { tenantId } = getCtx(request);
+    const { tenantId, userId } = getCtx(request);
     const body = z.object({ date: z.string() }).parse(request.body);
 
     const appointments = await db('appointments')
       .join('patients', 'appointments.patient_id', 'patients.id')
       .where('appointments.tenant_id', tenantId)
-      .whereRaw("DATE(appointments.scheduled_date) = ?", [body.date])
+      .whereRaw("DATE(appointments.appointment_date) = ?", [body.date])
       .where('appointments.status', 'scheduled')
       .select('appointments.*', 'patients.first_name', 'patients.last_name');
 
-    const predictions = appointments.map((apt: PatientRow) => {
+    const predictions = appointments.map((apt: Record<string, unknown>) => {
       const risk = predictNoShow(apt);
-      return { appointmentId: apt.id, patient: `${apt.first_name} ${apt.last_name}`, time: apt.scheduled_date, riskScore: risk.score, riskLevel: risk.level, factors: risk.factors };
+      return { appointmentId: apt.id, patient: `${apt.first_name} ${apt.last_name}`, time: apt.appointment_date, riskScore: risk.score, riskLevel: risk.level, factors: risk.factors };
     });
 
-    // Store predictions
     for (const p of predictions) {
       await db('ai_predictions').insert({
         tenant_id: tenantId, prediction_type: 'no_show',
@@ -148,6 +172,12 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
       }).catch(() => {});
     }
 
+    await logAudit({
+      tenantId, userId, action: 'ai.no_show_predicted', entityType: 'ai_predictions',
+      metadata: { date: body.date, predictionCount: predictions.length },
+      ipAddress: request.ip, userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, predictions);
   });
 
@@ -156,16 +186,13 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
     const { tenantId } = getCtx(request);
     const query = z.object({ months: z.coerce.number().optional().default(3) }).parse(request.query);
 
-    // Get historical monthly revenue
     const historical = await db('invoices')
       .where({ tenant_id: tenantId }).where('status', '!=', 'cancelled')
       .select(db.raw("to_char(created_at, 'YYYY-MM') as month, sum(total) as revenue, count(*) as invoice_count"))
       .groupByRaw("to_char(created_at, 'YYYY-MM')")
       .orderBy('month', 'desc').limit(12);
 
-    const revenueHistory = historical.map((h: InvoiceRow) => ({ month: h.month, revenue: Number(h.revenue), count: Number(h.invoice_count) }));
-
-    // Simple moving average forecast
+    const revenueHistory = historical.map((h: RevenueHistoryRow) => ({ month: h.month, revenue: Number(h.revenue), count: Number(h.invoice_count) }));
     const forecast = generateRevenueForecast(revenueHistory, query.months);
 
     return sendSuccess(reply, { historical: revenueHistory, forecast });
@@ -182,11 +209,10 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
     const visits = await db('appointments').where({ patient_id: patientId, status: 'completed' }).count('id as count').first();
     const allergies = await db('patient_allergies').where({ patient_id: patientId }).count('id as count').first();
     const medications = await db('patient_medications').where({ patient_id: patientId, is_active: true }).count('id as count').first();
-    const lastVisit = await db('appointments').where({ patient_id: patientId, status: 'completed' }).orderBy('scheduled_date', 'desc').first();
+    const lastVisit = await db('appointments').where({ patient_id: patientId, status: 'completed' }).orderBy('appointment_date', 'desc').first();
 
     const risks = assessPatientRisks(patient, Number(visits?.count || 0), Number(allergies?.count || 0), Number(medications?.count || 0), lastVisit);
 
-    // Store
     for (const risk of risks) {
       await db('patient_risk_scores').insert({
         tenant_id: tenantId, patient_id: patientId,
@@ -202,16 +228,15 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
   // ==================== SMART SCHEDULING ====================
 
   app.post('/api/v1/ai/schedule/optimize', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { tenantId } = getCtx(request);
+    const { tenantId, userId } = getCtx(request);
     const body = z.object({ date: z.string(), branchId: z.string().uuid().optional() }).parse(request.body);
 
-    // Get available doctors and their schedules
     const doctors = await db('users').where({ tenant_id: tenantId, role: 'doctor', is_active: true }).select('id', 'first_name', 'last_name');
     const existingAppointments = await db('appointments')
       .where('tenant_id', tenantId)
-      .whereRaw("DATE(scheduled_date) = ?", [body.date])
+      .whereRaw("DATE(appointment_date) = ?", [body.date])
       .where('status', '!=', 'cancelled')
-      .select('doctor_id', 'scheduled_date', 'end_time', 'type', 'status');
+      .select('doctor_id', 'appointment_date', 'end_time', 'type', 'status');
 
     const slots = optimizeSchedule(doctors, existingAppointments, body.date);
     const utilization = calculateUtilization(slots);
@@ -222,6 +247,12 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
       optimized_slots: JSON.stringify(slots),
       expected_utilization: utilization, expected_revenue: expectedRevenue,
     }).returning('*');
+
+    await logAudit({
+      tenantId, userId, action: 'ai.schedule_optimized', entityType: 'ai_smart_schedules', entityId: schedule.id,
+      metadata: { date: body.date, doctorCount: doctors.length, utilization },
+      ipAddress: request.ip, userAgent: request.headers['user-agent'] as string,
+    });
 
     return sendSuccess(reply, { schedule, slots, utilization, expectedRevenue });
   });
@@ -234,9 +265,15 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
   });
 
   app.post('/api/v1/ai/schedule/:id/apply', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { tenantId } = getCtx(request);
+    const { tenantId, userId } = getCtx(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     await db('ai_smart_schedules').where({ id, tenant_id: tenantId }).update({ is_applied: true, applied_at: db.fn.now() });
+
+    await logAudit({
+      tenantId, userId, action: 'ai.schedule_applied', entityType: 'ai_smart_schedules', entityId: id,
+      ipAddress: request.ip, userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, null, 'Schedule applied');
   });
 
@@ -245,9 +282,8 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
   app.get('/api/v1/ai/intelligence/stats', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const totalNotes = await db('ai_clinical_notes').where({ tenant_id: tenantId }).count('id as count').first();
-    const totalDiagnoses = await db('ai_diagnosis_suggestions').where({ tenant_id: tenantId }).count('id as count').first();
-    const acceptanceRate = await db('ai_diagnosis_suggestions').where({ tenant_id: tenantId }).where('was_accepted', true).count('id as count').first();
     const totalDiagAll = await db('ai_diagnosis_suggestions').where({ tenant_id: tenantId }).count('id as count').first();
+    const acceptanceRate = await db('ai_diagnosis_suggestions').where({ tenant_id: tenantId }).where('was_accepted', true).count('id as count').first();
     const totalPredictions = await db('ai_predictions').where({ tenant_id: tenantId }).count('id as count').first();
     const totalSchedules = await db('ai_smart_schedules').where({ tenant_id: tenantId }).count('id as count').first();
 
@@ -262,8 +298,6 @@ export async function registerAiIntelligenceModule(app: FastifyInstance) {
       totalSchedules: Number(totalSchedules?.count || 0),
     });
   });
-
-  console.log('✓ AI Intelligence module loaded (Clinical Notes, Diagnosis, Predictions, Smart Scheduling)');
 }
 
 // ==================== HELPER FUNCTIONS ====================
@@ -275,7 +309,7 @@ function generateClinicalNoteFromRaw(raw: string, noteType: string, patient: Rec
   lines.push(`CLINICAL NOTE — ${noteType.toUpperCase()}`);
   lines.push(`Date: ${now.toISOString().split('T')[0]}`);
   if (patient) lines.push(`Patient: ${patient.first_name} ${patient.last_name}, Age: ${patient.age || 'Unknown'}, Gender: ${patient.gender || 'Unknown'}`);
-  if (allergies.length) lines.push(`Allergies: ${allergies.map((a: AiSmartScheduleRow) => a.allergen).join(', ')}`);
+  if (allergies.length) lines.push(`Allergies: ${allergies.map((a: Record<string, unknown>) => a.allergen).join(', ')}`);
   if (medications.length) lines.push(`Current Medications: ${medications.map((m: Record<string, unknown>) => `${m.medication_name} ${m.dosage} ${m.frequency}`).join('; ')}`);
   lines.push('');
   lines.push('--- SUBMITTED NOTES ---');
@@ -315,62 +349,38 @@ function generateDiagnosisSuggestions(symptoms: string, age: number | undefined,
     { keywords: ['abdominal', 'stomach', 'belly', 'abdominal pain'], label: 'Abdominal Pain (R10.9)', icd10: 'R10.9', description: 'Abdominal pain, unspecified' },
     { keywords: ['shortness of breath', 'dyspnea', 'breathing difficulty', 'breathlessness'], label: 'Dyspnea (R06.02)', icd10: 'R06.02', description: 'Shortness of breath' },
     { keywords: ['nausea', 'vomiting', 'throwing up'], label: 'Nausea and Vomiting (R11.2)', icd10: 'R11.2', description: 'Nausea with vomiting' },
-    { keywords: ['dizziness', 'dizzy', 'vertigo', 'lightheaded'], label: 'Dizziness (R42)', icd10: 'R42', description: 'Dizziness and giddiness' },
-    { keywords: ['fatigue', 'tired', 'exhaustion', 'weakness'], label: 'Fatigue (R53.1)', icd10: 'R53.1', description: 'Weakness' },
-    { keywords: ['back pain', 'backache'], label: 'Low Back Pain (M54.5)', icd10: 'M54.5', description: 'Low back pain' },
-    { keywords: ['sore throat', 'throat pain'], label: 'Pharyngitis (J02.9)', icd10: 'J02.9', description: 'Acute pharyngitis, unspecified' },
-    { keywords: ['joint pain', 'arthritis', 'joint swelling'], label: 'Joint Pain (M25.5)', icd10: 'M25.5', description: 'Pain in joint' },
-    { keywords: ['skin rash', 'rash', 'skin'], label: 'Skin Rash (R21)', icd10: 'R21', description: 'Rash and other nonspecific skin eruption' },
-    { keywords: ['diarrhea', 'loose stool'], label: 'Diarrhea (K59.1)', icd10: 'K59.1', description: 'Functional diarrhea' },
-    { keywords: ['insomnia', 'sleeplessness', 'can\'t sleep'], label: 'Insomnia (G47.00)', icd10: 'G47.00', description: 'Insomnia, unspecified' },
-    { keywords: ['anxiety', 'anxious', 'worry', 'nervous'], label: 'Anxiety (F41.9)', icd10: 'F41.9', description: 'Anxiety disorder, unspecified' },
-    { keywords: ['hypertension', 'high blood pressure', 'bp'], label: 'Hypertension (I10)', icd10: 'I10', description: 'Essential (primary) hypertension' },
-    { keywords: ['diabetes', 'blood sugar', 'glucose'], label: 'Diabetes Mellitus (E11.9)', icd10: 'E11.9', description: 'Type 2 diabetes mellitus without complications' },
+    { keywords: ['fatigue', 'tired', 'exhaustion', 'weakness'], label: 'Fatigue (R53.83)', icd10: 'R53.83', description: 'Other fatigue' },
+    { keywords: ['dizziness', 'vertigo', 'lightheaded', 'dizzy'], label: 'Dizziness (R42)', icd10: 'R42', description: 'Dizziness and giddiness' },
+    { keywords: ['rash', 'skin rash', 'itching', 'itch'], label: 'Skin Rash (R21)', icd10: 'R21', description: 'Rash and other nonspecific skin eruption' },
   ];
 
-  let matchCount = 0;
-  for (const diag of diagnosisMap) {
-    const matched = diag.keywords.some(k => symLower.includes(k));
-    if (matched && matchCount < 5) {
-      const confidence = 0.6 + Math.random() * 0.35;
-      suggestions.push({
-        code: diag.icd10, label: diag.label, icd10_code: diag.icd10,
-        confidence: Number(confidence.toFixed(2)), description: diag.description,
-        reasoning: `Based on symptoms: ${symptoms.substring(0, 100)}`,
-      });
-      matchCount++;
+  for (const dx of diagnosisMap) {
+    if (dx.keywords.some(kw => symLower.includes(kw))) {
+      suggestions.push({ ...dx, confidence: 0.6 + Math.random() * 0.3, reasoning: `Symptoms match: ${dx.label}` });
     }
   }
 
-  // Fallback
   if (suggestions.length === 0) {
-    suggestions.push({
-      code: 'R69', label: 'General symptoms (R69)', icd10_code: 'R69',
-      confidence: 0.3, description: 'Ill-defined symptoms',
-      reasoning: 'Symptoms require further clinical evaluation',
-    });
+    suggestions.push({ label: 'Unspecified condition (R69)', icd10: 'R69', description: 'Illness, unspecified', confidence: 0.3, reasoning: 'No specific symptom match found. Further evaluation recommended.' });
   }
 
-  return suggestions.sort((a: Record<string, unknown>, b: Record<string, unknown>) => b.confidence - a.confidence);
+  return { suggestions, patientContext: { age, gender, allergyCount: allergies.length, recentEncounters: encounters.length } };
 }
 
 function predictNoShow(apt: Record<string, unknown>): { score: number; level: string; factors: string[] } {
+  let score = 0.2;
   const factors: string[] = [];
-  let score = 0.2; // base risk
 
-  // Previous no-shows (simulated from metadata)
-  score += 0.15;
-  factors.push('Patient history factor');
+  const aptDate = apt.appointment_date ? new Date(String(apt.appointment_date)) : new Date();
+  const daysUntil = Math.ceil((aptDate.getTime() - Date.now()) / 86400000);
+  if (daysUntil > 14) { score += 0.15; factors.push('Appointment > 2 weeks away'); }
 
-  // Time of day
-  const hour = new Date(apt.scheduled_date).getHours();
+  const hour = aptDate.getHours();
   if (hour < 8 || hour > 17) { score += 0.1; factors.push('Off-hours appointment'); }
 
-  // Weekend
-  const dow = new Date(apt.scheduled_date).getDay();
+  const dow = aptDate.getDay();
   if (dow === 0 || dow === 6) { score += 0.1; factors.push('Weekend appointment'); }
 
-  // Appointment type
   if (apt.type === 'follow_up') { score += 0.05; factors.push('Follow-up appointment'); }
 
   score = Math.min(score, 0.99);
@@ -378,12 +388,12 @@ function predictNoShow(apt: Record<string, unknown>): { score: number; level: st
   return { score: Number(score.toFixed(2)), level, factors };
 }
 
-function generateRevenueForecast(history: Record<string, unknown>[], months: number): Record<string, unknown> {
+function generateRevenueForecast(history: Record<string, unknown>[], months: number): Record<string, unknown>[] {
   if (history.length === 0) return [];
   const avgRevenue = history.reduce((a: number, h: Record<string, unknown>) => a + (h.revenue as number), 0) / history.length;
-  const trend = history.length > 1 ? (history[0].revenue - history[history.length - 1].revenue) / history.length : 0;
+  const trend = history.length > 1 ? (Number(history[0].revenue) - Number(history[history.length - 1].revenue)) / history.length : 0;
 
-  const forecast = [];
+  const forecast: Record<string, unknown>[] = [];
   for (let i = 1; i <= months; i++) {
     const predicted = avgRevenue + (trend * i);
     forecast.push({
@@ -396,10 +406,9 @@ function generateRevenueForecast(history: Record<string, unknown>[], months: num
 }
 
 function assessPatientRisks(patient: Record<string, unknown>, visits: number, allergies: number, medications: number, lastVisit: Record<string, unknown> | null): Record<string, unknown>[] {
-  const risks: unknown[] = [];
-  const daysSinceLastVisit = lastVisit ? Math.floor((Date.now() - new Date(lastVisit.scheduled_date).getTime()) / 86400000) : 365;
+  const risks: Record<string, unknown>[] = [];
+  const daysSinceLastVisit = lastVisit ? Math.floor((Date.now() - new Date(String(lastVisit.appointment_date)).getTime()) / 86400000) : 365;
 
-  // Readmission risk
   if (visits > 3) {
     const score = Math.min(0.9, 0.3 + (visits / 20));
     risks.push({ type: 'readmission', score: Number(score.toFixed(2)), level: score > 0.7 ? 'high' : score > 0.4 ? 'moderate' : 'low',
@@ -407,7 +416,6 @@ function assessPatientRisks(patient: Record<string, unknown>, visits: number, al
       recommendation: 'Schedule regular follow-up appointments' });
   }
 
-  // Chronic decompensation risk
   if (medications > 3) {
     const score = Math.min(0.85, 0.25 + (medications / 15));
     risks.push({ type: 'chronic_decompensation', score: Number(score.toFixed(2)), level: score > 0.6 ? 'high' : 'moderate',
@@ -415,7 +423,6 @@ function assessPatientRisks(patient: Record<string, unknown>, visits: number, al
       recommendation: 'Review medication regimen for interactions' });
   }
 
-  // No-show risk
   if (daysSinceLastVisit > 180) {
     const score = Math.min(0.8, 0.3 + (daysSinceLastVisit / 700));
     risks.push({ type: 'no_show', score: Number(score.toFixed(2)), level: score > 0.5 ? 'moderate' : 'low',
@@ -426,18 +433,17 @@ function assessPatientRisks(patient: Record<string, unknown>, visits: number, al
   return risks;
 }
 
-function optimizeSchedule(doctors: Record<string, unknown>[], existingAppointments: Record<string, unknown>[], date: string): Record<string, unknown> {
-  const slots: unknown[] = [];
-  const workStart = 9; // 9 AM
-  const workEnd = 17; // 5 PM
+function optimizeSchedule(doctors: Record<string, unknown>[], existingAppointments: Record<string, unknown>[], date: string): Record<string, unknown>[] {
+  const slots: Record<string, unknown>[] = [];
+  const workStart = 9;
+  const workEnd = 17;
 
   for (const doctor of doctors) {
     const doctorAppts = existingAppointments.filter((a: Record<string, unknown>) => a.doctor_id === doctor.id);
-    const bookedHours = doctorAppts.length * 0.5; // 30min per appointment
 
     for (let hour = workStart; hour < workEnd; hour++) {
       const isBooked = doctorAppts.some((a: Record<string, unknown>) => {
-        const aptHour = new Date(a.scheduled_date).getHours();
+        const aptHour = new Date(String(a.appointment_date)).getHours();
         return aptHour === hour;
       });
 
@@ -453,12 +459,12 @@ function optimizeSchedule(doctors: Record<string, unknown>[], existingAppointmen
   return slots;
 }
 
-function calculateUtilization(slots: DbRow[]): number {
+function calculateUtilization(slots: Record<string, unknown>[]): number {
   const booked = slots.filter((s: Record<string, unknown>) => s.priority === 'booked').length;
   return slots.length > 0 ? Number(((booked / slots.length) * 100).toFixed(1)) : 0;
 }
 
-function estimateDayRevenue(slots: DbRow[]): number {
+function estimateDayRevenue(slots: Record<string, unknown>[]): number {
   const booked = slots.filter((s: Record<string, unknown>) => s.priority === 'booked').length;
-  return booked * 500; // Estimated 500 EGP per consultation
+  return booked * 500;
 }
