@@ -439,6 +439,144 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
     return reply.status(200).send({ status: 'OK' });
   });
 
+
+  // ==================== FAWRY CREATE ====================
+
+  app.post('/api/v1/payments/fawry/create', {
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const { userId } = getCtx(request);
+    const { invoiceId, amount, customerPhone, customerName, customerEmail } = z.object({
+      invoiceId: z.string().uuid(),
+      amount: z.number().positive(),
+      customerPhone: z.string().min(10),
+      customerName: z.string().min(1),
+      customerEmail: z.string().email().optional(),
+    }).parse(request.body);
+
+    const invoice = await db('invoices').where({ id: invoiceId, tenant_id: tenantId }).first();
+    if (!invoice) return sendError(reply, 'Invoice not found', 404);
+
+    const merchantCode = env.FAWRY_MERCHANT_CODE;
+    const referenceNumber = `FW-${Date.now()}-${crypto.randomInt(1000, 9999)}`;
+
+    const [paymentTx] = await db('payment_transactions').insert({
+      tenant_id: tenantId,
+      invoice_id: invoiceId,
+      amount,
+      method: 'fawry',
+      reference: referenceNumber,
+      status: 'pending',
+      notes: `Fawry payment for ${customerName} (${customerPhone})`,
+    }).returning('*');
+
+    try { await logAudit({ tenantId, userId, action: 'payment.fawry_created', entityType: 'invoice', entityId: invoiceId, metadata: { amount, customerPhone, referenceNumber } }); } catch {}
+
+    return sendSuccess(reply, {
+      paymentTransactionId: paymentTx.id,
+      referenceNumber,
+      merchantCode: merchantCode || 'PENDING_CONFIG',
+      amount,
+      customerPhone,
+      customerName,
+      invoiceNumber: invoice.invoice_number,
+      status: 'pending',
+      message: 'Fawry payment initiated. Customer should complete payment at Fawry outlet or online.',
+    }, 'Fawry payment created', 201);
+  });
+
+  // ==================== INSTAPAY CREATE ====================
+
+  app.post('/api/v1/payments/instapay', {
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const { userId } = getCtx(request);
+    const { amount } = z.object({
+      amount: z.number().positive(),
+    }).parse(request.body);
+
+    const walletId = env.INSTAPAY_WALLET;
+    const referenceNumber = `IP-${Date.now()}-${crypto.randomInt(1000, 9999)}`;
+
+    const [paymentTx] = await db('payment_transactions').insert({
+      tenant_id: tenantId,
+      invoice_id: null,
+      amount,
+      method: 'instapay',
+      reference: referenceNumber,
+      status: 'pending',
+      notes: 'InstaPay transfer initiated',
+    }).returning('*');
+
+    try { await logAudit({ tenantId, userId, action: 'payment.instapay_created', entityType: 'payment', entityId: paymentTx.id, metadata: { amount, referenceNumber } }); } catch {}
+
+    return sendSuccess(reply, {
+      paymentTransactionId: paymentTx.id,
+      referenceNumber,
+      walletId: walletId || 'PENDING_CONFIG',
+      amount,
+      status: 'pending',
+      message: 'InstaPay details generated. Customer should transfer to the wallet and include the reference number.',
+    }, 'InstaPay payment created', 201);
+  });
+
+  // ==================== ETA QR CODE ====================
+
+  app.get('/api/v1/invoices/:id/eta-qr', {
+    preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)],
+  }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const { id } = request.params as { id: string };
+
+    const invoice = await db('invoices').where({ id, tenant_id: tenantId }).first();
+    if (!invoice) return sendError(reply, 'Invoice not found', 404);
+
+    const etaInvoice = await db('eta_invoices').where({ invoice_id: id, tenant_id: tenantId }).first();
+
+    if (etaInvoice?.qr_code_data) {
+      return sendSuccess(reply, {
+        invoiceId: id,
+        qrCodeData: etaInvoice.qr_code_data,
+        etaUuid: etaInvoice.eta_uuid,
+        etaInvoiceNumber: etaInvoice.eta_invoice_number,
+        status: etaInvoice.status,
+      });
+    }
+
+    const tenant = await db('tenants').where({ id: tenantId }).first();
+    const sellerName = tenant?.name || 'Vision Healthcare';
+    const taxRegNo = env.TAX_REGISTRATION_NUMBER || '000000000000000';
+    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const total = Number(invoice.total);
+    const vatTotal = Number(invoice.tax);
+
+    const qrCodeData = generateEtaQrTLV(sellerName, taxRegNo, timestamp, total, vatTotal);
+
+    if (etaInvoice) {
+      await db('eta_invoices').where({ id: etaInvoice.id }).update({ qr_code_data: qrCodeData });
+    } else {
+      await db('eta_invoices').insert({
+        tenant_id: tenantId,
+        invoice_id: id,
+        qr_code_data: qrCodeData,
+        status: 'draft',
+      });
+    }
+
+    try { await logAudit({ tenantId, userId: (getCtx(request)).userId, action: 'invoice.eta_qr_generated', entityType: 'invoice', entityId: id }); } catch {}
+
+    return sendSuccess(reply, {
+      invoiceId: id,
+      qrCodeData,
+      invoiceNumber: invoice.invoice_number,
+      total,
+      vatTotal,
+      sellerName,
+    });
+  });
+
   // Module loaded
 }
 

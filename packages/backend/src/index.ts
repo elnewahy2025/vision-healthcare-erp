@@ -16,7 +16,7 @@ import { getEnv, validateProductionEnvironment, validateDevelopmentEnvironment }
 import { registerAuthModule } from './modules/auth/index.js';
 import { registerPatientModule } from './modules/patient/index.js';
 import { registerAppointmentModule } from './modules/appointment/index.js';
-import { registerEmmModule } from './modules/emr/index.js';
+import { registerEmrModule } from './modules/emr/index.js';
 import { registerBillingModule } from './modules/billing/index.js';
 import { registerCommonModule } from './modules/common/index.js';
 import { errorHandler } from './core/error-handler.js';
@@ -169,7 +169,7 @@ async function buildApp() {
   await registerAuthModule(app);
   await registerPatientModule(app);
   await registerAppointmentModule(app);
-  await registerEmmModule(app);
+  await registerEmrModule(app);
   await registerBillingModule(app);
   await registerLaboratoryModule(app);
   await registerRadiologyModule(app);
