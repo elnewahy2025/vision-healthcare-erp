@@ -3,11 +3,76 @@ import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { authenticate } from '../auth-guard.js';
+import { logAudit } from '../../services/audit.js';
+
+interface CompliancePolicyRow {
+  id: string;
+  tenant_id: string;
+  title: string;
+  code: string;
+  category: string | null;
+  description: string | null;
+  content: string | null;
+  status: string;
+  effective_date: string | null;
+  review_date: string | null;
+  created_by: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface ComplianceAuditRow {
+  id: string;
+  tenant_id: string;
+  title: string;
+  type: string;
+  status: string;
+  scheduled_date: string | null;
+  completed_date: string | null;
+  scope: string | null;
+  findings: string | null;
+  recommendations: string | null;
+  auditor: string | null;
+  created_by: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface DataConsentLogRow {
+  id: string;
+  tenant_id: string;
+  patient_id: string;
+  consent_type: string;
+  granted: boolean;
+  details: string | null;
+  ip_address: string | null;
+  consented_at: Date;
+  pf?: string;
+  pl?: string;
+}
+
+interface BreachLogRow {
+  id: string;
+  tenant_id: string;
+  type: string;
+  detected_date: string;
+  reported_date: string | null;
+  severity: string;
+  description: string;
+  affected_data: string | null;
+  affected_records: number;
+  action_taken: string | null;
+  status: string;
+  created_by: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
 
 export async function registerComplianceModule(app: FastifyInstance) {
   // Policies
   app.get('/api/v1/compliance/policies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { category, status } = request.query as { category?: string; status?: string };
+    const tenantId = getTenantId(request);
+    const { category, status } = request.query as { category?: string; status?: string };
     let q = db('compliance_policies').where('compliance_policies.tenant_id', tenantId);
     if (category) q = q.andWhere('category', category);
     if (status) q = q.andWhere('status', status);
@@ -16,24 +81,38 @@ export async function registerComplianceModule(app: FastifyInstance) {
       id: p.id, title: p.title, code: p.code, category: p.category,
       description: p.description, content: p.content, status: p.status,
       effectiveDate: p.effective_date, reviewDate: p.review_date,
-      createdAt: p.created_at, updatedAt: p.updated_at
+      createdAt: p.created_at, updatedAt: p.updated_at,
     })));
   });
 
   app.post('/api/v1/compliance/policies', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
     const [pol] = await db('compliance_policies').insert({
       tenant_id: tenantId, title: body.title, code: body.code,
       category: body.category || 'general', description: body.description || null,
       content: body.content || null, status: body.status || 'draft',
       effective_date: body.effectiveDate || null, review_date: body.reviewDate || null,
-      created_by: ctx.userId
+      created_by: ctx.userId,
     }).returning('*');
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'compliance.policy_created', entityType: 'compliance_policy', entityId: pol.id,
+      metadata: { title: body.title, code: body.code, category: body.category },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, { id: pol.id, code: pol.code, title: pol.title }, 'Policy created', 201);
   });
 
   app.put('/api/v1/compliance/policies/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const { id } = request.params as { id: string };
+    const body = request.body as Record<string, unknown>;
     const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.title) update.title = body.title;
     if (body.category) update.category = body.category;
@@ -42,13 +121,23 @@ export async function registerComplianceModule(app: FastifyInstance) {
     if (body.status) update.status = body.status;
     if (body.effectiveDate) update.effective_date = body.effectiveDate;
     if (body.reviewDate) update.review_date = body.reviewDate;
-    await db('compliance_policies').where({ id }).update(update);
+    await db('compliance_policies').where({ id, tenant_id: tenantId }).update(update);
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'compliance.policy_updated', entityType: 'compliance_policy', entityId: id,
+      metadata: { updatedFields: Object.keys(update).filter(k => k !== 'updated_at') },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, null, 'Policy updated');
   });
 
   // Audits
   app.get('/api/v1/compliance/audits', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { status, type } = request.query as { status?: string; type?: string };
+    const tenantId = getTenantId(request);
+    const { status, type } = request.query as { status?: string; type?: string };
     let q = db('compliance_audits').where('compliance_audits.tenant_id', tenantId);
     if (status) q = q.andWhere('status', status);
     if (type) q = q.andWhere('type', type);
@@ -57,61 +146,98 @@ export async function registerComplianceModule(app: FastifyInstance) {
       id: a.id, title: a.title, type: a.type, status: a.status,
       scheduledDate: a.scheduled_date, completedDate: a.completed_date,
       scope: a.scope, findings: a.findings, recommendations: a.recommendations,
-      auditor: a.auditor, createdAt: a.created_at, updatedAt: a.updated_at
+      auditor: a.auditor, createdAt: a.created_at, updatedAt: a.updated_at,
     })));
   });
 
   app.post('/api/v1/compliance/audits', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
     const [audit] = await db('compliance_audits').insert({
       tenant_id: tenantId, title: body.title, type: body.type || 'internal',
       status: body.status || 'planned', scheduled_date: body.scheduledDate || null,
-      scope: body.scope || null, auditor: body.auditor || null, created_by: ctx.userId
+      scope: body.scope || null, auditor: body.auditor || null, created_by: ctx.userId,
     }).returning('*');
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'compliance.audit_created', entityType: 'compliance_audit', entityId: audit.id,
+      metadata: { title: body.title, type: body.type },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, { id: audit.id, title: audit.title }, 'Audit created', 201);
   });
 
   app.put('/api/v1/compliance/audits/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const { id } = request.params as { id: string };
+    const body = request.body as Record<string, unknown>;
     const update: Record<string, unknown> = { updated_at: new Date() };
+    if (body.title) update.title = body.title;
     if (body.status) update.status = body.status;
+    if (body.scope !== undefined) update.scope = body.scope;
     if (body.findings !== undefined) update.findings = body.findings;
     if (body.recommendations !== undefined) update.recommendations = body.recommendations;
-    if (body.scope) update.scope = body.scope;
-    if (body.auditor) update.auditor = body.auditor;
+    if (body.auditor !== undefined) update.auditor = body.auditor;
     if (body.status === 'completed') update.completed_date = new Date().toISOString().split('T')[0];
-    await db('compliance_audits').where({ id }).update(update);
+    await db('compliance_audits').where({ id, tenant_id: tenantId }).update(update);
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'compliance.audit_updated', entityType: 'compliance_audit', entityId: id,
+      metadata: { updatedFields: Object.keys(update).filter(k => k !== 'updated_at') },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, null, 'Audit updated');
   });
 
   // Consent Logs
   app.get('/api/v1/compliance/consents', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { patientId } = request.query as { patientId?: string };
+    const tenantId = getTenantId(request);
+    const { patientId } = request.query as { patientId?: string };
     let q = db('data_consent_logs').where('data_consent_logs.tenant_id', tenantId);
     if (patientId) q = q.andWhere('data_consent_logs.patient_id', patientId);
     const consents = await q.leftJoin('patients', 'data_consent_logs.patient_id', 'patients.id')
       .select('data_consent_logs.*', 'patients.first_name as pf', 'patients.last_name as pl')
       .orderBy('consented_at', 'desc').limit(50);
     return sendSuccess(reply, consents.map((c: DataConsentLogRow) => ({
-      id: c.id, patientId: c.patient_id, patientName: c.pf + ' ' + c.pl,
+      id: c.id, patientId: c.patient_id, patientName: `${c.pf || ''} ${c.pl || ''}`.trim(),
       consentType: c.consent_type, granted: c.granted, details: c.details,
-      ipAddress: c.ip_address, consentedAt: c.consented_at
+      ipAddress: c.ip_address, consentedAt: c.consented_at,
     })));
   });
 
   app.post('/api/v1/compliance/consents', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
     const [consent] = await db('data_consent_logs').insert({
       tenant_id: tenantId, patient_id: body.patientId,
       consent_type: body.consentType, granted: body.granted !== false,
-      details: body.details || null, ip_address: body.ipAddress || null
+      details: body.details || null, ip_address: body.ipAddress || null,
     }).returning('*');
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'compliance.consent_logged', entityType: 'data_consent_log', entityId: consent.id,
+      metadata: { patientId: body.patientId, consentType: body.consentType, granted: body.granted },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, { id: consent.id, granted: consent.granted }, 'Consent logged', 201);
   });
 
   // Breach Log
   app.get('/api/v1/compliance/breaches', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { status, severity } = request.query as { severity?: string; status?: string };
+    const tenantId = getTenantId(request);
+    const { status, severity } = request.query as { severity?: string; status?: string };
     let q = db('breach_log').where('breach_log.tenant_id', tenantId);
     if (status) q = q.andWhere('breach_log.status', status);
     if (severity) q = q.andWhere('breach_log.severity', severity);
@@ -121,24 +247,38 @@ export async function registerComplianceModule(app: FastifyInstance) {
       reportedDate: b.reported_date, severity: b.severity,
       description: b.description, affectedData: b.affected_data,
       affectedRecords: b.affected_records, actionTaken: b.action_taken,
-      status: b.status, createdAt: b.created_at, updatedAt: b.updated_at
+      status: b.status, createdAt: b.created_at, updatedAt: b.updated_at,
     })));
   });
 
   app.post('/api/v1/compliance/breaches', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
     const [breach] = await db('breach_log').insert({
       tenant_id: tenantId, type: body.type, detected_date: body.detectedDate || new Date().toISOString().split('T')[0],
       severity: body.severity || 'medium', description: body.description,
       affected_data: body.affectedData || null, affected_records: body.affectedRecords || 0,
       action_taken: body.actionTaken || null, status: body.status || 'open',
-      created_by: ctx.userId
+      created_by: ctx.userId,
     }).returning('*');
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'compliance.breach_logged', entityType: 'breach_log', entityId: breach.id,
+      metadata: { type: body.type, severity: body.severity },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, { id: breach.id, type: breach.type }, 'Breach logged', 201);
   });
 
   app.put('/api/v1/compliance/breaches/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const { id } = request.params as { id: string };
+    const body = request.body as Record<string, unknown>;
     const update: Record<string, unknown> = { updated_at: new Date() };
     if (body.status) update.status = body.status;
     if (body.severity) update.severity = body.severity;
@@ -146,7 +286,16 @@ export async function registerComplianceModule(app: FastifyInstance) {
     if (body.affectedData !== undefined) update.affected_data = body.affectedData;
     if (body.affectedRecords !== undefined) update.affected_records = body.affectedRecords;
     if (body.reportedDate) update.reported_date = body.reportedDate;
-    await db('breach_log').where({ id }).update(update);
+    await db('breach_log').where({ id, tenant_id: tenantId }).update(update);
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'compliance.breach_updated', entityType: 'breach_log', entityId: id,
+      metadata: { updatedFields: Object.keys(update).filter(k => k !== 'updated_at') },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, null, 'Breach updated');
   });
 }
