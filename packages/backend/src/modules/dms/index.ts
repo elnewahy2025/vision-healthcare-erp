@@ -9,6 +9,42 @@ import { authenticate } from '../auth-guard.js';
 
 const CATEGORIES = ['lab_report', 'radiology_report', 'prescription', 'consent', 'id_scan', 'insurance', 'medical_record', 'discharge_summary', 'referral', 'other'];
 
+interface DmsDocumentRow {
+  id: string;
+  tenant_id: string;
+  patient_id: string | null;
+  title: string;
+  category: string | null;
+  file_name: string;
+  file_type: string | null;
+  file_size: number;
+  storage_path: string;
+  mime_type: string | null;
+  description: string | null;
+  status: string;
+  version: number;
+  uploaded_by: string | null;
+  ocr_text: unknown;
+  deleted_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+  // Joined fields
+  pf?: string;
+  pl?: string;
+}
+
+interface DmsDocumentVersionRow {
+  id: string;
+  document_id: string;
+  version: number;
+  file_name: string;
+  storage_path: string;
+  file_size: number;
+  change_notes: string | null;
+  uploaded_by: string | null;
+  created_at: Date;
+}
+
 export async function registerDmsModule(app: FastifyInstance) {
 
   // ==================== FILE UPLOAD (multipart) ====================
@@ -20,16 +56,16 @@ export async function registerDmsModule(app: FastifyInstance) {
     if (!file) return reply.code(400).send({ error: 'No file uploaded' });
 
     const fields = file.fields as Record<string, unknown>;
-    const title = fields?.title?.value || file.filename;
-    const category = fields?.category?.value || 'other';
-    const patientId = fields?.patientId?.value || null;
-    const description = fields?.description?.value || null;
+    const title = (fields?.title as { value: string })?.value || file.filename;
+    const category = (fields?.category as { value: string })?.value || 'other';
+    const patientId = (fields?.patientId as { value: string })?.value || null;
+    const description = (fields?.description as { value: string })?.value || null;
 
     const buffer = await file.toBuffer();
     const mimeType = file.mimetype;
     const originalName = file.filename;
 
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 50 * 1024 * 1024;
     if (buffer.length > maxSize) return reply.code(400).send({ error: 'File too large (max 50MB)' });
 
     const { storagePath, fileName } = await uploadFile(tenantId, category, buffer, originalName, mimeType);
@@ -48,7 +84,13 @@ export async function registerDmsModule(app: FastifyInstance) {
       uploaded_by: ctx.userId,
     }).returning('*');
 
-    await logAudit({ tenantId, userId: ctx.userId, action: 'document.upload', entityType: 'document', entityId: doc.id, metadata: { title, category, size: buffer.length } });
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'document.upload', entityType: 'document', entityId: doc.id,
+      metadata: { title, category, size: buffer.length },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
 
     return sendSuccess(reply, { id: doc.id, title: doc.title, fileName: doc.file_name, fileSize: doc.file_size, mimeType: doc.mime_type }, 'File uploaded', 201);
   });
@@ -75,7 +117,7 @@ export async function registerDmsModule(app: FastifyInstance) {
       .orderBy('created_at', 'desc')
       .limit(query.limit).offset((query.page - 1) * query.limit);
 
-    return sendPaginated(reply, docs.map((d: DocumentRow) => ({
+    return sendPaginated(reply, docs.map((d: DmsDocumentRow) => ({
       id: d.id, title: d.title, category: d.category, fileName: d.file_name,
       fileType: d.file_type, fileSize: d.file_size, mimeType: d.mime_type,
       patientId: d.patient_id, patientName: d.pf ? `${d.pf} ${d.pl}` : null,
@@ -99,7 +141,7 @@ export async function registerDmsModule(app: FastifyInstance) {
       version: doc.version, patientId: doc.patient_id, uploadedBy: doc.uploaded_by,
       isImage: isImage(doc.mime_type), isPdf: isPdf(doc.mime_type),
       createdAt: doc.created_at, updatedAt: doc.updated_at,
-      versions: versions.map((v: DocumentVersionRow) => ({ id: v.id, version: v.version, fileName: v.file_name, fileSize: v.file_size, changeNotes: v.change_notes, createdAt: v.created_at })),
+      versions: versions.map((v: DmsDocumentVersionRow) => ({ id: v.id, version: v.version, fileName: v.file_name, fileSize: v.file_size, changeNotes: v.change_notes, createdAt: v.created_at })),
     });
   });
 
@@ -136,6 +178,8 @@ export async function registerDmsModule(app: FastifyInstance) {
 
   // ==================== UPDATE DOCUMENT ====================
   app.put('/api/v1/dms/documents/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const body = z.object({ title: z.string().optional(), category: z.string().optional(), description: z.string().optional().nullable(), status: z.string().optional() }).parse(request.body);
     const update: Record<string, unknown> = { updated_at: new Date() };
@@ -143,19 +187,34 @@ export async function registerDmsModule(app: FastifyInstance) {
     if (body.category) update.category = body.category;
     if (body.description !== undefined) update.description = body.description;
     if (body.status) update.status = body.status;
-    await db('documents').where({ id }).update(update);
+    await db('documents').where({ id, tenant_id: tenantId }).update(update);
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'document.update', entityType: 'document', entityId: id,
+      metadata: { updatedFields: Object.keys(update).filter(k => k !== 'updated_at') },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, null, 'Document updated');
   });
 
   // ==================== DELETE DOCUMENT ====================
   app.delete('/api/v1/dms/documents/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
+    const { tenantId, userId } = getCtx(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const { tenantId } = getCtx(request);
     const doc = await db('documents').where({ id, tenant_id: tenantId }).first();
     if (doc) {
       deleteFile(doc.storage_path);
-      await db('documents').where({ id }).update({ status: 'deleted', deleted_at: new Date(), updated_at: new Date() });
-      await logAudit({ tenantId, action: 'document.delete', entityType: 'document', entityId: id });
+      await db('documents').where({ id, tenant_id: tenantId }).update({ status: 'deleted', deleted_at: new Date(), updated_at: new Date() });
+      await logAudit({
+        tenantId, userId,
+        action: 'document.delete', entityType: 'document', entityId: id,
+        metadata: { title: doc.title },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'] as string,
+      });
     }
     return sendSuccess(reply, null, 'Document deleted');
   });
@@ -170,7 +229,7 @@ export async function registerDmsModule(app: FastifyInstance) {
     const tenantId = getTenantId(request);
     const { patientId } = z.object({ patientId: z.string().uuid() }).parse(request.params);
     const docs = await db('documents').where({ tenant_id: tenantId, patient_id: patientId }).whereNull('deleted_at').orderBy('created_at', 'desc');
-    return sendSuccess(reply, docs.map((d: DocumentRow) => ({
+    return sendSuccess(reply, docs.map((d: DmsDocumentRow) => ({
       id: d.id, title: d.title, category: d.category, fileName: d.file_name,
       fileType: d.file_type, fileSize: d.file_size, mimeType: d.mime_type,
       isImage: isImage(d.mime_type), createdAt: d.created_at,
