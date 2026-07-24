@@ -12,6 +12,7 @@ COPY packages/shared ./packages/shared
 COPY packages/backend ./packages/backend
 
 RUN npm run build -w packages/shared
+RUN cd packages/backend && npx tsc --noEmit
 RUN npm run build -w packages/backend
 
 FROM node:20-alpine AS runner

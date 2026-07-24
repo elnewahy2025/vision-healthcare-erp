@@ -12,7 +12,7 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/backup-postgres.sh:/docker-entrypoint-initdb.d/01-backup.sh:ro
+      - ./scripts/backup.sh:/docker-entrypoint-initdb.d/01-backup.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-healthcare}"]
       interval: 10s

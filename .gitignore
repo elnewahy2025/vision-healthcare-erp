@@ -50,3 +50,11 @@ packages/frontend/public/icons/icon-192.png
 packages/frontend/public/icons/icon-512.png
 packages/frontend/public/icons/generate-icons.mjs
 .github/workflows/sbom.yml
+
+# SSL certificates (never commit real certs)
+deployment/nginx/ssl/*.pem
+deployment/nginx/ssl/*.key
+deployment/nginx/ssl/*.crt
+
+# Allow Dockerfile.backup
+!Dockerfile.backup

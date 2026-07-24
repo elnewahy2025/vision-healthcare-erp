@@ -1,0 +1,12 @@
+FROM postgres:15-alpine
+
+RUN apk add --no-cache bash openssl curl
+
+COPY scripts/backup.sh /usr/local/bin/backup.sh
+RUN chmod +x /usr/local/bin/backup.sh
+
+# Install aws-cli for S3 uploads
+RUN apk add --no-cache python3 py3-pip && \
+    pip3 install --break-system-packages aws-cli
+
+ENTRYPOINT ["/usr/local/bin/backup.sh"]
