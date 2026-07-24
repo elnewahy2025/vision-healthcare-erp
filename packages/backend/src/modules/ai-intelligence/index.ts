@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../../core/database.js';
@@ -356,7 +357,7 @@ function generateDiagnosisSuggestions(symptoms: string, age: number | undefined,
 
   for (const dx of diagnosisMap) {
     if (dx.keywords.some(kw => symLower.includes(kw))) {
-      suggestions.push({ ...dx, confidence: 0.6 + Math.random() * 0.3, reasoning: `Symptoms match: ${dx.label}` });
+      suggestions.push({ ...dx, confidence: crypto.randomInt(60, 90) / 100, reasoning: `Symptoms match: ${dx.label}` });
     }
   }
 

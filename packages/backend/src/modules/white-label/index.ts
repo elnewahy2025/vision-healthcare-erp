@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
@@ -65,7 +66,7 @@ export async function registerWhiteLabelModule(app: FastifyInstance) {
 
   app.post('/api/v1/white-label/domains', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
     const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
-    const token = Math.random().toString(36).substring(2, 15) + '.' + Math.random().toString(36).substring(2, 15);
+    const token = crypto.randomBytes(24).toString("base64url");
     const [d] = await db('tenant_domains').insert({
       tenant_id: tenantId, domain: body.domain, is_primary: body.isPrimary || false,
       verification_token: token

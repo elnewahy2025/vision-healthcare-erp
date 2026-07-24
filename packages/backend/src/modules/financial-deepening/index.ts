@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../../core/database.js';
@@ -257,8 +258,8 @@ export async function registerFinancialDeepeningModule(app: FastifyInstance) {
 
     // In production, this would POST to ETA API
     // For now, simulate successful submission
-    const etaUuid = `ETA-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    const etaInvoiceNumber = `ETA-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`;
+    const etaUuid = `ETA-${Date.now()}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
+    const etaInvoiceNumber = `ETA-${new Date().getFullYear()}-${String(crypto.randomInt(1, 100000)).padStart(5, '0')}`;
 
     await db('eta_invoices').where({ id }).update({
       status: 'approved',

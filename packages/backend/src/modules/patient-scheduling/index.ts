@@ -83,5 +83,4 @@ export async function registerPatientSchedulingModule(app: FastifyInstance) {
     return sendSuccess(reply, null, 'Appointment cancelled');
   });
 
-  console.log('✓ Patient Scheduling module loaded');
 }

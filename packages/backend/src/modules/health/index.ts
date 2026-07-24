@@ -60,5 +60,4 @@ export async function registerHealthModule(app: FastifyInstance) {
     return reply.status(200).send({ alive: true, uptime: Math.floor((Date.now() - startTime) / 1000) });
   });
 
-  console.log('✓ Health module loaded (/health, /ready, /live)');
 }

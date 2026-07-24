@@ -82,7 +82,7 @@ export async function registerMedicalContentModule(app: FastifyInstance) {
   // Medications with Arabic translations
   app.get('/api/v1/medications/arabic', async (request, reply) => {
     const query = z.object({ q: z.string().optional().default(''), page: z.coerce.number().optional().default(1), limit: z.coerce.number().optional().default(20) }).parse(request.query);
-    let dbQuery = db('medications');
+    let dbQuery = db('medication_database');
     if (query.q) dbQuery = dbQuery.where(function () {
       this.whereILike('name', `%${query.q}%`);
       const arabicMatches = Object.entries(MEDICATIONS_ARABIC)
@@ -99,5 +99,4 @@ export async function registerMedicalContentModule(app: FastifyInstance) {
     return sendPaginated(reply, enriched, Number(total?.count || 0), query.page, query.limit);
   });
 
-  console.log('✓ Medical Content module loaded (ICD-10 Arabic, Medications Arabic)');
 }

@@ -47,5 +47,4 @@ export async function registerPdfModule(app: FastifyInstance) {
       .send(buffer);
   });
 
-  console.log('✓ PDF module loaded (/pdf/invoice, /pdf/prescription, /pdf/lab-report)');
 }

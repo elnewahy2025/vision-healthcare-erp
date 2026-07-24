@@ -118,7 +118,7 @@ export async function registerBiModule(app: FastifyInstance) {
     const since = new Date(Date.now() - (Number(days) || 30) * 86400000);
     const labOrders = await db('lab_orders').where({ tenant_id: tenantId }).where('created_at', '>=', since).count('id as c').first();
     const radiologyOrders = await db('radiology_orders').where({ tenant_id: tenantId }).where('created_at', '>=', since).count('id as c').first();
-    const prescriptions = await db('prescriptions').where({ tenant_id: tenantId }).where('created_at', '>=', since).count('id as c').first();
+    const prescriptions = await db('pharmacy_prescriptions').where({ tenant_id: tenantId }).where('created_at', '>=', since).count('id as c').first();
     return sendSuccess(reply, {
       labOrders: Number((labOrders as Record<string, unknown>)?.c || 0),
       radiologyOrders: Number((radiologyOrders as Record<string, unknown>)?.c || 0),

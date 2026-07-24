@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
@@ -66,7 +67,7 @@ export async function registerDrBackupModule(app: FastifyInstance) {
     // In production, this would trigger an async backup job
     setTimeout(async () => {
       await db('backup_executions').where({ id: b.id }).update({
-        status: 'completed', size_bytes: Math.floor(Math.random() * 1000000000),
+        status: 'completed', size_bytes: crypto.randomInt(1000000, 1000000000),
         checksum: 'simulated-' + Date.now().toString(36), completed_at: new Date()
       });
       if (body.configId) {

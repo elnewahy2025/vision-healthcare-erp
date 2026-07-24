@@ -70,7 +70,7 @@ export async function generateInvoicePdf(invoiceId: string): Promise<Buffer | nu
 export async function generatePrescriptionPdf(prescriptionId: string): Promise<Buffer | null> {
   try {
     const pm = await getPdfMake();
-    const rx = await db('prescriptions')
+    const rx = await db('pharmacy_prescriptions')
       .join('patients', 'prescriptions.patient_id', 'patients.id')
       .where('prescriptions.id', prescriptionId)
       .select('prescriptions.*', 'patients.first_name', 'patients.last_name', 'patients.age', 'patients.gender', 'patients.phone')

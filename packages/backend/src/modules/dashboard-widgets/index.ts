@@ -52,7 +52,7 @@ export async function registerDashboardWidgetsModule(app: FastifyInstance) {
       case 'queue_status': { const w = await db('queue_entries').where({ tenant_id: tenantId }).where('status', 'waiting').count('id as c').first(); data = { waiting: Number(w?.c || 0) }; break; }
       case 'recent_activity': { const l = await db('audit_logs').where({ tenant_id: tenantId }).orderBy('created_at', 'desc').limit(10).select('action', 'entity_type', 'created_at'); data = { items: l }; break; }
       case 'ai_stats': { const n = await db('ai_clinical_notes').where({ tenant_id: tenantId }).count('id as c').first(); data = { notesGenerated: Number(n?.c || 0) }; break; }
-      case 'prescriptions_pending': { const r = await db('prescriptions').where({ tenant_id: tenantId }).where('status', 'pending').count('id as c').first(); data = { pending: Number(r?.c || 0) }; break; }
+      case 'prescriptions_pending': { const r = await db('pharmacy_prescriptions').where({ tenant_id: tenantId }).where('status', 'pending').count('id as c').first(); data = { pending: Number(r?.c || 0) }; break; }
       case 'lab_results_pending': { const l = await db('lab_orders').where({ tenant_id: tenantId }).where('status', 'ordered').count('id as c').first(); data = { pending: Number(l?.c || 0) }; break; }
       case 'invoices_pending': { const i = await db('invoices').where({ tenant_id: tenantId }).whereIn('status', ['pending', 'partial', 'overdue']).count('id as c').first(); data = { count: Number(i?.c || 0) }; break; }
       case 'insurance_claims': { const c = await db('insurance_claims').where({ tenant_id: tenantId }).where('status', 'submitted').count('id as c').first(); data = { submitted: Number(c?.c || 0) }; break; }
@@ -67,5 +67,4 @@ export async function registerDashboardWidgetsModule(app: FastifyInstance) {
     return sendSuccess(reply, { widgetId, data });
   });
 
-  console.log('✓ Dashboard Widgets module loaded');
 }

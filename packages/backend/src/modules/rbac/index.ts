@@ -91,5 +91,4 @@ export async function registerRbacModule(app: FastifyInstance) {
     return sendSuccess(reply, { userId, ...body }, 'Permissions updated');
   });
 
-  console.log('✓ RBAC module loaded (fine-grained permissions)');
 }

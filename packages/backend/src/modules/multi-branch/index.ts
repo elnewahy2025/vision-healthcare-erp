@@ -130,5 +130,4 @@ export async function registerMultiBranchModule(app: FastifyInstance) {
     return sendPaginated(reply, rows, Number(total?.count || 0), page, limit);
   });
 
-  console.log('✓ Multi-Branch module registered');
 }

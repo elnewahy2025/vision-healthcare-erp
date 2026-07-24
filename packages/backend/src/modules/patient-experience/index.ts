@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../../core/database.js';
@@ -42,7 +43,7 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
 
     return sendSuccess(reply, {
       checkinId: checkin.id, queueNumber, patientName: `${patient.first_name} ${patient.last_name}`,
-      status: 'checked_in', estimatedWaitMinutes: Math.floor(Math.random() * 15) + 5,
+      status: 'checked_in', estimatedWaitMinutes: crypto.randomInt(5, 20),
     }, 'Check-in successful', 201);
   });
 
