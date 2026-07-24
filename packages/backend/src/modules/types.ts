@@ -1321,6 +1321,55 @@ export interface PatientMessageRow {
   updated_at: Date;
 }
 
+// ── Portal Session Table ──
+
+export interface PortalSessionRow {
+  id: string;
+  patient_id: string;
+  token: string;
+  otp: string | null;
+  otp_expires_at: Date | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  last_activity_at: Date;
+  expires_at: Date;
+  created_at: Date;
+}
+
+// ── Patient Shared Documents Table ──
+
+export interface PatientSharedDocumentRow {
+  id: string;
+  tenant_id: string;
+  patient_id: string;
+  document_id: string | null;
+  title: string;
+  file_name: string;
+  file_type: string | null;
+  storage_path: string;
+  category: string;
+  notes: string | null;
+  shared_at: Date;
+  is_acknowledged: boolean;
+  acknowledged_at: Date | null;
+}
+
+// ── Patient Portal Messages (subset of patient_messages) ──
+
+export interface PortalMessageRow {
+  id: string;
+  tenant_id: string;
+  patient_id: string;
+  sender_id: string | null;
+  direction: string;
+  subject: string;
+  body: string;
+  is_read: boolean;
+  read_at: Date | null;
+  attachment_id: string | null;
+  created_at: Date;
+}
+
 // ── Online Booking Tables ──
 
 export interface BookingSlotRow {
