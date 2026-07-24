@@ -3,6 +3,66 @@ import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { authenticate } from '../auth-guard.js';
+import { logAudit } from '../../services/audit.js';
+
+interface AiProviderRow {
+  id: string;
+  tenant_id: string;
+  name: string;
+  provider: string;
+  api_endpoint: string | null;
+  config: unknown;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface AiAssistantRow {
+  id: string;
+  tenant_id: string;
+  name: string;
+  slug: string;
+  category: string;
+  system_prompt: string | null;
+  tools: unknown;
+  model_id: string | null;
+  config: unknown;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: Date;
+  updated_at: Date;
+  // joined
+  model_name?: string;
+}
+
+interface AiRequestRow {
+  id: string;
+  tenant_id: string;
+  assistant_id: string | null;
+  model_id: string | null;
+  user_id: string | null;
+  prompt: string;
+  response: string | null;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost: number;
+  latency_ms: number;
+  status: string;
+  error: string | null;
+  source: string | null;
+  created_at: Date;
+}
+
+interface AiCostLogRow {
+  id: string;
+  tenant_id: string;
+  date: string;
+  source: string;
+  total_cost: number;
+  total_requests: number;
+  total_tokens: number;
+  created_at: Date;
+}
 
 export async function registerAiHubModule(app: FastifyInstance) {
   // ── AI Providers ──
@@ -12,27 +72,51 @@ export async function registerAiHubModule(app: FastifyInstance) {
     return sendSuccess(reply, providers.map((p: AiProviderRow) => ({
       id: p.id, name: p.name, provider: p.provider,
       apiEndpoint: p.api_endpoint, config: p.config,
-      isActive: p.is_active, createdAt: p.created_at
+      isActive: p.is_active, createdAt: p.created_at,
     })));
   });
 
   app.post('/api/v1/ai/providers', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
     const [p] = await db('ai_providers').insert({
       tenant_id: tenantId, name: body.name, provider: body.provider,
       api_endpoint: body.apiEndpoint || null, config: JSON.stringify(body.config || {}),
-      is_active: body.isActive !== false
+      is_active: body.isActive !== false,
     }).returning('*');
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'ai.provider_created', entityType: 'ai_provider', entityId: p.id,
+      metadata: { name: body.name, provider: body.provider },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, { id: p.id, name: p.name }, 'AI provider added', 201);
   });
 
   app.put('/api/v1/ai/providers/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const { id } = request.params as { id: string };
+    const body = request.body as Record<string, unknown>;
     const update: Record<string, unknown> = { updated_at: new Date() };
-    if (body.name) update.name = body.name; if (body.config) update.config = JSON.stringify(body.config);
+    if (body.name) update.name = body.name;
+    if (body.config) update.config = JSON.stringify(body.config);
     if (body.isActive !== undefined) update.is_active = body.isActive;
     if (body.apiEndpoint) update.api_endpoint = body.apiEndpoint;
-    await db('ai_providers').where({ id }).update(update);
+    await db('ai_providers').where({ id, tenant_id: tenantId }).update(update);
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'ai.provider_updated', entityType: 'ai_provider', entityId: id,
+      metadata: { updatedFields: Object.keys(update).filter(k => k !== 'updated_at') },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, null, 'Provider updated');
   });
 
@@ -44,24 +128,36 @@ export async function registerAiHubModule(app: FastifyInstance) {
       id: m.id, providerId: m.provider_id, modelName: m.model_name,
       displayName: m.display_name, capabilities: m.capabilities,
       costPer1kInput: Number(m.cost_per_1k_input), costPer1kOutput: Number(m.cost_per_1k_output),
-      maxTokens: m.max_tokens, isActive: m.is_active
+      maxTokens: m.max_tokens, isActive: m.is_active,
     })));
   });
 
   app.post('/api/v1/ai/models', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
     const [m] = await db('ai_models').insert({
       tenant_id: tenantId, provider_id: body.providerId, model_name: body.modelName,
       display_name: body.displayName || null, capabilities: body.capabilities || 'chat',
       cost_per_1k_input: body.costPer1kInput || 0, cost_per_1k_output: body.costPer1kOutput || 0,
-      max_tokens: body.maxTokens || 4096
+      max_tokens: body.maxTokens || 4096,
     }).returning('*');
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'ai.model_created', entityType: 'ai_model', entityId: m.id,
+      metadata: { modelName: body.modelName, providerId: body.providerId },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, { id: m.id, modelName: m.model_name }, 'Model added', 201);
   });
 
   // ── AI Assistants ──
   app.get('/api/v1/ai/assistants', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { category } = request.query as { category?: string };
+    const tenantId = getTenantId(request);
+    const { category } = request.query as { category?: string };
     let q = db('ai_assistants').where('ai_assistants.tenant_id', tenantId);
     if (category) q = q.andWhere('category', category);
     const assistants = await q.leftJoin('ai_models', 'ai_assistants.model_id', 'ai_models.id')
@@ -71,35 +167,63 @@ export async function registerAiHubModule(app: FastifyInstance) {
       id: a.id, name: a.name, slug: a.slug, category: a.category,
       systemPrompt: a.system_prompt, tools: a.tools,
       modelId: a.model_id, modelName: a.model_name,
-      config: a.config, isActive: a.is_active, createdAt: a.created_at
+      config: a.config, isActive: a.is_active,
+      createdAt: a.created_at,
     })));
   });
 
   app.post('/api/v1/ai/assistants', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
-    const slug = body.slug || body.name.toLowerCase().replace(/\s+/g, '_');
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
+    const slug = String(body.slug || (body.name as string).toLowerCase().replace(/\s+/g, '_'));
     const [a] = await db('ai_assistants').insert({
       tenant_id: tenantId, name: body.name, slug, category: body.category || 'general',
       system_prompt: body.systemPrompt || null, tools: JSON.stringify(body.tools || []),
       model_id: body.modelId || null, config: JSON.stringify(body.config || {}),
-      created_by: ctx.userId
+      created_by: ctx.userId,
     }).returning('*');
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'ai.assistant_created', entityType: 'ai_assistant', entityId: a.id,
+      metadata: { name: body.name, slug, category: body.category },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, { id: a.id, name: a.name, slug: a.slug }, 'Assistant created', 201);
   });
 
   app.put('/api/v1/ai/assistants/:id', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { id } = request.params as { id: string }; const body = request.body as Record<string, unknown>;
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const { id } = request.params as { id: string };
+    const body = request.body as Record<string, unknown>;
     const update: Record<string, unknown> = { updated_at: new Date() };
-    if (body.name) update.name = body.name; if (body.systemPrompt !== undefined) update.system_prompt = body.systemPrompt;
-    if (body.tools) update.tools = JSON.stringify(body.tools); if (body.modelId) update.model_id = body.modelId;
-    if (body.config) update.config = JSON.stringify(body.config); if (body.isActive !== undefined) update.is_active = body.isActive;
-    await db('ai_assistants').where({ id }).update(update);
+    if (body.name) update.name = body.name;
+    if (body.systemPrompt !== undefined) update.system_prompt = body.systemPrompt;
+    if (body.tools) update.tools = JSON.stringify(body.tools);
+    if (body.modelId) update.model_id = body.modelId;
+    if (body.config) update.config = JSON.stringify(body.config);
+    if (body.isActive !== undefined) update.is_active = body.isActive;
+    await db('ai_assistants').where({ id, tenant_id: tenantId }).update(update);
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'ai.assistant_updated', entityType: 'ai_assistant', entityId: id,
+      metadata: { updatedFields: Object.keys(update).filter(k => k !== 'updated_at') },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, null, 'Assistant updated');
   });
 
   // ── AI Request Log ──
   app.get('/api/v1/ai/requests', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { status, source, limit } = request.query as { limit?: string; source?: string; status?: string };
+    const tenantId = getTenantId(request);
+    const { status, source, limit } = request.query as { limit?: string; source?: string; status?: string };
     let q = db('ai_requests').where('ai_requests.tenant_id', tenantId);
     if (status) q = q.andWhere('status', status);
     if (source) q = q.andWhere('source', source);
@@ -110,33 +234,51 @@ export async function registerAiHubModule(app: FastifyInstance) {
       promptTokens: r.prompt_tokens, completionTokens: r.completion_tokens,
       cost: Number(r.cost), latencyMs: r.latency_ms,
       status: r.status, error: r.error, source: r.source,
-      createdAt: r.created_at
+      createdAt: r.created_at,
     })));
   });
 
   // ── AI Cost Tracking ──
   app.get('/api/v1/ai/costs', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { days } = request.query as { days?: string };
+    const tenantId = getTenantId(request);
+    const { days } = request.query as { days?: string };
     const since = new Date(Date.now() - (Number(days) || 30) * 86400000).toISOString().split('T')[0];
     const costs = await db('ai_cost_logs').where({ tenant_id: tenantId }).andWhere('date', '>=', since).orderBy('date', 'desc');
     const totals = await db('ai_requests').where({ tenant_id: tenantId }).where('created_at', '>=', since)
       .sum('cost as total_cost').sum('prompt_tokens as total_tokens').count('id as total_requests').first();
     return sendSuccess(reply, {
-      daily: costs.map((c: AiRequestRow) => ({ date: c.date, source: c.source, totalCost: Number(c.total_cost), totalRequests: c.total_requests, totalTokens: c.total_tokens })),
-      summary: { totalCost: Number((totals as Record<string, unknown>)?.total_cost || 0), totalTokens: Number((totals as Record<string, unknown>)?.total_tokens || 0), totalRequests: Number((totals as Record<string, unknown>)?.total_requests || 0) }
+      daily: costs.map((c: AiCostLogRow) => ({
+        date: c.date, source: c.source, totalCost: Number(c.total_cost),
+        totalRequests: c.total_requests, totalTokens: c.total_tokens,
+      })),
+      summary: {
+        totalCost: Number((totals as Record<string, unknown>)?.total_cost || 0),
+        totalTokens: Number((totals as Record<string, unknown>)?.total_tokens || 0),
+        totalRequests: Number((totals as Record<string, unknown>)?.total_requests || 0),
+      },
     });
   });
 
   // ── Chat Completion (proxy stub) ──
   app.post('/api/v1/ai/chat', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
-    // Record the request (actual AI call would happen via provider adapter)
+    const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const body = request.body as Record<string, unknown>;
     const [reqLog] = await db('ai_requests').insert({
       tenant_id: tenantId, assistant_id: body.assistantId || null,
       model_id: body.modelId || null, user_id: ctx.userId,
       prompt: body.prompt || '', status: 'completed',
-      source: body.source || 'chat'
+      source: body.source || 'chat',
     }).returning('*');
+
+    await logAudit({
+      tenantId, userId: ctx.userId,
+      action: 'ai.chat_request', entityType: 'ai_request', entityId: reqLog.id,
+      metadata: { source: body.source, assistantId: body.assistantId },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, { id: reqLog.id, message: 'AI request logged. Provider integration required for actual completion.' });
   });
 }
