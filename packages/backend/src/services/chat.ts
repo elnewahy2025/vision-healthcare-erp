@@ -10,7 +10,7 @@ interface ChatMessage {
   senderRole: 'doctor' | 'patient' | 'staff' | 'admin';
   messageType: 'text' | 'image' | 'file' | 'system';
   content: string;
-  metadata?: any;
+  metadata?: Record<string, unknown> | null;
   createdAt?: string;
 }
 
@@ -28,13 +28,48 @@ interface Conversation {
   createdAt: string;
 }
 
-// Store for WebSocket connections (per-conversation rooms)
-// In production, use Redis pub/sub for horizontal scaling
+interface ChatMessageRow {
+  id: string;
+  tenant_id: string;
+  conversation_id: string;
+  sender_id: string;
+  sender_role: string;
+  message_type: string;
+  content: string;
+  metadata: Record<string, unknown> | null;
+  is_edited: boolean;
+  is_deleted: boolean;
+  created_at: Date;
+}
+
+interface ChatConversationRow {
+  id: string;
+  tenant_id: string;
+  title: string;
+  patient_id: string | null;
+  appointment_id: string | null;
+  created_by: string | null;
+  is_active: boolean;
+  last_message_at: Date | null;
+  created_at: Date;
+}
+
+interface ChatParticipantRow {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  tenant_id: string;
+  role: string;
+  unread_count: number;
+  last_read_at: Date | null;
+  created_at: Date;
+}
+
 interface WsClient {
   userId: string;
   tenantId: string;
   role: string;
-  send: (data: any) => void;
+  send: (data: Record<string, unknown>) => void;
 }
 
 const conversationRooms = new Map<string, Map<string, WsClient>>();
@@ -42,44 +77,35 @@ const conversationRooms = new Map<string, Map<string, WsClient>>();
 export function registerChatWsHandlers(app: FastifyInstance): void {
   const env = getEnv();
 
-  // WebSocket endpoint for chat
-  // Using polling fallback — WebSocket native support depends on @fastify/websocket
-  // For now, we implement REST-based chat with SSE for real-time updates
-  // and a WebSocket upgrade handler when the plugin is available
-
-  // If @fastify/websocket is registered, handle upgrade
-  if ((app as any).websocket) {
-    (app as any).websocket('/api/v1/chat/ws', { options: { maxPayload: 131072 } }, async (socket: any, req: any) => {
-      const url = new URL(req.url, 'http://localhost');
+  if ((app as unknown as Record<string, unknown>).websocket) {
+    (app as unknown as Record<string, unknown>).websocket('/api/v1/chat/ws', { options: { maxPayload: 131072 } }, async (socket: Record<string, unknown>, req: Record<string, unknown>) => {
+      const url = new URL(req.url as string, 'http://localhost');
       const token = url.searchParams.get('token');
       const conversationId = url.searchParams.get('conversationId');
 
       if (!token || !conversationId) {
-        socket.close(4001, 'Missing token or conversationId');
+        (socket as Record<string, unknown>).close(4001, 'Missing token or conversationId');
         return;
       }
 
-      // Validate token and get user info
       try {
-        const jwt = app.jwt as any;
+        const jwt = (app as unknown as Record<string, unknown>).jwt as { verify: (t: string) => Record<string, unknown> };
         const payload = jwt.verify(token);
         const client: WsClient = {
-          userId: payload.userId,
-          tenantId: payload.tenantId || payload.ctx?.tenantId,
-          role: payload.role || 'staff',
-          send: (data: any) => {
-            try { socket.send(JSON.stringify(data)); } catch { /* ignore */ }
+          userId: String(payload.userId || ''),
+          tenantId: String(payload.tenantId || (payload.ctx as Record<string, unknown>)?.tenantId || ''),
+          role: String(payload.role || 'staff'),
+          send: (data: Record<string, unknown>) => {
+            try { (socket as WebSocket).send(JSON.stringify(data)); } catch { /* ignore */ }
           },
         };
 
-        // Join conversation room
         if (!conversationRooms.has(conversationId)) {
           conversationRooms.set(conversationId, new Map());
         }
         const room = conversationRooms.get(conversationId)!;
         room.set(client.userId, client);
 
-        // Notify others
         broadcastToConversation(conversationId, {
           type: 'user_joined',
           userId: client.userId,
@@ -87,19 +113,18 @@ export function registerChatWsHandlers(app: FastifyInstance): void {
           timestamp: new Date().toISOString(),
         }, client.userId);
 
-        // Handle incoming messages
-        socket.on('message', async (raw: string) => {
+        (socket as Record<string, unknown>).on('message', async (raw: string) => {
           try {
-            const msg = JSON.parse(raw);
+            const msg = JSON.parse(raw) as Record<string, unknown>;
             if (msg.type === 'message' && msg.content) {
               const saved = await sendChatMessage({
                 tenantId: client.tenantId,
                 conversationId,
                 senderId: client.userId,
-                senderRole: client.role as any,
-                messageType: msg.messageType || 'text',
-                content: msg.content,
-                metadata: msg.metadata || null,
+                senderRole: client.role as 'doctor' | 'patient' | 'staff' | 'admin',
+                messageType: (msg.messageType as 'text' | 'image' | 'file') || 'text',
+                content: String(msg.content),
+                metadata: (msg.metadata as Record<string, unknown>) || null,
               });
 
               broadcastToConversation(conversationId, {
@@ -107,12 +132,13 @@ export function registerChatWsHandlers(app: FastifyInstance): void {
                 message: saved,
               });
             }
-          } catch (err: any) {
-            console.error('✗ WS message error:', err.message);
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error('WS message error:', msg);
           }
         });
 
-        socket.on('close', () => {
+        (socket as Record<string, unknown>).on('close', () => {
           const room = conversationRooms.get(conversationId);
           if (room) {
             room.delete(client.userId);
@@ -125,12 +151,10 @@ export function registerChatWsHandlers(app: FastifyInstance): void {
           });
         });
 
-        // Send existing messages
         const messages = await getConversationMessages(conversationId, 1, 50);
-        socket.send(JSON.stringify({ type: 'history', messages: messages.data }));
+        (socket as WebSocket).send(JSON.stringify({ type: 'history', messages: messages.data }));
 
-        // Send typing indicator handler
-        socket.on('typing', (isTyping: boolean) => {
+        (socket as Record<string, unknown>).on('typing', (isTyping: boolean) => {
           broadcastToConversation(conversationId, {
             type: 'typing',
             userId: client.userId,
@@ -138,13 +162,13 @@ export function registerChatWsHandlers(app: FastifyInstance): void {
           }, client.userId);
         });
       } catch {
-        socket.close(4001, 'Invalid token');
+        (socket as Record<string, unknown>).close(4001, 'Invalid token');
       }
     });
   }
 }
 
-function broadcastToConversation(conversationId: string, data: any, excludeUserId?: string): void {
+function broadcastToConversation(conversationId: string, data: Record<string, unknown>, excludeUserId?: string): void {
   const room = conversationRooms.get(conversationId);
   if (!room) return;
   for (const [uid, client] of room) {
@@ -160,7 +184,7 @@ export function getOnlineUsers(conversationId: string): string[] {
   return Array.from(room.keys());
 }
 
-export async function sendChatMessage(msg: ChatMessage): Promise<any> {
+export async function sendChatMessage(msg: ChatMessage): Promise<ChatMessageRow> {
   const [saved] = await db('chat_messages').insert({
     id: msg.id || undefined,
     tenant_id: msg.tenantId,
@@ -172,18 +196,16 @@ export async function sendChatMessage(msg: ChatMessage): Promise<any> {
     metadata: msg.metadata ? JSON.stringify(msg.metadata) : null,
   }).returning('*');
 
-  // Update conversation's last_message_at
   await db('chat_conversations')
     .where({ id: msg.conversationId })
     .update({ last_message_at: db.fn.now(), is_active: true });
 
-  // Mark as unread for other participants
   await db('chat_participants')
     .where({ conversation_id: msg.conversationId })
     .whereNot('user_id', msg.senderId)
     .increment('unread_count', 1);
 
-  return saved;
+  return saved as ChatMessageRow;
 }
 
 export async function createConversation(data: {
@@ -194,7 +216,7 @@ export async function createConversation(data: {
   patientId?: string;
   appointmentId?: string;
   createdBy: string;
-}): Promise<any> {
+}): Promise<ChatConversationRow> {
   const [conv] = await db('chat_conversations').insert({
     tenant_id: data.tenantId,
     title: data.title,
@@ -203,7 +225,6 @@ export async function createConversation(data: {
     created_by: data.createdBy,
   }).returning('*');
 
-  // Add participants
   const participants = data.participantIds.map((userId, i) => ({
     conversation_id: conv.id,
     user_id: userId,
@@ -213,7 +234,6 @@ export async function createConversation(data: {
 
   await db('chat_participants').insert(participants);
 
-  // System message
   await db('chat_messages').insert({
     tenant_id: data.tenantId,
     conversation_id: conv.id,
@@ -223,7 +243,7 @@ export async function createConversation(data: {
     content: `Conversation started with ${data.participantIds.length} participants`,
   });
 
-  return conv;
+  return conv as ChatConversationRow;
 }
 
 export async function getConversations(
@@ -231,7 +251,7 @@ export async function getConversations(
   userId: string,
   page = 1,
   limit = 20
-): Promise<{ data: any[]; total: number }> {
+): Promise<{ data: Array<ChatConversationRow & { unread_count: number; last_message: string | null }>; total: number }> {
   const baseQuery = db('chat_conversations as cc')
     .join('chat_participants as cp', 'cc.id', 'cp.conversation_id')
     .where('cc.tenant_id', tenantId)
@@ -250,13 +270,13 @@ export async function getConversations(
     .limit(limit)
     .offset((page - 1) * limit);
 
-  // Deduplicate conversations (because of join)
   const seen = new Set<string>();
-  const unique = data.filter((r: any) => {
-    if (seen.has(r.id)) return false;
-    seen.add(r.id);
+  const unique = data.filter((r: Record<string, unknown>) => {
+    const id = String(r.id);
+    if (seen.has(id)) return false;
+    seen.add(id);
     return true;
-  });
+  }) as Array<ChatConversationRow & { unread_count: number; last_message: string | null }>;
 
   return { data: unique, total: Number(total?.count || 0) };
 }
@@ -265,7 +285,7 @@ export async function getConversationMessages(
   conversationId: string,
   page = 1,
   limit = 50
-): Promise<{ data: any[]; total: number }> {
+): Promise<{ data: ChatMessageRow[]; total: number }> {
   const total = await db('chat_messages')
     .where({ conversation_id: conversationId })
     .count('id as count').first();
@@ -276,7 +296,7 @@ export async function getConversationMessages(
     .limit(limit)
     .offset((page - 1) * limit);
 
-  return { data, total: Number(total?.count || 0) };
+  return { data: data as ChatMessageRow[], total: Number(total?.count || 0) };
 }
 
 export async function markConversationRead(
@@ -299,11 +319,11 @@ export async function getUnreadCount(
     .sum('chat_participants.unread_count as total')
     .first();
 
-  return Number((result as any)?.total || 0);
+  return Number(result?.total || 0);
 }
 
-export async function getConversationParticipants(conversationId: string): Promise<any[]> {
+export async function getConversationParticipants(conversationId: string): Promise<ChatParticipantRow[]> {
   return db('chat_participants')
     .where({ conversation_id: conversationId })
-    .select('*');
+    .select('*') as Promise<ChatParticipantRow[]>;
 }

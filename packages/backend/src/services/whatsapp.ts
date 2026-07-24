@@ -11,13 +11,37 @@ interface WhatsAppSendOptions {
   messageType?: 'text' | 'template' | 'image' | 'document';
 }
 
+interface WhatsAppTemplateComponent {
+  type: string;
+  parameters?: Array<{ type: string; text: string }>;
+}
+
 interface WhatsAppTemplate {
   name: string;
   language: string;
-  components: any[];
+  components: WhatsAppTemplateComponent[];
 }
 
-let whatsappClient: any = null;
+interface WhatsAppApiResponse {
+  messages?: Array<{ id: string }>;
+  error?: { message: string; code: number; type: string; error_subcode?: number };
+}
+
+interface WhatsAppWebhookMessage {
+  type: 'message' | 'status' | 'unknown';
+  data: {
+    from?: string;
+    messageId?: string;
+    timestamp?: string;
+    type?: string;
+    text?: string;
+    contact?: string;
+    status?: string;
+    errors?: Array<{ code: number; title: string; message: string; error_data?: { details: string } }>;
+  };
+}
+
+let whatsappClient: Record<string, unknown> | null = null;
 
 async function getAccessToken(): Promise<string | null> {
   const env = getEnv();
@@ -41,7 +65,6 @@ async function sendTemplateMessage(
   const token = await getAccessToken();
 
   if (!token || !phoneNumberId) {
-    console.log('[WHATSAPP DEV] Template:', { to, templateName, params });
     return { success: true, messageId: `dev_${Date.now()}` };
   }
 
@@ -72,14 +95,14 @@ async function sendTemplateMessage(
       }
     );
 
-    const data = await response.json();
+    const data = await response.json() as WhatsAppApiResponse;
     if (data.messages?.[0]?.id) {
       return { success: true, messageId: data.messages[0].id };
     }
     return { success: false, error: data.error?.message || 'Unknown WhatsApp error' };
-  } catch (error: any) {
-    console.error('✗ WhatsApp template send failed:', error.message);
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return { success: false, error: msg };
   }
 }
 
@@ -92,7 +115,6 @@ async function sendTextMessage(
   const token = await getAccessToken();
 
   if (!token || !phoneNumberId) {
-    console.log('[WHATSAPP DEV] Text:', { to, text: text.substring(0, 100) });
     return { success: true, messageId: `dev_${Date.now()}` };
   }
 
@@ -114,14 +136,14 @@ async function sendTextMessage(
       }
     );
 
-    const data = await response.json();
+    const data = await response.json() as WhatsAppApiResponse;
     if (data.messages?.[0]?.id) {
       return { success: true, messageId: data.messages[0].id };
     }
     return { success: false, error: data.error?.message || 'Unknown WhatsApp error' };
-  } catch (error: any) {
-    console.error('✗ WhatsApp text send failed:', error.message);
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return { success: false, error: msg };
   }
 }
 
@@ -135,16 +157,18 @@ async function sendMediaMessage(
   const token = await getAccessToken();
 
   if (!token || !phoneNumberId) {
-    console.log('[WHATSAPP DEV] Media:', { to, mediaUrl, mediaType });
     return { success: true, messageId: `dev_${Date.now()}` };
   }
 
   try {
-    const body: any = {
+    const mediaObj: Record<string, string> = { link: mediaUrl };
+    if (caption) mediaObj.caption = caption;
+
+    const body: Record<string, unknown> = {
       messaging_product: 'whatsapp',
       to: to.replace(/[^0-9]/g, ''),
       type: mediaType,
-      [mediaType]: { link: mediaUrl, ...(caption ? { caption } : {}) },
+      [mediaType]: mediaObj,
     };
 
     const response = await fetch(
@@ -159,14 +183,14 @@ async function sendMediaMessage(
       }
     );
 
-    const data = await response.json();
+    const data = await response.json() as WhatsAppApiResponse;
     if (data.messages?.[0]?.id) {
       return { success: true, messageId: data.messages[0].id };
     }
     return { success: false, error: data.error?.message || 'Media send failed' };
-  } catch (error: any) {
-    console.error('✗ WhatsApp media send failed:', error.message);
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return { success: false, error: msg };
   }
 }
 
@@ -191,11 +215,9 @@ export async function sendWhatsAppMessage(options: WhatsAppSendOptions): Promise
     } else if (options.message) {
       result = await sendTextMessage(options.to, options.message);
     } else {
-      console.warn('⚠️ WhatsApp: No message content provided');
       return false;
     }
 
-    // Log to whatsapp_messages table
     await db('whatsapp_messages').insert({
       tenant_id: options.tenantId,
       to_number: options.to,
@@ -208,8 +230,8 @@ export async function sendWhatsAppMessage(options: WhatsAppSendOptions): Promise
     });
 
     return result.success;
-  } catch (error: any) {
-    console.error('✗ WhatsApp send error:', error.message);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     await db('whatsapp_messages').insert({
       tenant_id: options.tenantId,
       to_number: options.to,
@@ -217,58 +239,67 @@ export async function sendWhatsAppMessage(options: WhatsAppSendOptions): Promise
       template_name: options.templateName || null,
       message_type: options.messageType || 'text',
       status: 'failed',
-      error_message: error.message,
+      error_message: msg,
     }).catch(() => {});
     return false;
   }
 }
 
-export function parseWhatsAppWebhook(body: any): {
-  type: 'message' | 'status' | 'unknown';
-  data: any;
-} {
+export function parseWhatsAppWebhook(body: Record<string, unknown>): WhatsAppWebhookMessage {
   try {
-    if (!body?.entry?.[0]?.changes?.[0]?.value) {
-      return { type: 'unknown', data: body };
+    const entry = body.entry as Array<Record<string, unknown>> | undefined;
+    const changes = entry?.[0]?.changes as Array<Record<string, unknown>> | undefined;
+    const value = changes?.[0]?.value as Record<string, unknown> | undefined;
+
+    if (!value) {
+      return { type: 'unknown', data: {} };
     }
 
-    const value = body.entry[0].changes[0].value;
-
-    // Inbound message
-    if (value.messages?.[0]) {
+    const messages = value.messages as Array<Record<string, unknown>> | undefined;
+    if (messages?.[0]) {
+      const msg = messages[0];
+      const textObj = msg.text as Record<string, unknown> | undefined;
+      const contacts = value.contacts as Array<Record<string, unknown>> | undefined;
+      const profile = contacts?.[0]?.profile as Record<string, unknown> | undefined;
       return {
         type: 'message',
         data: {
-          from: value.messages[0].from,
-          messageId: value.messages[0].id,
-          timestamp: value.messages[0].timestamp,
-          type: value.messages[0].type,
-          text: value.messages[0].text?.body || null,
-          contact: value.contacts?.[0]?.profile?.name || null,
+          from: String(msg.from || ''),
+          messageId: String(msg.id || ''),
+          timestamp: String(msg.timestamp || ''),
+          type: String(msg.type || 'text'),
+          text: String(textObj?.body || ''),
+          contact: String(profile?.name || ''),
         },
       };
     }
 
-    // Status update
-    if (value.statuses?.[0]) {
+    const statuses = value.statuses as Array<Record<string, unknown>> | undefined;
+    if (statuses?.[0]) {
+      const st = statuses[0];
       return {
         type: 'status',
         data: {
-          messageId: value.statuses[0].id,
-          status: value.statuses[0].status,
-          timestamp: value.statuses[0].timestamp,
-          errors: value.statuses[0].errors || [],
+          messageId: String(st.id || ''),
+          status: String(st.status || ''),
+          timestamp: String(st.timestamp || ''),
+          errors: (st.errors as WhatsAppWebhookMessage['data']['errors']) || [],
         },
       };
     }
 
-    return { type: 'unknown', data: value };
+    return { type: 'unknown', data: {} };
   } catch {
-    return { type: 'unknown', data: body };
+    return { type: 'unknown', data: {} };
   }
 }
 
-export async function getWhatsAppStats(tenantId: string): Promise<any> {
+export async function getWhatsAppStats(tenantId: string): Promise<{
+  total: number;
+  today: number;
+  byStatus: Array<{ status: string; count: string | number }>;
+  byType: Array<{ message_type: string; count: string | number }>;
+}> {
   const total = await db('whatsapp_messages').where({ tenant_id: tenantId }).count('id as count').first();
   const byStatus = await db('whatsapp_messages').where({ tenant_id: tenantId })
     .select('status').count('id as count').groupBy('status');
@@ -282,7 +313,7 @@ export async function getWhatsAppStats(tenantId: string): Promise<any> {
   return {
     total: Number(total?.count || 0),
     today: Number(today?.count || 0),
-    byStatus,
-    byType,
+    byStatus: byStatus as Array<{ status: string; count: string | number }>,
+    byType: byType as Array<{ message_type: string; count: string | number }>,
   };
 }

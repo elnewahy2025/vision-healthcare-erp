@@ -22,15 +22,27 @@ interface ConferenceOptions {
   appointmentId?: string;
 }
 
-let twilioClient: any = null;
+interface TwilioCallResult {
+  sid: string;
+  status: string;
+}
 
-function getTwilioClient() {
+interface TwilioClient {
+  calls: {
+    create(options: Record<string, unknown>): Promise<TwilioCallResult>;
+  };
+}
+
+let twilioClient: TwilioClient | null = null;
+
+function getTwilioClient(): TwilioClient | null {
   if (twilioClient) return twilioClient;
   const env = getEnv();
   if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const twilio = require('twilio');
-      twilioClient = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+      twilioClient = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN) as TwilioClient;
       return twilioClient;
     } catch { /* not installed */ }
   }
@@ -47,8 +59,6 @@ export async function makeVoiceCall(options: VoiceCallOptions): Promise<{
     const env = getEnv();
 
     if (!client) {
-      console.log('[VOICE DEV] Outbound call:', { to: options.toNumber, from: options.fromNumber });
-      // Simulate a call
       await db('voice_calls').insert({
         tenant_id: options.tenantId,
         patient_id: options.patientId || null,
@@ -57,7 +67,7 @@ export async function makeVoiceCall(options: VoiceCallOptions): Promise<{
         from_number: options.fromNumber,
         to_number: options.toNumber,
         status: 'completed',
-        duration_seconds: Math.floor(Math.random() * 300),
+        duration_seconds: 0,
         notes: options.notes || null,
         external_call_sid: `dev_${Date.now()}`,
       });
@@ -86,8 +96,8 @@ export async function makeVoiceCall(options: VoiceCallOptions): Promise<{
     });
 
     return { success: true, callSid: call.sid };
-  } catch (error: any) {
-    console.error('✗ Voice call failed:', error.message);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     await db('voice_calls').insert({
       tenant_id: options.tenantId,
       patient_id: options.patientId || null,
@@ -96,10 +106,10 @@ export async function makeVoiceCall(options: VoiceCallOptions): Promise<{
       from_number: options.fromNumber,
       to_number: options.toNumber,
       status: 'failed',
-      error_message: error.message,
+      error_message: msg,
       notes: options.notes || null,
     }).catch(() => {});
-    return { success: false, error: error.message };
+    return { success: false, error: msg };
   }
 }
 
@@ -113,14 +123,13 @@ export async function createConferenceCall(options: ConferenceOptions): Promise<
     const env = getEnv();
 
     if (!client) {
-      console.log('[VOICE DEV] Conference:', { room: options.roomName, participants: options.participants.length });
       await db('voice_calls').insert({
         tenant_id: options.tenantId,
         appointment_id: options.appointmentId || null,
         call_type: 'conference',
         to_number: options.participants.map(p => p.phone).join(','),
         status: 'completed',
-        duration_seconds: Math.floor(Math.random() * 600),
+        duration_seconds: 0,
         external_call_sid: `conf_dev_${Date.now()}`,
       });
       return { success: true, roomSid: `conf_dev_${Date.now()}` };
@@ -128,7 +137,6 @@ export async function createConferenceCall(options: ConferenceOptions): Promise<
 
     const roomName = options.roomName || `room_${Date.now()}`;
 
-    // Dial each participant into the conference room
     for (const participant of options.participants) {
       await client.calls.create({
         to: participant.phone,
@@ -149,13 +157,19 @@ export async function createConferenceCall(options: ConferenceOptions): Promise<
     });
 
     return { success: true, roomSid: roomName };
-  } catch (error: any) {
-    console.error('✗ Conference call failed:', error.message);
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return { success: false, error: msg };
   }
 }
 
-export async function getVoiceStats(tenantId: string): Promise<any> {
+export async function getVoiceStats(tenantId: string): Promise<{
+  total: number;
+  today: number;
+  totalMinutes: number;
+  byStatus: Array<{ status: string; count: string | number }>;
+  byType: Array<{ call_type: string; count: string | number }>;
+}> {
   const total = await db('voice_calls').where({ tenant_id: tenantId }).count('id as count').first();
   const byStatus = await db('voice_calls').where({ tenant_id: tenantId })
     .select('status').count('id as count').groupBy('status');
@@ -172,9 +186,9 @@ export async function getVoiceStats(tenantId: string): Promise<any> {
   return {
     total: Number(total?.count || 0),
     today: Number(today?.count || 0),
-    totalMinutes: Math.round(Number((totalMinutes as any)?.total_seconds || 0) / 60),
-    byStatus,
-    byType,
+    totalMinutes: Math.round(Number(totalMinutes?.total_seconds || 0) / 60),
+    byStatus: byStatus as Array<{ status: string; count: string | number }>,
+    byType: byType as Array<{ call_type: string; count: string | number }>,
   };
 }
 
@@ -183,21 +197,23 @@ export async function updateCallStatus(
   status: string,
   durationSeconds?: number
 ): Promise<void> {
+  const updateData: Record<string, unknown> = {
+    status,
+  };
+  if (durationSeconds !== undefined) updateData.duration_seconds = durationSeconds;
+  if (['completed', 'failed', 'busy', 'no-answer'].includes(status)) {
+    updateData.completed_at = db.fn.now();
+  }
+
   await db('voice_calls')
     .where({ external_call_sid: callSid })
-    .update({
-      status,
-      duration_seconds: durationSeconds || undefined,
-      completed_at: ['completed', 'failed', 'busy', 'no-answer'].includes(status)
-        ? db.fn.now()
-        : undefined,
-    });
+    .update(updateData);
 }
 
 export async function getVoiceCalls(
   tenantId: string,
   filters: { status?: string; callType?: string; page: number; limit: number }
-): Promise<{ data: any[]; total: number }> {
+): Promise<{ data: Record<string, unknown>[]; total: number }> {
   let query = db('voice_calls').where({ tenant_id: tenantId });
 
   if (filters.status) {

@@ -1,4 +1,5 @@
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
+import crypto from 'crypto';
 import { z } from 'zod';
 import { db } from '../../core/database.js';
 import { getCtx } from '../../utils/route-helper.js';
@@ -12,6 +13,12 @@ import {
 } from '../../services/chat.js';
 import { getEnv } from '@healthcare/shared/config';
 import { authenticate } from '../auth-guard.js';
+import { logAudit } from '../../services/audit.js';
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
 export async function registerAdvancedCommunicationModule(app: FastifyInstance) {
   const env = getEnv();
@@ -35,10 +42,14 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
       const parsed = parseWhatsAppWebhook(request.body);
 
       if (parsed.type === 'message') {
-        // Store incoming message
+        const fromNumber = parsed.data.from;
+        const patient = await db('patients').where({ phone: fromNumber }).whereNull('deleted_at').select('tenant_id', 'id').first();
+        const tenantId = patient?.tenant_id || null;
+
         await db('whatsapp_messages').insert({
-          tenant_id: 'webhook', // Will be resolved from sender
-          to_number: parsed.data.from,
+          tenant_id: tenantId,
+          patient_id: patient?.id || null,
+          to_number: fromNumber,
           direction: 'inbound',
           message_type: parsed.data.type || 'text',
           message: parsed.data.text || null,
@@ -46,17 +57,28 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
           external_message_id: parsed.data.messageId,
           metadata: JSON.stringify(parsed.data),
         });
+
+        if (tenantId) {
+          await logAudit({
+            tenantId,
+            entityType: 'whatsapp_message',
+            action: 'whatsapp.inbound_received',
+            metadata: { from: fromNumber, messageId: parsed.data.messageId },
+            ipAddress: request.ip,
+            userAgent: request.headers['user-agent'] as string,
+          });
+        }
       } else if (parsed.type === 'status') {
-        // Update message status
+        const updateData: Record<string, unknown> = {
+          status: parsed.data.status,
+        };
+        if (parsed.data.status === 'delivered') updateData.delivered_at = db.fn.now();
+        if (parsed.data.status === 'read') updateData.read_at = db.fn.now();
+
         await db('whatsapp_messages')
           .where({ external_message_id: parsed.data.messageId })
-          .update({
-            status: parsed.data.status,
-            delivered_at: parsed.data.status === 'delivered' ? db.fn.now() : undefined,
-            read_at: parsed.data.status === 'read' ? db.fn.now() : undefined,
-          });
+          .update(updateData);
 
-        // Also update voice call if applicable
         if (parsed.data.status === 'completed' || parsed.data.status === 'failed') {
           await updateCallStatus(parsed.data.messageId, parsed.data.status);
         }
@@ -64,14 +86,14 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
 
       return reply.status(200).send({ success: true });
     } catch (error: unknown) {
-      console.error('✗ WhatsApp webhook error:', error.message);
-      return reply.status(200).send({ success: true }); // Always return 200 to Meta
+      console.error('WhatsApp webhook error:', getErrorMessage(error));
+      return reply.status(200).send({ success: true });
     }
   });
 
   // Send WhatsApp message
   app.post('/api/v1/whatsapp/send', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { tenantId } = getCtx(request);
+    const { tenantId, userId } = getCtx(request);
     const body = z.object({
       to: z.string().min(1),
       message: z.string().optional(),
@@ -89,6 +111,16 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
       templateParams: body.templateParams,
       mediaUrl: body.mediaUrl,
       messageType: body.messageType,
+    });
+
+    await logAudit({
+      tenantId,
+      userId,
+      action: 'whatsapp.message_sent',
+      entityType: 'whatsapp_message',
+      metadata: { to: body.to, messageType: body.messageType, success: result },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
     });
 
     return sendSuccess(reply, { sent: result }, result ? 'Message sent successfully' : 'Failed to send message');
@@ -130,7 +162,7 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
   });
 
   app.post('/api/v1/whatsapp/templates', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { tenantId } = getCtx(request);
+    const { tenantId, userId } = getCtx(request);
     const body = z.object({
       name: z.string().min(1),
       category: z.string().optional().default('utility'),
@@ -148,6 +180,17 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
       variables: JSON.stringify(body.variables),
     }).returning('*');
 
+    await logAudit({
+      tenantId,
+      userId,
+      action: 'whatsapp.template_created',
+      entityType: 'whatsapp_template',
+      entityId: template.id,
+      metadata: { name: body.name, category: body.category },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, template, 'Template created', 201);
   });
 
@@ -164,14 +207,24 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
       notes: z.string().optional(),
     }).parse(request.body);
 
-    const env = getEnv();
+    const voiceEnv = getEnv();
     const result = await makeVoiceCall({
       tenantId,
-      fromNumber: body.fromNumber || env.TWILIO_PHONE_NUMBER || '+201234567890',
+      fromNumber: body.fromNumber || voiceEnv.TWILIO_PHONE_NUMBER || '+201234567890',
       toNumber: body.toNumber,
       patientId: body.patientId,
       appointmentId: body.appointmentId,
       notes: body.notes,
+    });
+
+    await logAudit({
+      tenantId,
+      userId,
+      action: 'voice.call_initiated',
+      entityType: 'voice_call',
+      metadata: { to: body.toNumber, success: result.success, callSid: result.callSid },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
     });
 
     if (result.success) return sendSuccess(reply, { callSid: result.callSid });
@@ -180,7 +233,7 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
 
   // Create conference call
   app.post('/api/v1/voice/conference', { preHandler: [(r: FastifyRequest, rep: FastifyReply) => authenticate(r, rep)] }, async (request, reply) => {
-    const { tenantId } = getCtx(request);
+    const { tenantId, userId } = getCtx(request);
     const body = z.object({
       roomName: z.string().optional(),
       participants: z.array(z.object({
@@ -197,6 +250,16 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
       participants: body.participants,
       callType: body.participants.length > 2 ? 'conference' : 'one-on-one',
       appointmentId: body.appointmentId,
+    });
+
+    await logAudit({
+      tenantId,
+      userId,
+      action: 'voice.conference_created',
+      entityType: 'voice_call',
+      metadata: { roomName: body.roomName, participantCount: body.participants.length, success: result.success },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
     });
 
     if (result.success) return sendSuccess(reply, { roomSid: result.roomSid });
@@ -230,20 +293,40 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
     return sendSuccess(reply, stats);
   });
 
-  // Voice call status callback (from Twilio)
+  // Voice call status callback (from Twilio) — validated via signature
   app.post('/api/v1/voice/status', async (request, reply) => {
     try {
+      const twilioSignature = request.headers['x-twilio-signature'] as string | undefined;
+      const twilioUrl = `${env.APP_URL || 'http://localhost:3000'}/api/v1/voice/status`;
+
+      if (env.TWILIO_AUTH_TOKEN && twilioSignature) {
+        const params = request.body as Record<string, string>;
+        const sortedKeys = Object.keys(params).sort();
+        let dataStr = twilioUrl;
+        for (const key of sortedKeys) {
+          dataStr += key + (params[key] ?? '');
+        }
+        const expectedSig = crypto
+          .createHmac('sha1', env.TWILIO_AUTH_TOKEN)
+          .update(Buffer.from(dataStr, 'utf-8'))
+          .digest('base64');
+
+        if (twilioSignature !== expectedSig) {
+          return reply.status(403).send({ error: 'Invalid Twilio signature' });
+        }
+      }
+
       const body = request.body as Record<string, unknown>;
       const callSid = body.CallSid || body.callSid;
       const status = body.CallStatus || body.status;
-      const duration = parseInt(body.CallDuration || '0', 10);
+      const duration = parseInt(String(body.CallDuration || '0'), 10);
 
       if (callSid && status) {
-        await updateCallStatus(callSid, status.toLowerCase(), duration);
+        await updateCallStatus(String(callSid), String(status).toLowerCase(), duration);
       }
       return reply.status(200).send({ success: true });
     } catch (error: unknown) {
-      console.error('✗ Voice status callback error:', error.message);
+      console.error('Voice status callback error:', getErrorMessage(error));
       return reply.status(200).send({ success: true });
     }
   });
@@ -272,6 +355,17 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
       patientId: body.patientId,
       appointmentId: body.appointmentId,
       createdBy: userId,
+    });
+
+    await logAudit({
+      tenantId,
+      userId,
+      action: 'chat.conversation_created',
+      entityType: 'chat_conversation',
+      entityId: conversation.id,
+      metadata: { title: body.title, participantCount: body.participantIds.length },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
     });
 
     return sendSuccess(reply, conversation, 'Conversation created', 201);
@@ -321,6 +415,17 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
       metadata: body.metadata || null,
     });
 
+    await logAudit({
+      tenantId,
+      userId,
+      action: 'chat.message_sent',
+      entityType: 'chat_message',
+      entityId: msg.id,
+      metadata: { conversationId: id, messageType: body.messageType },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] as string,
+    });
+
     return sendSuccess(reply, msg, 'Message sent', 201);
   });
 
@@ -353,6 +458,4 @@ export async function registerAdvancedCommunicationModule(app: FastifyInstance) 
     const online = getOnlineUsers(id);
     return sendSuccess(reply, { onlineUsers: online });
   });
-
-  console.log('✓ Advanced Communication module loaded (WhatsApp, Voice, Chat)');
 }
