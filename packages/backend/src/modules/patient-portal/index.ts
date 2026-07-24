@@ -1,7 +1,6 @@
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import crypto from 'crypto';
 import { db } from '../../core/database.js';
-import { getCtx } from '../../utils/route-helper.js';
 import { sendSuccess, sendError } from '../../utils/response.js';
 import { logAudit } from '../../services/audit.js';
 import { createRateLimiter } from '../../utils/rate-limiter.js';
@@ -27,7 +26,7 @@ export async function registerPatientPortalModule(app: FastifyInstance) {
     const patient = await db('patients').where({ tenant_id: tenant.id, phone }).whereNull('deleted_at').first();
     if (!patient) return reply.status(404).send({ success: false, error: 'Patient not found with this phone' });
 
-    const otp = crypto.randomInt(100000, 999999).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const token = crypto.randomBytes(48).toString('hex');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -136,7 +135,7 @@ export async function registerPatientPortalModule(app: FastifyInstance) {
       } : null,
       upcomingAppointments: upcomingAppts.map((a: AppointmentRow) => ({
         id: a.id, date: a.appointment_date, time: a.start_time,
-        type: a.appointment_type, status: a.status,
+        type: a.type, status: a.status,
         doctorId: a.doctor_id, branchId: a.branch_id,
       })),
       recentRecords: recentRecords.map((r: EmrRecordRow) => ({
@@ -166,7 +165,7 @@ export async function registerPatientPortalModule(app: FastifyInstance) {
     const appointments = await q.orderBy('appointment_date', 'desc').limit(50);
     return sendSuccess(reply, appointments.map((a: AppointmentRow) => ({
       id: a.id, date: a.appointment_date, time: a.start_time, endTime: a.end_time,
-      type: a.appointment_type, status: a.status, reason: a.reason,
+      type: a.type, status: a.status, reason: a.reason,
       doctorId: a.doctor_id, branchId: a.branch_id, notes: a.notes,
     })));
   });
