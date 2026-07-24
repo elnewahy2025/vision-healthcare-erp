@@ -27,3 +27,13 @@ export function useRegister() {
       authApi.register(data),
   });
 }
+
+export function useRefreshToken() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => authApi.refresh(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.auth.me });
+    },
+  });
+}
