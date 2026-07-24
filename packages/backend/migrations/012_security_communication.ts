@@ -31,38 +31,7 @@ export async function up(knex: Knex): Promise<void> {
     });
   }
 
-  // Audit log
-  if (!(await knex.schema.hasTable('audit_logs'))) {
-    await knex.schema.createTable('audit_logs', (table) => {
-      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-      table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
-      table.uuid('user_id').nullable();
-      table.string('action', 100).notNullable(); // patient.created, user.login, etc.
-      table.string('entity_type', 50).nullable(); // patient, appointment, invoice
-      table.uuid('entity_id').nullable();
-      table.jsonb('metadata').nullable(); // changed fields, old/new values
-      table.string('ip_address', 45).nullable();
-      table.string('user_agent', 500).nullable();
-      table.timestamp('created_at').defaultTo(knex.fn.now()).index();
-    });
-  }
 
-  // Notification templates
-  if (!(await knex.schema.hasTable('notification_templates'))) {
-    await knex.schema.createTable('notification_templates', (table) => {
-      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-      table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
-      table.string('key', 100).notNullable(); // appointment.reminder, invoice.paid, etc.
-      table.string('channel', 20).notNullable(); // email | sms | both
-      table.string('locale', 2).notNullable().defaultTo('en');
-      table.string('subject', 255).nullable(); // email subject
-      table.text('body').notNullable(); // template body with {{variables}}
-      table.boolean('is_active').defaultTo(true);
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table.timestamp('updated_at').defaultTo(knex.fn.now());
-      table.unique(['tenant_id', 'key', 'channel', 'locale']);
-    });
-  }
 
   // Notification logs
   if (!(await knex.schema.hasTable('notification_logs'))) {
@@ -119,8 +88,6 @@ export async function up(knex: Knex): Promise<void> {
 
 export async function down(knex: Knex): Promise<void> {
   await knex.schema.dropTableIfExists('notification_logs');
-  await knex.schema.dropTableIfExists('notification_templates');
-  await knex.schema.dropTableIfExists('audit_logs');
   await knex.schema.dropTableIfExists('otp_codes');
   await knex.schema.dropTableIfExists('password_resets');
 }

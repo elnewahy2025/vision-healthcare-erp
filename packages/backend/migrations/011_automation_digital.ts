@@ -1,31 +1,6 @@
 import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
-  // ── Automation Rules Engine ──
-  if (!(await knex.schema.hasTable('automation_rules'))) {
-    await knex.schema.createTable('automation_rules', (table) => {
-      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-      table.uuid('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
-      table.string('name', 200).notNullable();
-      table.string('slug', 100).notNullable();
-      table.string('category', 50).defaultTo('general'); // clinical, billing, operations, general
-      table.string('trigger_type', 50).notNullable(); // event, schedule, manual
-      table.string('trigger_event', 100).nullable(); // appointment.created, lab.completed, etc.
-      table.jsonb('trigger_config').defaultTo('{}'); // cron expression, event filters
-      table.jsonb('conditions').defaultTo('[]'); // conditions to evaluate
-      table.text('description').nullable();
-      table.boolean('is_active').defaultTo(true);
-      table.integer('priority').defaultTo(0);
-      table.integer('max_executions').defaultTo(0); // 0 = unlimited
-      table.integer('cooldown_minutes').defaultTo(0);
-      table.uuid('created_by').nullable();
-      table.timestamp('last_triggered_at').nullable();
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table.timestamp('updated_at').defaultTo(knex.fn.now());
-      table.unique(['tenant_id', 'slug']);
-      table.index(['tenant_id', 'is_active']);
-    });
-  }
 
   if (!(await knex.schema.hasTable('automation_rule_actions'))) {
     await knex.schema.createTable('automation_rule_actions', (table) => {
