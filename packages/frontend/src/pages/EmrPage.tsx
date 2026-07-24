@@ -67,7 +67,20 @@ const VITALS_FIELDS = [
 
 export default function EmrPage() {
   const { t } = useTranslation();
-  const [records, setRecords] = useState<any[]>([]);
+  interface EmrRecord {
+  id: string;
+  patientName: string;
+  patientMrn: string;
+  status: string;
+  encounterDate: string;
+  chiefComplaint: string;
+  assessment: string;
+  diagnosis: string;
+  encounterType: string;
+  type: string;
+  createdAt: string;
+}
+  const [records, setRecords] = useState<EmrRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });

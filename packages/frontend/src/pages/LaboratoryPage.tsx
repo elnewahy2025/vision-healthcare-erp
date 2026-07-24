@@ -32,7 +32,18 @@ const PRIORITY_OPTIONS = [
 
 export default function LaboratoryPage() {
   const { t } = useTranslation();
-  const [orders, setOrders] = useState<any[]>([]);
+  interface LabOrder {
+  id: string;
+  orderNumber: string;
+  patientName: string;
+  patientMrn: string;
+  status: string;
+  priority: string;
+  orderDate: string;
+  clinicalNotes: string;
+  createdAt: string;
+}
+  const [orders, setOrders] = useState<LabOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);

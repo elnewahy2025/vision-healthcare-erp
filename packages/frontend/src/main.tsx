@@ -14,7 +14,6 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker
       .register('/sw.js')
       .then((registration) => {
-        console.log('SW registered:', registration.scope);
 
         // Check for updates
         registration.addEventListener('updatefound', () => {
@@ -22,14 +21,12 @@ if ('serviceWorker' in navigator) {
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('New version available. Reload to update.');
               }
             });
           }
         });
       })
       .catch((error) => {
-        console.warn('SW registration failed:', error.message);
         // Non-critical: app works without SW
       });
   });

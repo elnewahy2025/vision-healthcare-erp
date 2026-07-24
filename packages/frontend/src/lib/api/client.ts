@@ -95,7 +95,8 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         inMemoryAccessToken = null;
-        localStorage.clear();
+        localStorage.removeItem('tenantSlug');
+        localStorage.removeItem('locale');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {

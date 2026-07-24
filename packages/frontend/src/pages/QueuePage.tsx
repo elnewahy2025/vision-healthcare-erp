@@ -22,7 +22,17 @@ const SERVICE_TYPES = [
 
 export default function QueuePage() {
   const { t } = useTranslation();
-  const [queue, setQueue] = useState<any[]>([]);
+  interface QueueEntry {
+  id: string;
+  queueNumber: number;
+  position: number;
+  patientName: string;
+  serviceType: string;
+  status: string;
+  startedAt: string;
+  createdAt: string;
+}
+  const [queue, setQueue] = useState<QueueEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [saving, setSaving] = useState(false);

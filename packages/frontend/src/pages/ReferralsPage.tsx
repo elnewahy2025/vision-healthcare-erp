@@ -23,7 +23,19 @@ const INITIAL_FORM: ReferralForm = {
 
 export default function ReferralsPage() {
   const { t } = useTranslation();
-  const [referrals, setReferrals] = useState<any[]>([]);
+  interface Referral {
+  id: string;
+  referralNumber: string;
+  referralType: string;
+  patientName: string;
+  referringDoctor: string;
+  priority: string;
+  referralDate: string;
+  status: string;
+  reason: string;
+  createdAt: string;
+}
+  const [referrals, setReferrals] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);

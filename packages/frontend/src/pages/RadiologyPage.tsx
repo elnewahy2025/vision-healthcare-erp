@@ -24,7 +24,20 @@ const STUDY_TYPES = [
 
 export default function RadiologyPage() {
   const { t } = useTranslation();
-  const [orders, setOrders] = useState<any[]>([]);
+  interface RadiologyOrder {
+  id: string;
+  orderNumber: string;
+  patientName: string;
+  patientMrn: string;
+  studyType: string;
+  bodyPart: string;
+  status: string;
+  priority: string;
+  orderDate: string;
+  findings: string;
+  createdAt: string;
+}
+  const [orders, setOrders] = useState<RadiologyOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);

@@ -26,7 +26,20 @@ const VISIT_TYPES = [
 
 export default function HomeVisitsPage() {
   const { t } = useTranslation();
-  const [visits, setVisits] = useState<any[]>([]);
+  interface HomeVisit {
+  id: string;
+  visitNumber: string;
+  patientName: string;
+  visitType: string;
+  visitDate: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  status: string;
+  reason: string;
+  assignedToName: string;
+  createdAt: string;
+}
+  const [visits, setVisits] = useState<HomeVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);

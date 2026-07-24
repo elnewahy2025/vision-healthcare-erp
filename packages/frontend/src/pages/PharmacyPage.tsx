@@ -44,8 +44,28 @@ const FREQUENCY_OPTIONS = [
 export default function PharmacyPage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<'inventory' | 'prescriptions'>('inventory');
-  const [inventory, setInventory] = useState<any[]>([]);
-  const [prescriptions, setPrescriptions] = useState<any[]>([]);
+  interface PharmacyDrug {
+  id: string;
+  drugName: string;
+  genericName: string;
+  brandName: string;
+  stockQuantity: number;
+  reorderLevel: number;
+  unitPrice: number;
+  expiryDate: string;
+  status: string;
+}
+interface Prescription {
+  id: string;
+  prescriptionNumber: string;
+  patientName: string;
+  status: string;
+  notes: string;
+  items: Array<{ id: string; drugName: string; dosage: string; quantity: number; quantityDispensed: number; status: string }>;
+  createdAt: string;
+}
+  const [inventory, setInventory] = useState<PharmacyDrug[]>([]);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showNewDrugModal, setShowNewDrugModal] = useState(false);

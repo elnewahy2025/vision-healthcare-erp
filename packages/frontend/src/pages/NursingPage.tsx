@@ -26,7 +26,20 @@ const CATEGORY_OPTIONS = [
 
 export default function NursingPage() {
   const { t } = useTranslation();
-  const [tasks, setTasks] = useState<any[]>([]);
+  interface NursingTask {
+  id: string;
+  title: string;
+  description: string;
+  patientName: string;
+  taskType: string;
+  category: string;
+  priority: string;
+  status: string;
+  dueDate: string;
+  dueAt: string;
+  createdAt: string;
+}
+  const [tasks, setTasks] = useState<NursingTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);
