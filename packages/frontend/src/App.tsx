@@ -7,6 +7,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 import { ErrorBoundary, PageLoader } from './components/ui';
 import { Shield } from 'lucide-react';
 import { useDirection } from './hooks/useDirection';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { routePermissions } from './router';
 
 // Lazy-loaded page components
@@ -135,6 +136,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppContent() {
   useDirection();
+  useKeyboardShortcuts();
   const { user, tenant } = useAuth();
   const { i18n } = useTranslation();
 

@@ -216,6 +216,7 @@ export default function UserPreferencesPage() {
         <Card>
           <CardBody>
             <h2 className="text-lg font-semibold mb-4">{t('preferences.keyboardShortcuts')}</h2>
+            <p className="text-sm text-[var(--text-muted)] mb-4">Shortcuts are active globally. Press the key combination anywhere in the app.</p>
             {shortcuts.length === 0 ? (
               <EmptyState title={t('preferences.noShortcuts')} />
             ) : (

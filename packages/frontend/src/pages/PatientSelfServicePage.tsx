@@ -154,7 +154,7 @@ export default function PatientSelfServicePage() {
   const fetchAppointments = useCallback(async (): Promise<void> => {
     try {
       const { data } = await api.get('/appointments', { params: { limit: 50 } });
-      const rows = (data.data?.rows ?? data.data ?? []) as Array<Record<string, unknown>>;
+      const rows = (data.data?.data ?? data.data?.rows ?? data.data ?? []) as Array<Record<string, unknown>>;
       setAppointments(rows.map((a) => ({
         id: a.id as string,
         date: (a.appointmentDate as string) ?? (a.date as string) ?? '',

@@ -68,7 +68,8 @@ export default function QueueDisplayPage() {
 
     if (token) {
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const wsUrl = `${protocol}://${window.location.host}/api/v1/queue/ws?token=${token}&tenantSlug=${slug}&branchId=${branchId}`;
+      const authToken = document.cookie.split(';').find(c => c.trim().startsWith('access_token='))?.split('=')[1] || token || '';
+      const wsUrl = `${protocol}://${window.location.host}/api/v1/queue/ws?token=${authToken}&tenantSlug=${slug}&branchId=${branchId}`;
 
       const connectWs = () => {
         try {
