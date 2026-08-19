@@ -111,7 +111,15 @@ export interface CreateBudgetPlanPayload {
 
 export const financialApi = {
   revenue: (params?: { period?: string }) =>
-    apiClient.get('/billing/revenue', { params }).then((r) => r.data.data as RevenueSummary),
+    apiClient.get('/billing/revenue', { params }).then((r) => {
+      const d = r.data.data || {};
+      return {
+        totalRevenue: d.totalRevenue ?? d.total_revenue ?? 0,
+        totalCollected: d.totalCollected ?? d.total_collected ?? 0,
+        totalOutstanding: d.totalOutstanding ?? d.total_pending ?? 0,
+        revenueByCategory: d.revenueByCategory ?? d.revenue_by_category ?? [],
+      } as RevenueSummary;
+    }),
   revenueByMonth: (year?: number) =>
     apiClient.get('/billing/revenue/monthly', { params: { year } }).then((r) => r.data.data as PlMonthData[]),
   aging: () =>
