@@ -9,6 +9,7 @@ import {
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import { sanitizeString, escapeHtml } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -180,7 +181,7 @@ export default function ExpenseTrackingPage() {
     {
       key: 'expense_number',
       header: '#',
-      render: (item) => <span className="text-xs text-gray-400">{escapeHtml(item.expense_number)}</span>,
+      render: (item) => <span className="text-xs text-[var(--text-disabled)]">{escapeHtml(item.expense_number)}</span>,
     },
     {
       key: 'title',
@@ -200,7 +201,7 @@ export default function ExpenseTrackingPage() {
     {
       key: 'expense_date',
       header: t('expense.date'),
-      render: (item) => <span className="text-sm text-gray-500">{escapeHtml(item.expense_date)}</span>,
+      render: (item) => <span className="text-sm text-[var(--text-muted)]">{escapeHtml(item.expense_date)}</span>,
     },
     {
       key: 'status',
@@ -212,7 +213,7 @@ export default function ExpenseTrackingPage() {
     {
       key: 'vendor_name',
       header: t('expense.vendorName'),
-      render: (item) => <span className="text-sm text-gray-500">{escapeHtml(item.vendor_name || '-')}</span>,
+      render: (item) => <span className="text-sm text-[var(--text-muted)]">{escapeHtml(item.vendor_name || '-')}</span>,
     },
   ];
 
@@ -235,18 +236,20 @@ export default function ExpenseTrackingPage() {
             <Wallet className="w-6 h-6 text-orange-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('expense.title')}</h1>
-            <p className="text-sm text-gray-500">{t('expense.subtitle')}</p>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('expense.title')}</h1>
+            <p className="text-sm text-[var(--text-muted)]">{t('expense.subtitle')}</p>
           </div>
         </div>
-        <Button onClick={() => setTab('add')}>
+        <Can permission="expenses.create">
+          <Button onClick={() => setTab('add')}>
           <Plus className="w-4 h-4 mr-1" />
           {t('expense.newExpense')}
         </Button>
+        </Can>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-gray-200 pb-2">
+      <div className="flex gap-2 border-b border-[var(--border)] pb-2">
         {tabs.map((tabItem) => (
           <button
             key={tabItem.key}
@@ -254,7 +257,7 @@ export default function ExpenseTrackingPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === tabItem.key
                 ? 'bg-orange-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {tabItem.icon}
@@ -312,7 +315,7 @@ export default function ExpenseTrackingPage() {
                   >
                     {t('expense.prev')}
                   </Button>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-[var(--text-muted)]">
                     {t('expense.pageOf', { current: String(page), total: String(totalPages) } as Record<string, unknown>)}
                   </span>
                   <Button
@@ -331,7 +334,7 @@ export default function ExpenseTrackingPage() {
           {tab === 'add' && (
             <Card>
               <CardBody className="p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">{t('expense.recordExpense')}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('expense.recordExpense')}</h3>
                 <div className="space-y-4 max-w-lg">
                   <Input
                     label={t('expense.titleField')}
@@ -375,11 +378,11 @@ export default function ExpenseTrackingPage() {
                     options={PAYMENT_METHODS.map((opt) => ({ value: opt.value, label: t(opt.label) }))}
                   />
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                       {t('expense.description')}
                     </label>
                     <textarea
-                      className="w-full border border-gray-300 rounded-lg p-3 h-24 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                      className="w-full border border-[var(--border-strong)] rounded-lg p-3 h-24 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                       value={form.description}
                       onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
                       placeholder={t('expense.descriptionPlaceholder')}
@@ -400,7 +403,7 @@ export default function ExpenseTrackingPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Card>
                   <CardBody className="p-5 text-center">
-                    <p className="text-sm text-gray-500">{t('expense.totalExpenses')}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{t('expense.totalExpenses')}</p>
                     <p className="text-3xl font-bold text-orange-600">
                       {stats.totalExpenses?.toLocaleString('ar-EG')} EGP
                     </p>
@@ -408,13 +411,13 @@ export default function ExpenseTrackingPage() {
                 </Card>
                 <Card>
                   <CardBody className="p-5 text-center">
-                    <p className="text-sm text-gray-500">{t('expense.pendingCount')}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{t('expense.pendingCount')}</p>
                     <p className="text-3xl font-bold text-yellow-600">{stats.pendingCount}</p>
                   </CardBody>
                 </Card>
                 <Card>
                   <CardBody className="p-5 text-center">
-                    <p className="text-sm text-gray-500">{t('expense.categoriesCount')}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{t('expense.categoriesCount')}</p>
                     <p className="text-3xl font-bold text-blue-600">{stats.byCategory?.length || 0}</p>
                   </CardBody>
                 </Card>

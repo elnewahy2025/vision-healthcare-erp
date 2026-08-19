@@ -80,12 +80,56 @@ export async function createSessionRecord(
 
 // ── JWT ──
 
-export function buildAccessTokenPayload(tenantId: string, userId: string): Record<string, unknown> {
-  return { tenantId, userId };
+/**
+ * Build the access token payload per AUTHORIZATION-SOUND-OF-TRUTH.md §5.
+ *
+ * JWT contains ONLY identity references:
+ *   sub  — user ID (subject)
+ *   mid  — active membership ID
+ *   sid  — session ID
+ *   authz_version — for staleness detection
+ *
+ * JWT NEVER contains: tenantId, branchId, departmentId, roles, permissions.
+ */
+export function buildAccessTokenPayload(
+  userId: string,
+  membershipId: string,
+  sessionId: string,
+  authzVersion: number,
+): Record<string, unknown> {
+  return {
+    sub: userId,
+    mid: membershipId,
+    sid: sessionId,
+    authz_version: authzVersion,
+  };
 }
 
-export function generateAccessToken(jwt: JwtHelper, tenantId: string, userId: string): string {
-  return jwt.sign(buildAccessTokenPayload(tenantId, userId), { expiresIn: env.ACCESS_TOKEN_EXPIRY });
+export function generateAccessToken(
+  jwt: JwtHelper,
+  userId: string,
+  membershipId: string,
+  sessionId: string,
+  authzVersion: number,
+): string {
+  return jwt.sign(
+    buildAccessTokenPayload(userId, membershipId, sessionId, authzVersion),
+    { expiresIn: env.ACCESS_TOKEN_EXPIRY },
+  );
+}
+
+/**
+ * Backward-compatible overload for refresh token flow where sessionId
+ * is generated fresh and authzVersion is loaded from the membership.
+ */
+export function generateAccessTokenCompat(
+  jwt: JwtHelper,
+  userId: string,
+  membershipId: string,
+  authzVersion: number,
+): string {
+  const sessionId = crypto.randomUUID();
+  return generateAccessToken(jwt, userId, membershipId, sessionId, authzVersion);
 }
 
 // ── Verification Token ──

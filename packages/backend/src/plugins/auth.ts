@@ -6,79 +6,52 @@ import { db } from '../core/database.js';
 
 const env = getEnv();
 
+/**
+ * JWT auth plugin — registers @fastify/jwt and type declarations.
+ *
+ * NOTE: The actual `authenticate` decorator is defined in index.ts.
+ * This file only registers the JWT library and declares TypeScript types
+ * for the JWT payload shape.
+ *
+ * See docs/engineering/AUTHORIZATION-SOUND-OF-TRUTH.md §5.
+ */
 export async function authPlugin(app: FastifyInstance) {
   await app.register(jwt, {
     secret: env.JWT_SECRET,
     sign: { expiresIn: '15m' },
   });
-
-  app.decorate('authenticate', async function (request: FastifyRequest) {
-    try {
-      await request.jwtVerify();
-    } catch {
-      throw new UnauthorizedError('Invalid or expired token');
-    }
-
-    const req = request as any;
-    const { tenantId, userId, roles, permissions, locale, branchId } = request.user as any;
-    req.tenantId = tenantId;
-    req.ctx = {
-      tenantId,
-      userId,
-      roles: roles || [],
-      permissions: permissions || [],
-      locale: locale || 'en',
-      branchId,
-      requestId: request.id,
-    };
-  });
-
-  app.decorate(
-    'authorize',
-    (...requiredPermissions: string[]) =>
-      async function (request: FastifyRequest) {
-        const req = request as any;
-        const { permissions, roles } = req.ctx;
-        if (roles.includes('super_admin')) return;
-        const hasAll = requiredPermissions.every((p) => permissions.includes(p));
-        if (!hasAll) {
-          throw new ForbiddenError('Insufficient permissions');
-        }
-      },
-  );
-
-  app.addHook('onRequest', async (request: FastifyRequest) => {
-    const tenantSlug = request.headers['x-tenant-slug'] as string;
-    if (!tenantSlug && request.url !== '/health' && !request.url.startsWith('/api/v1/tenants')) {
-      return;
-    }
-    if (tenantSlug) {
-      const tenant = await db('tenants').where({ slug: tenantSlug }).first();
-      if (tenant) {
-        (request as any).tenantId = tenant.id;
-      }
-    }
-  });
 }
 
+/**
+ * JWT payload type declarations.
+ *
+ * The JWT contains ONLY identity references per AUTHORIZATION-SOUND-OF-TRUTH.md §5:
+ *   sub  — user_id (subject)
+ *   mid  — active_membership_id
+ *   sid  — session_id
+ *   authz_version — for staleness detection
+ *
+ * JWT NEVER contains: tenantId, branchId, departmentId, roles, permissions.
+ */
 declare module '@fastify/jwt' {
   interface FastifyJWT {
     payload: {
-      tenantId: string;
-      userId: string;
-      roles: string[];
-      permissions: string[];
-      locale: 'ar' | 'en';
-      branchId?: string;
+      sub: string;           // user_id (subject)
+      mid: string;           // active_membership_id
+      sid: string;           // session_id
+      authz_version: number; // authorization version for staleness detection
+      iat: number;
+      exp: number;
+      /** @deprecated Used only for MFA partial tokens */
       mfaPending?: boolean;
     };
     user: {
-      tenantId: string;
-      userId: string;
-      roles: string[];
-      permissions: string[];
-      locale: 'ar' | 'en';
-      branchId?: string;
+      sub: string;
+      mid: string;
+      sid: string;
+      authz_version: number;
+      iat: number;
+      exp: number;
       mfaPending?: boolean;
     };
   }

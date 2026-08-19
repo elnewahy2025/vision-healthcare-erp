@@ -23,6 +23,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 type TabType = 'branding' | 'domains';
 
@@ -228,7 +229,7 @@ export default function WhiteLabelPage() {
       {tab === 'branding' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Brand Identity Form */}
-          <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+          <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
             <h3 className="font-semibold mb-4">{t('wl.brandIdentity')}</h3>
             <div className="space-y-4">
               <Input
@@ -240,7 +241,7 @@ export default function WhiteLabelPage() {
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                   {t('wl.primaryColor')}
                 </label>
                 <div className="flex gap-2">
@@ -258,7 +259,7 @@ export default function WhiteLabelPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                   {t('wl.secondaryColor')}
                 </label>
                 <div className="flex gap-2">
@@ -276,7 +277,7 @@ export default function WhiteLabelPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                   {t('wl.accentColor')}
                 </label>
                 <div className="flex gap-2">
@@ -300,16 +301,18 @@ export default function WhiteLabelPage() {
                 helpText={t('wl.fontHelp')}
               />
 
-              <Button onClick={handleSaveBranding} loading={saving}>
+              <Can permission="white_label.create">
+          <Button onClick={handleSaveBranding} loading={saving}>
                 {t('wl.saveBranding')}
               </Button>
+        </Can>
             </div>
           </div>
 
           {/* Preview */}
-          <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+          <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
             <h3 className="font-semibold mb-4">{t('wl.preview')}</h3>
-            <div className="p-6 rounded-lg border bg-white">
+            <div className="p-6 rounded-lg border bg-[var(--surface)]">
               <div
                 className="w-16 h-16 rounded-xl flex items-center justify-center mb-3"
                 style={{ backgroundColor: primaryColor }}
@@ -353,7 +356,7 @@ export default function WhiteLabelPage() {
       {tab === 'domains' && (
         <div>
           {/* Add Domain */}
-          <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800 mb-6">
+          <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800 mb-6">
             <div className="flex gap-2">
               <div className="flex-1 max-w-md">
                 <Input
@@ -373,16 +376,16 @@ export default function WhiteLabelPage() {
           </div>
 
           {/* Domains Table */}
-          <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+          <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('wl.domain')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('wl.primary')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('wl.verified')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('wl.ssl')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('wl.verifiedAt')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.actions')}</th>
+                <tr className="border-b bg-[var(--surface-secondary)]">
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('wl.domain')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('wl.primary')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('wl.verified')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('wl.ssl')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('wl.verifiedAt')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -398,13 +401,13 @@ export default function WhiteLabelPage() {
                   </tr>
                 ) : (
                   domains.map((d) => (
-                    <tr key={d.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <tr key={d.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                       <td className="p-3 text-sm font-medium">{escapeHtml(d.domain)}</td>
                       <td className="p-3">
                         {d.isPrimary ? (
                           <CheckCircle className="w-4 h-4 text-green-500" />
                         ) : (
-                          <XCircle className="w-4 h-4 text-gray-400" />
+                          <XCircle className="w-4 h-4 text-[var(--text-disabled)]" />
                         )}
                       </td>
                       <td className="p-3">
@@ -417,7 +420,7 @@ export default function WhiteLabelPage() {
                           {escapeHtml(d.sslStatus)}
                         </Badge>
                       </td>
-                      <td className="p-3 text-xs text-gray-500">
+                      <td className="p-3 text-xs text-[var(--text-muted)]">
                         {formatDateTime(d.verifiedAt) || '-'}
                       </td>
                       <td className="p-3">

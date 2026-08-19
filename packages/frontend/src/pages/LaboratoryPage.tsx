@@ -4,6 +4,7 @@ import { apiClient as api } from '../lib/api';
 import { Modal, Input, Select, PatientSearchField } from '../components/ui';
 import { Plus, Search, Loader2, Trash2, FlaskConical, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 interface LabTest {
   testCode: string;
@@ -124,8 +125,11 @@ export default function LaboratoryPage() {
   return (
     <div>
       <div className="page-header">
-        <div><h1 className="page-title">{t('lab.title')}</h1><p className="text-gray-500 mt-1">{orders.length} orders</p></div>
-        <button onClick={() => setShowNewModal(true)} className="btn-primary"><Plus className="w-4 h-4" />{t('lab.newOrder')}</button>
+        <div><h1 className="page-title">{t('lab.title')}</h1><p className="text-[var(--text-muted)] mt-1">{orders.length} orders</p></div>
+        <Can permission="laboratory.create">
+          <button onClick={() => setShowNewModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />{t('lab.newOrder')}</button>
+        </Can>
       </div>
 
       <div className="card mb-6"><div className="card-body">
@@ -136,11 +140,11 @@ export default function LaboratoryPage() {
         <table>
           <thead><tr><th>{t('lab.orderNumber')}</th><th>{t('lab.patient')}</th><th>{t('lab.status')}</th><th>{t('lab.priority')}</th><th>{t('lab.date')}</th></tr></thead>
           <tbody>
-            {filtered.length === 0 ? <tr><td colSpan={5} className="text-center py-12 text-gray-500">{t('lab.noOrders')}</td></tr> :
+            {filtered.length === 0 ? <tr><td colSpan={5} className="text-center py-12 text-[var(--text-muted)]">{t('lab.noOrders')}</td></tr> :
               filtered.map(o => (
-                <tr key={o.id} className="hover:bg-gray-50">
+                <tr key={o.id} className="hover:bg-[var(--surface-secondary)]">
                   <td className="font-mono text-xs text-primary-600">{o.orderNumber}</td>
-                  <td><p className="font-medium">{o.patientName}</p><p className="text-xs text-gray-500 font-mono">{o.patientMrn}</p></td>
+                  <td><p className="font-medium">{o.patientName}</p><p className="text-xs text-[var(--text-muted)] font-mono">{o.patientMrn}</p></td>
                   <td><span className={`badge ${o.status === 'completed' ? 'badge-success' : 'badge-info'}`}>{o.status}</span></td>
                   <td><span className={`badge ${o.priority === 'urgent' ? 'badge-danger' : o.priority === 'stat' ? 'badge-warning' : 'badge-info'}`}>{t(`lab.${o.priority}`)}</span></td>
                   <td className="text-xs">{o.orderDate}</td>
@@ -175,38 +179,38 @@ export default function LaboratoryPage() {
             error={formErrors.priority} />
 
           <div ref={catalogRef} className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('lab.selectTests')} *</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">{t('lab.selectTests')} *</label>
             <div className="relative">
-              <Search className="absolute top-1/2 -translate-y-1/2 left-3 w-4 h-4 text-gray-400" />
+              <Search className="absolute top-1/2 -translate-y-1/2 left-3 w-4 h-4 text-[var(--text-disabled)]" />
               <input type="text" className="input pl-10" placeholder={t('lab.searchTests')}
                 value={catalogSearch}
                 onChange={e => { setCatalogSearch(e.target.value); setShowCatalogDropdown(e.target.value.length >= 1); }}
                 onFocus={() => catalogSearch.length >= 1 && setShowCatalogDropdown(true)} />
             </div>
             {showCatalogDropdown && filteredCatalog.length > 0 && (
-              <div className="absolute z-50 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              <div className="absolute z-50 mt-1 w-full bg-[var(--surface)] border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 {filteredCatalog.slice(0, 20).map(c => (
                   <button key={c.testCode} type="button" onClick={() => addTest(c)}
-                    className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center justify-between">
-                    <div><p className="text-sm font-medium">{c.testName}</p><p className="text-xs text-gray-500">{c.testCode} | {c.specimenType}</p></div>
+                    className="w-full text-left px-4 py-2 hover:bg-[var(--surface-secondary)] flex items-center justify-between">
+                    <div><p className="text-sm font-medium">{c.testName}</p><p className="text-xs text-[var(--text-muted)]">{c.testCode} | {c.specimenType}</p></div>
                     <Plus className="w-4 h-4 text-primary-600" />
                   </button>
                 ))}
               </div>
             )}
             {showCatalogDropdown && filteredCatalog.length === 0 && (
-              <div className="absolute z-50 mt-1 w-full bg-white border rounded-lg shadow-lg p-4 text-center text-gray-500">{t('lab.noResults')}</div>
+              <div className="absolute z-50 mt-1 w-full bg-[var(--surface)] border rounded-lg shadow-lg p-4 text-center text-[var(--text-muted)]">{t('lab.noResults')}</div>
             )}
             {formErrors.tests && <p className="mt-1 text-sm text-red-600">{formErrors.tests}</p>}
           </div>
 
           {newOrder.tests.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('lab.addedTests')} ({newOrder.tests.length})</label>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">{t('lab.addedTests')} ({newOrder.tests.length})</label>
               <div className="space-y-2">
                 {newOrder.tests.map((test, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div><p className="text-sm font-medium">{test.testName}</p><p className="text-xs text-gray-500">{test.testCode} | {test.specimenType}</p></div>
+                  <div key={idx} className="flex items-center justify-between p-3 bg-[var(--surface-secondary)] rounded-lg">
+                    <div><p className="text-sm font-medium">{test.testName}</p><p className="text-xs text-[var(--text-muted)]">{test.testCode} | {test.specimenType}</p></div>
                     <button type="button" onClick={() => removeTest(idx)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 ))}
@@ -215,7 +219,7 @@ export default function LaboratoryPage() {
           )}
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('lab.clinicalNotes')}</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('lab.clinicalNotes')}</label>
             <textarea className="input" rows={2} value={newOrder.clinicalNotes}
               onChange={e => setNewOrder(prev => ({ ...prev, clinicalNotes: e.target.value }))} />
           </div>

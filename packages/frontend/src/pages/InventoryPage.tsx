@@ -5,6 +5,7 @@ import { Modal, Input, Select, Button, Badge, EmptyState, PageLoader } from '../
 import { Plus, Package, Warehouse as WarehouseIcon } from 'lucide-react';
 import { sanitizeNumber, sanitizeString } from '../lib/sanitize';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 type TabType = 'items' | 'warehouses' | 'pos';
 
@@ -321,13 +322,15 @@ export default function InventoryPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('inventory.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('inventory.itemsCount', { count: items.length })}, {pos.length} {t('inventory.purchaseOrders').toLowerCase()}
           </p>
         </div>
-        <Button icon={<Plus className="w-4 h-4" />} onClick={openNewModal}>
-          {tab === 'items' ? newItemLabel : tab === 'warehouses' ? newWhLabel : newPoLabel}
-        </Button>
+        <Can permission="inventory.create">
+          <Button icon={<Plus className="w-4 h-4" />} onClick={openNewModal}>
+            {tab === 'items' ? newItemLabel : tab === 'warehouses' ? newWhLabel : newPoLabel}
+          </Button>
+        </Can>
       </div>
 
       {/* Tab Buttons */}
@@ -370,33 +373,33 @@ export default function InventoryPage() {
         filteredItems.length === 0 ? (
           <EmptyState title={t('inventory.noItems')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.sku')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.name')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.category')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.quantity')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.reorderPoint')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.unitPrice')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('common.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.sku')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.name')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.category')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.quantity')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.reorderPoint')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.unitPrice')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('common.status')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {filteredItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{item.sku}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
+                    <tr key={item.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">{item.sku}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{item.name}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{item.category}</Badge></td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`text-sm font-medium ${getStockColor(item.quantity, item.reorderPoint)}`}>
                           {item.quantity} {t(`inventory.${item.unit}`)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.reorderPoint}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{formatEgp(item.unitPrice)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{item.reorderPoint}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)] font-medium">{formatEgp(item.unitPrice)}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge>{item.status}</Badge>
                       </td>
@@ -414,22 +417,22 @@ export default function InventoryPage() {
         filteredItems.length === 0 && warehouses.length === 0 ? (
           <EmptyState title={t('inventory.noWarehouses')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.name')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.sku')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.category')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('common.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.name')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.sku')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.category')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('common.status')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {warehouses.map((wh) => (
-                    <tr key={wh.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{wh.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{wh.code}</td>
+                    <tr key={wh.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{wh.name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">{wh.code}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{t(`inventory.${wh.type}`)}</Badge></td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge variant="success">{t('inventory.inStock')}</Badge></td>
                     </tr>
@@ -446,28 +449,28 @@ export default function InventoryPage() {
         filteredPos.length === 0 ? (
           <EmptyState title={t('inventory.noPos')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.poNumber')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.supplier')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.totalAmount')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('common.status')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.orderDate')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('inventory.items')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.poNumber')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.supplier')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.totalAmount')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('common.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.orderDate')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('inventory.items')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {filteredPos.map((po) => (
-                    <tr key={po.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{po.poNumber}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{po.supplier}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{formatEgp(po.totalAmount)}</td>
+                    <tr key={po.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">{po.poNumber}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{po.supplier}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)] font-medium">{formatEgp(po.totalAmount)}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{po.status}</Badge></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{po.orderDate}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{po.items.length}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{po.orderDate}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{po.items.length}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -574,8 +577,8 @@ export default function InventoryPage() {
               onChange={(e) => setPoForm((p) => ({ ...p, expectedDate: e.target.value }))} />
           </div>
 
-          <div className="border border-gray-200 rounded-lg p-3 space-y-3">
-            <p className="text-sm font-medium text-gray-700">{t('inventory.poItems')}</p>
+          <div className="border border-[var(--border)] rounded-lg p-3 space-y-3">
+            <p className="text-sm font-medium text-[var(--text-primary)]">{t('inventory.poItems')}</p>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
               <Select
                 label={t('inventory.item')}
@@ -618,9 +621,9 @@ export default function InventoryPage() {
             {poItems.length > 0 ? (
               <ul className="space-y-1 text-sm">
                 {poItems.map((line, idx) => (
-                  <li key={idx} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1">
+                  <li key={idx} className="flex items-center justify-between bg-[var(--surface-secondary)] rounded px-2 py-1">
                     <span className="font-medium">{sanitizeString(line.itemName)}</span>
-                    <span className="text-gray-500">
+                    <span className="text-[var(--text-muted)]">
                       {line.quantityOrdered} x {Number(line.unitCost).toFixed(2)} = {(line.quantityOrdered * line.unitCost).toFixed(2)}
                     </span>
                     <button type="button" onClick={() => removePoLine(idx)} className="text-red-500 hover:text-red-700 text-xs font-medium">
@@ -630,7 +633,7 @@ export default function InventoryPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-xs text-gray-400">{t('inventory.poNoItems')}</p>
+              <p className="text-xs text-[var(--text-disabled)]">{t('inventory.poNoItems')}</p>
             )}
             {poErrors.items && <p className="text-xs text-red-600">{poErrors.items}</p>}
           </div>

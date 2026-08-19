@@ -135,6 +135,9 @@ async function buildApp() {
   await app.register(jwt, { secret: env.JWT_SECRET });
 
   // Decorate app with authenticate middleware
+  // JWT contains only identity references: { sub, mid, sid, authz_version }
+  // All organizational context is resolved from the membership table.
+  // See docs/engineering/AUTHORIZATION-SOUND-OF-TRUTH.md §6.7.
   app.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     try {
       await request.jwtVerify();
@@ -143,21 +146,51 @@ async function buildApp() {
       return;
     }
     const req = request as any;
-    const { tenantId, userId } = request.user as any;
-    const principal = await loadUserPrincipal(userId, tenantId);
+    const user = request.user as any;
+
+    // Extract identity from JWT (NOT tenant/branch/roles)
+    const userId = user.sub || user.userId;  // support both formats during transition
+    const membershipId = user.mid;           // active membership reference
+
+    if (!userId || !membershipId) {
+      reply.status(401).send({ success: false, error: "Invalid token payload" });
+      return;
+    }
+
+    // Resolve organizational context from membership table
+    const principal = await loadUserPrincipal(userId, membershipId);
     if (!principal || principal.status !== 'active') {
       reply.status(401).send({ success: false, error: "Account is not active" });
       return;
     }
-    req.tenantId = tenantId;
+
+    // Check membership status
+    if (principal.membershipStatus !== 'active') {
+      reply.status(401).send({ success: false, error: "Membership suspended" });
+      return;
+    }
+
+    // Permission versioning: detect stale authorization context.
+    // If the JWT's authz_version doesn't match the DB, the cached principal
+    // may be stale. Force re-authentication on next request by rejecting
+    // this token. The client should refresh to get a new token.
+    // See docs/engineering/AUTHORIZATION-SOUND-OF-TRUTH.md §13.
+    const jwtAuthzVersion = user.authz_version;
+    if (jwtAuthzVersion !== undefined && jwtAuthzVersion !== principal.authzVersion) {
+      reply.status(401).send({ success: false, error: "Authorization context changed. Please refresh." });
+      return;
+    }
+
+    // Populate request context — same shape as before for backward compatibility
+    req.tenantId = principal.tenantId;
     req.ctx = {
-      tenantId,
-      userId,
+      tenantId: principal.tenantId,
+      userId: principal.userId,
       roles: principal.roles,
       permissions: uniquePermissionKeys(principal.grants),
       branches: principal.branches,
       locale: principal.locale,
-      branchId: principal.branches[0],
+      branchId: principal.branchId || principal.branches[0] || undefined,
       requestId: request.id,
       principal,
     };

@@ -8,6 +8,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 type ExportTab = 'export' | 'jobs' | 'definitions';
 
@@ -120,7 +121,7 @@ export default function DataExportPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('dataExport.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('dataExport.moduleCount', { modules: modules.length })} · {t('dataExport.jobCount', { jobs: jobs.length })}
           </p>
         </div>
@@ -172,7 +173,7 @@ export default function DataExportPage() {
                     <div
                       key={m.module}
                       className={`p-2 rounded-lg cursor-pointer transition-colors ${
-                        selectedModule === m.module ? 'bg-primary-50 ring-1 ring-primary-200' : 'bg-gray-50 hover:bg-gray-100'
+                        selectedModule === m.module ? 'bg-primary-50 ring-1 ring-primary-200' : 'bg-[var(--surface-secondary)] hover:bg-[var(--surface-hover)]'
                       }`}
                       onClick={() => setSelectedModule(m.module)}
                       role="button"
@@ -180,7 +181,7 @@ export default function DataExportPage() {
                       onKeyDown={(e) => { if (e.key === 'Enter') setSelectedModule(m.module); }}
                     >
                       <p className="font-medium text-sm capitalize">{sanitizeString(m.module)}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-[var(--text-muted)]">
                         {m.tables?.length} {t('dataExport.tables')} · {m.formats?.join(', ')}
                       </p>
                     </div>
@@ -216,7 +217,7 @@ export default function DataExportPage() {
                 </tr>
               ) : (
                 jobs.map((j) => (
-                  <tr key={j.id} className="hover:bg-gray-50">
+                  <tr key={j.id} className="hover:bg-[var(--surface-secondary)]">
                     <td className="font-medium capitalize">{sanitizeString(j.module)}</td>
                     <td><Badge>{sanitizeString(j.format)}</Badge></td>
                     <td>{j.recordCount?.toLocaleString()}</td>
@@ -273,7 +274,7 @@ export default function DataExportPage() {
                   </tr>
                 ) : (
                   definitions.map((d) => (
-                    <tr key={d.id} className="hover:bg-gray-50">
+                    <tr key={d.id} className="hover:bg-[var(--surface-secondary)]">
                       <td className="font-medium">{sanitizeString(d.name)}</td>
                       <td className="capitalize">{sanitizeString(d.module)}</td>
                       <td><Badge>{sanitizeString(d.format)}</Badge></td>

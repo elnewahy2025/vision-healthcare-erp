@@ -19,7 +19,6 @@ export const authApi = {
   me: () =>
     apiClient.get('/auth/me').then((r) => r.data.data),
   refresh: async () => {
-    // Refresh token is in HttpOnly cookie — sent automatically
     const response = await apiClient.post('/auth/refresh', {});
     const result = response.data.data;
     if (result.accessToken) {
@@ -48,5 +47,19 @@ export const authApi = {
       setAccessToken(null);
       setCsrfToken(null);
     }
+  },
+  /** Get all active memberships for the current user */
+  getMemberships: async () => {
+    const response = await apiClient.get('/auth/memberships');
+    return response.data.data;
+  },
+  /** Switch active membership (multi-tenant / multi-branch users) */
+  switchMembership: async (membershipId: string) => {
+    const response = await apiClient.post('/auth/switch-membership', { membershipId });
+    const result = response.data.data;
+    if (result.accessToken) {
+      setAccessToken(result.accessToken);
+    }
+    return result;
   },
 };

@@ -4,6 +4,7 @@ import { History, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button, PageLoader, EmptyState, Select, Badge } from '../components/ui';
 import { auditApi } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 interface AuditLog {
   id: string;
@@ -26,7 +27,7 @@ const actionColor = (action: string): string => {
   if (action.includes('delete') || action.includes('disable')) return 'text-red-600';
   if (action.includes('create')) return 'text-blue-600';
   if (action.includes('update') || action.includes('change')) return 'text-yellow-600';
-  return 'text-gray-600';
+  return 'text-[var(--text-secondary)]';
 };
 
 export default function AuditLogsPage() {
@@ -112,16 +113,18 @@ export default function AuditLogsPage() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <History className="w-6 h-6" /> {t('audit.title')}
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('audit.entries', { count: pagination.total })}
           </p>
         </div>
-        <Button onClick={handleLoad} loading={loading}>
+        <Can permission="audit.view">
+          <Button onClick={handleLoad} loading={loading}>
           {t('audit.title')}
         </Button>
+        </Can>
       </div>
 
-      <div className="bg-white border rounded-lg p-4 dark:bg-gray-900 dark:border-gray-800">
+      <div className="bg-[var(--surface)] border rounded-lg p-4 dark:bg-[var(--background)] dark:border-gray-800">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <Select
@@ -161,25 +164,25 @@ export default function AuditLogsPage() {
         />
       ) : (
         <>
-          <div className="overflow-x-auto bg-white border rounded-lg">
+          <div className="overflow-x-auto bg-[var(--surface)] border rounded-lg">
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('audit.time')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('audit.action')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('audit.user')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('audit.entity')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('audit.ipAddress')}</th>
+                <tr className="border-b bg-[var(--surface-secondary)]">
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('audit.time')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('audit.action')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('audit.user')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('audit.entity')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('audit.ipAddress')}</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log) => (
                   <tr
                     key={log.id}
-                    className="border-b last:border-b-0 hover:bg-gray-50 cursor-pointer"
+                    className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)] cursor-pointer"
                     onClick={() => toggleSelect(log)}
                   >
-                    <td className="p-3 text-xs text-gray-500">
+                    <td className="p-3 text-xs text-[var(--text-muted)]">
                       {new Date(log.created_at).toLocaleString()}
                     </td>
                     <td className="p-3">
@@ -187,7 +190,7 @@ export default function AuditLogsPage() {
                         {sanitizeString(log.action)}
                       </span>
                     </td>
-                    <td className="p-3 text-sm font-mono text-gray-600">
+                    <td className="p-3 text-sm font-mono text-[var(--text-secondary)]">
                       {log.user_id ? sanitizeString(log.user_id.substring(0, 8)) + '...' : '—'}
                     </td>
                     <td className="p-3">
@@ -200,7 +203,7 @@ export default function AuditLogsPage() {
                         '—'
                       )}
                     </td>
-                    <td className="p-3 text-xs text-gray-500">
+                    <td className="p-3 text-xs text-[var(--text-muted)]">
                       {log.ip_address ? sanitizeString(log.ip_address) : '—'}
                     </td>
                   </tr>
@@ -210,9 +213,9 @@ export default function AuditLogsPage() {
           </div>
 
           {selected && (
-            <div className="bg-white border rounded-lg p-4 dark:bg-gray-900 dark:border-gray-800">
+            <div className="bg-[var(--surface)] border rounded-lg p-4 dark:bg-[var(--background)] dark:border-gray-800">
               <h3 className="font-semibold mb-2">{t('audit.action')}: {sanitizeString(selected.action)}</h3>
-              <pre className="text-xs text-gray-600 bg-gray-50 p-3 rounded overflow-x-auto">
+              <pre className="text-xs text-[var(--text-secondary)] bg-[var(--surface-secondary)] p-3 rounded overflow-x-auto">
                 {JSON.stringify(selected.details || {}, null, 2)}
               </pre>
             </div>
@@ -220,7 +223,7 @@ export default function AuditLogsPage() {
 
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[var(--text-muted)]">
                 {t('audit.pageOf', { current: currentPage, total: pagination.totalPages })}
               </p>
               <div className="flex gap-2">

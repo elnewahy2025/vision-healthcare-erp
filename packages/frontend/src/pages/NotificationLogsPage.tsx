@@ -4,6 +4,7 @@ import { MessageSquare, ChevronLeft, ChevronRight, CheckCircle, XCircle } from '
 import { Button, PageLoader, EmptyState, Badge } from '../components/ui';
 import { communicationsApi } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 interface NotificationLog {
   id: string;
@@ -61,9 +62,11 @@ export default function NotificationLogsPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <MessageSquare className="w-6 h-6" /> {t('notifLog.title')}
         </h1>
-        <Button onClick={handleLoad} loading={loading}>
+        <Can permission="notifications.view">
+          <Button onClick={handleLoad} loading={loading}>
           {t('notifLog.title')}
         </Button>
+        </Can>
       </div>
 
       {loading ? (
@@ -76,21 +79,21 @@ export default function NotificationLogsPage() {
         />
       ) : (
         <>
-          <div className="overflow-x-auto bg-white border rounded-lg">
+          <div className="overflow-x-auto bg-[var(--surface)] border rounded-lg">
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('notifLog.time')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('notifLog.channel')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('notifLog.recipient')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('notifLog.template')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('notifLog.status')}</th>
+                <tr className="border-b bg-[var(--surface-secondary)]">
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('notifLog.time')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('notifLog.channel')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('notifLog.recipient')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('notifLog.template')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('notifLog.status')}</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log) => (
-                  <tr key={log.id} className="border-b last:border-b-0 hover:bg-gray-50">
-                    <td className="p-3 text-xs text-gray-500">
+                  <tr key={log.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
+                    <td className="p-3 text-xs text-[var(--text-muted)]">
                       {new Date(log.created_at).toLocaleString()}
                     </td>
                     <td className="p-3">
@@ -99,7 +102,7 @@ export default function NotificationLogsPage() {
                       </Badge>
                     </td>
                     <td className="p-3 text-sm">{sanitizeString(log.recipient)}</td>
-                    <td className="p-3 text-xs font-mono text-gray-500">
+                    <td className="p-3 text-xs font-mono text-[var(--text-muted)]">
                       {log.template_key ? sanitizeString(log.template_key) : '—'}
                     </td>
                     <td className="p-3">
@@ -117,7 +120,7 @@ export default function NotificationLogsPage() {
 
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[var(--text-muted)]">
                 {t('notifLog.pageOf', {
                   current: currentPage,
                   total: pagination.totalPages,

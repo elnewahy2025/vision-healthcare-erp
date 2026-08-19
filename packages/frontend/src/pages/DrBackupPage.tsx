@@ -22,6 +22,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 type TabType = 'backups' | 'configs' | 'dr';
 
@@ -132,9 +133,11 @@ export default function DrBackupPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <HardDrive className="w-6 h-6" /> {t('dr.title')}
         </h1>
-        <Button onClick={handleRunBackup} loading={runningBackup}>
+        <Can permission="dr_backup.create">
+          <Button onClick={handleRunBackup} loading={runningBackup}>
           <RefreshCw className="w-4 h-4 mr-1" /> {t('dr.runBackup')}
         </Button>
+        </Can>
       </div>
 
       {/* Tabs */}
@@ -163,17 +166,17 @@ export default function DrBackupPage() {
 
       {/* Backups Tab */}
       {tab === 'backups' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('dr.configName')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('dr.type')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('dr.status')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('dr.size')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('dr.checksum')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('dr.trigger')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('dr.started')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('dr.configName')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('dr.type')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('dr.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('dr.size')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('dr.checksum')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('dr.trigger')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('dr.started')}</th>
               </tr>
             </thead>
             <tbody>
@@ -189,7 +192,7 @@ export default function DrBackupPage() {
                 </tr>
               ) : (
                 backups.map((b) => (
-                  <tr key={b.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={b.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3 text-sm font-medium">
                       {b.configName ? escapeHtml(b.configName) : t('dr.manual')}
                     </td>
@@ -227,12 +230,12 @@ export default function DrBackupPage() {
               />
             ) : (
               configs.map((c) => (
-                <div key={c.id} className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+                <div key={c.id} className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-semibold text-sm">{escapeHtml(c.name)}</h3>
                     <Badge>{escapeHtml(c.type)}</Badge>
                   </div>
-                  <div className="space-y-1 text-xs text-gray-500">
+                  <div className="space-y-1 text-xs text-[var(--text-muted)]">
                     <p>
                       {t('dr.schedule')}: <code className="font-mono">{escapeHtml(c.schedule)}</code>
                     </p>
@@ -259,56 +262,56 @@ export default function DrBackupPage() {
         <div>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-              <p className="text-sm text-gray-500">{t('dr.status')}</p>
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+              <p className="text-sm text-[var(--text-muted)]">{t('dr.status')}</p>
               <p className="text-xl font-bold">
                 <Badge variant={drConfig?.status === 'healthy' ? 'success' : 'danger'}>
                   {drConfig?.status ? escapeHtml(drConfig.status) : t('dr.notConfigured')}
                 </Badge>
               </p>
             </div>
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-              <p className="text-sm text-gray-500">{t('dr.rpo')}</p>
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+              <p className="text-sm text-[var(--text-muted)]">{t('dr.rpo')}</p>
               <p className="text-xl font-bold">{drConfig?.rpoMinutes ?? 60} min</p>
-              <p className="text-xs text-gray-400">{t('dr.rpoDesc')}</p>
+              <p className="text-xs text-[var(--text-disabled)]">{t('dr.rpoDesc')}</p>
             </div>
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-              <p className="text-sm text-gray-500">{t('dr.rto')}</p>
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+              <p className="text-sm text-[var(--text-muted)]">{t('dr.rto')}</p>
               <p className="text-xl font-bold">{drConfig?.rtoMinutes ?? 120} min</p>
-              <p className="text-xs text-gray-400">{t('dr.rtoDesc')}</p>
+              <p className="text-xs text-[var(--text-disabled)]">{t('dr.rtoDesc')}</p>
             </div>
           </div>
 
           {/* DR Configuration Details */}
-          <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800 mb-4">
+          <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800 mb-4">
             <h3 className="font-semibold mb-3">{t('dr.drConfiguration')}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-gray-500">{t('dr.failover')}</p>
+                <p className="text-[var(--text-muted)]">{t('dr.failover')}</p>
                 <p className="font-medium capitalize">
                   {drConfig?.failoverStrategy ? escapeHtml(drConfig.failoverStrategy) : t('dr.manual')}
                 </p>
               </div>
               <div>
-                <p className="text-gray-500">{t('dr.replicationRegion')}</p>
+                <p className="text-[var(--text-muted)]">{t('dr.replicationRegion')}</p>
                 <p className="font-medium">
                   {drConfig?.replicationRegion ? escapeHtml(drConfig.replicationRegion) : 'auto'}
                 </p>
               </div>
               <div>
-                <p className="text-gray-500">{t('dr.crossRegion')}</p>
+                <p className="text-[var(--text-muted)]">{t('dr.crossRegion')}</p>
                 <p className="font-medium">
                   {drConfig?.crossRegionReplication ? t('dr.enabled') : t('dr.disabled')}
                 </p>
               </div>
               <div>
-                <p className="text-gray-500">{t('dr.secondaryRegion')}</p>
+                <p className="text-[var(--text-muted)]">{t('dr.secondaryRegion')}</p>
                 <p className="font-medium">
                   {drConfig?.secondaryRegion ? escapeHtml(drConfig.secondaryRegion) : '-'}
                 </p>
               </div>
               <div>
-                <p className="text-gray-500">{t('dr.lastDrTest')}</p>
+                <p className="text-[var(--text-muted)]">{t('dr.lastDrTest')}</p>
                 <p className="font-medium">
                   {formatDateTime(drConfig?.lastDrTestAt) || t('dr.never')}
                 </p>

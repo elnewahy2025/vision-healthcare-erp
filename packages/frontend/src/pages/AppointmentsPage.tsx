@@ -8,6 +8,7 @@ import { confirmDialog } from '../components/ui';
 import { Plus, Loader2, CalendarCheck, CheckCircle2, Ban } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate } from '../lib/format';
+import { Can } from '../components/Can';
 
 interface AppointmentFormData {
   patientId: string;
@@ -170,11 +171,13 @@ export default function AppointmentsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('appointment.title')}</h1>
-          <p className="text-gray-500 mt-1">{pagination.total} appointments</p>
+          <p className="text-[var(--text-muted)] mt-1">{pagination.total} appointments</p>
         </div>
-        <button onClick={() => setShowNewModal(true)} className="btn-primary">
-          <Plus className="w-4 h-4" />{t('appointment.new')}
-        </button>
+        <Can permission="appointments.create">
+          <button onClick={() => setShowNewModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />{t('appointment.new')}
+          </button>
+        </Can>
       </div>
 
       <div className="card mb-6">
@@ -208,19 +211,19 @@ export default function AppointmentsPage() {
           </thead>
           <tbody>
             {appointments.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-12 text-gray-500">{t('common.noData')}</td></tr>
+              <tr><td colSpan={7} className="text-center py-12 text-[var(--text-muted)]">{t('common.noData')}</td></tr>
             ) : appointments.map(a => (
-              <tr key={a.id} className="hover:bg-gray-50">
-                <td><p className="font-medium">{a.patientName}</p><p className="text-xs text-gray-500 font-mono">{a.patientMrn}</p></td>
+              <tr key={a.id} className="hover:bg-[var(--surface-secondary)]">
+                <td><p className="font-medium">{a.patientName}</p><p className="text-xs text-[var(--text-muted)] font-mono">{a.patientMrn}</p></td>
                 <td>{formatDate(a.appointmentDate) || '-'}</td><td>{a.startTime} - {a.endTime}</td>
                 <td><span className="badge-info">{a.type}</span></td>
                 <td>{a.doctorName || '-'}</td>
                 <td><span className={statusBadge(a.status)}>{a.status}</span></td>
                 <td>
                   <div className="flex flex-wrap gap-1">
-                    {(a.status === 'scheduled' || a.status === 'confirmed') && <button onClick={() => handleCheckIn(a.id)} className="btn-ghost btn-sm"><CalendarCheck className="w-3.5 h-3.5" />{t('appointment.status.checkedIn')}</button>}
-                    {a.status === 'checked_in' && <button onClick={() => handleComplete(a.id)} className="btn-ghost btn-sm text-green-600"><CheckCircle2 className="w-3.5 h-3.5" />{t('appointment.status.completed')}</button>}
-                    {(a.status === 'scheduled' || a.status === 'confirmed') && <button onClick={() => handleCancel(a.id)} className="btn-ghost btn-sm text-red-600"><Ban className="w-3.5 h-3.5" />{t('appointment.status.cancelled')}</button>}
+                    {(a.status === 'scheduled' || a.status === 'confirmed') && <Can permission="appointments.update"><button onClick={() => handleCheckIn(a.id)} className="btn-ghost btn-sm"><CalendarCheck className="w-3.5 h-3.5" />{t('appointment.status.checkedIn')}</button></Can>}
+                    {a.status === 'checked_in' && <Can permission="appointments.update"><button onClick={() => handleComplete(a.id)} className="btn-ghost btn-sm text-green-600"><CheckCircle2 className="w-3.5 h-3.5" />{t('appointment.status.completed')}</button></Can>}
+                    {(a.status === 'scheduled' || a.status === 'confirmed') && <Can permission="appointments.cancel"><button onClick={() => handleCancel(a.id)} className="btn-ghost btn-sm text-red-600"><Ban className="w-3.5 h-3.5" />{t('appointment.status.cancelled')}</button></Can>}
                   </div>
                 </td>
               </tr>
@@ -232,7 +235,7 @@ export default function AppointmentsPage() {
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary btn-sm">←</button>
-          <span className="text-sm text-gray-600">Page {page} / {pagination.totalPages}</span>
+          <span className="text-sm text-[var(--text-secondary)]">Page {page} / {pagination.totalPages}</span>
           <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page === pagination.totalPages} className="btn-secondary btn-sm">→</button>
         </div>
       )}
@@ -290,7 +293,7 @@ export default function AppointmentsPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('appointment.reason')}</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('appointment.reason')}</label>
             <textarea className="input" rows={2} value={newAppointment.reason}
               onChange={e => setNewAppointment(prev => ({ ...prev, reason: e.target.value }))} />
           </div>
@@ -299,13 +302,13 @@ export default function AppointmentsPage() {
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={newAppointment.isWalkIn}
                 onChange={e => setNewAppointment(prev => ({ ...prev, isWalkIn: e.target.checked }))}
-                className="rounded border-gray-300 text-primary-600" />
+                className="rounded border-[var(--border-strong)] text-primary-600" />
               <span className="text-sm">{t('appointment.walkIn')}</span>
             </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={newAppointment.isVirtual}
                 onChange={e => setNewAppointment(prev => ({ ...prev, isVirtual: e.target.checked }))}
-                className="rounded border-gray-300 text-primary-600" />
+                className="rounded border-[var(--border-strong)] text-primary-600" />
               <span className="text-sm">{t('appointment.virtual')}</span>
             </label>
           </div>

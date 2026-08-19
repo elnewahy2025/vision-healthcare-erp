@@ -8,6 +8,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 interface Session {
   id: string;
@@ -100,7 +101,7 @@ export default function SessionsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('sessions.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('sessions.sessionCount', { count: sessions.length })}
           </p>
         </div>
@@ -109,25 +110,25 @@ export default function SessionsPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardBody>
-            <p className="text-sm text-gray-500">{t('sessions.activeSessions')}</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('sessions.activeSessions')}</p>
             <p className="text-2xl font-bold">{securityInfo?.activeSessions ?? 0}</p>
           </CardBody>
         </Card>
         <Card>
           <CardBody>
-            <p className="text-sm text-gray-500">{t('sessions.lastLogin')}</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('sessions.lastLogin')}</p>
             <p className="text-sm font-medium">{formatDate(securityInfo?.lastLogin ?? '')}</p>
           </CardBody>
         </Card>
         <Card>
           <CardBody>
-            <p className="text-sm text-gray-500">{t('sessions.lastIp')}</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('sessions.lastIp')}</p>
             <p className="text-sm font-mono">{sanitizeString(securityInfo?.lastIp ?? t('sessions.na'))}</p>
           </CardBody>
         </Card>
         <Card>
           <CardBody>
-            <p className="text-sm text-gray-500">{t('sessions.device')}</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('sessions.device')}</p>
             <p className="text-sm font-medium capitalize">{sanitizeString(securityInfo?.lastDevice ?? t('sessions.na'))}</p>
           </CardBody>
         </Card>
@@ -142,9 +143,11 @@ export default function SessionsPage() {
                 {t('sessions.otherSessions', { count: sessions.length - 1 })}
               </span>
             </div>
+            <Can permission="sessions.manage">
             <Button variant="ghost" size="sm" onClick={handleLogoutOthers} loading={loggingOutOthers}>
               <LogOut className="w-3 h-3" /> {t('sessions.logoutOthers')}
             </Button>
+          </Can>
           </CardBody>
         </Card>
       )}
@@ -158,11 +161,11 @@ export default function SessionsPage() {
               <CardBody>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="p-2 bg-gray-100 rounded-lg">
+                    <div className="p-2 bg-[var(--surface-hover)] rounded-lg">
                       {s.device === 'mobile' ? (
-                        <Smartphone className="w-5 h-5 text-gray-500" />
+                        <Smartphone className="w-5 h-5 text-[var(--text-muted)]" />
                       ) : (
-                        <Monitor className="w-5 h-5 text-gray-500" />
+                        <Monitor className="w-5 h-5 text-[var(--text-muted)]" />
                       )}
                     </div>
                     <div>
@@ -172,11 +175,11 @@ export default function SessionsPage() {
                         </span>
                         {s.isCurrent && <Badge variant="success">{t('sessions.current')}</Badge>}
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">
                         <Globe className="w-3 h-3 inline mr-1" />
                         {sanitizeString(s.ipAddress)} · {sanitizeString(s.userAgent?.substring(0, 60) ?? '')}
                       </p>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                      <div className="flex items-center gap-3 mt-1 text-xs text-[var(--text-disabled)]">
                         <span><Clock className="w-3 h-3 inline mr-1" />{t('sessions.activeLabel')}: {formatDate(s.lastActivityAt)}</span>
                         <span>{t('sessions.createdLabel')}: {formatDate(s.createdAt)}</span>
                         <span>{t('sessions.expiresLabel')}: {formatDate(s.expiresAt)}</span>

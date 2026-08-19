@@ -5,18 +5,19 @@ import { FileUpload, ImageViewer, Button, Select, Modal, EmptyState, PageLoader 
 import { FileText, Search, Download, Trash2, Eye, Image as ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate } from '../lib/format';
+import { Can } from '../components/Can';
 
 const CATEGORY_COLORS: Record<string, string> = {
   lab_report: 'bg-blue-100 text-blue-800',
   radiology_report: 'bg-purple-100 text-purple-800',
   prescription: 'bg-green-100 text-green-800',
   consent: 'bg-yellow-100 text-yellow-800',
-  id_scan: 'bg-gray-100 text-gray-800',
+  id_scan: 'bg-[var(--surface-hover)] text-[var(--text-primary)]',
   insurance: 'bg-blue-100 text-blue-800',
   medical_record: 'bg-indigo-100 text-indigo-800',
   discharge_summary: 'bg-orange-100 text-orange-800',
   referral: 'bg-teal-100 text-teal-800',
-  other: 'bg-gray-100 text-gray-800',
+  other: 'bg-[var(--surface-hover)] text-[var(--text-primary)]',
 };
 
 function formatSize(bytes: number): string {
@@ -105,16 +106,18 @@ export default function DmsPage() {
           <h1 className="page-title flex items-center gap-2">
             <FileText className="w-6 h-6" /> {t('dms.title')}
           </h1>
-          <p className="text-gray-500 mt-1">{t('dms.files', { count: documents.length })}</p>
+          <p className="text-[var(--text-muted)] mt-1">{t('dms.files', { count: documents.length })}</p>
         </div>
-        <Button icon={<FileText className="w-4 h-4" />} onClick={() => setShowUpload(!showUpload)}>
+        <Can permission="documents.create">
+          <Button icon={<FileText className="w-4 h-4" />} onClick={() => setShowUpload(!showUpload)}>
           {showUpload ? t('dms.closeUpload') : t('dms.uploadFile')}
         </Button>
+        </Can>
       </div>
 
       {/* Upload Area */}
       {showUpload && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 mb-6">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 mb-6">
           <FileUpload onUpload={handleUpload} categories={categories} showPatientSelect />
         </div>
       )}
@@ -122,7 +125,7 @@ export default function DmsPage() {
       {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-disabled)]" />
           <input
             className="input pl-10"
             placeholder={t('dms.searchPlaceholder')}
@@ -141,27 +144,27 @@ export default function DmsPage() {
       {/* Document Grid */}
       {documents.length === 0 ? (
         <EmptyState
-          icon={<FileText className="w-8 h-8 text-gray-400" />}
+          icon={<FileText className="w-8 h-8 text-[var(--text-disabled)]" />}
           title={t('dms.noDocuments')}
           message={t('common.noData')}
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {documents.map((doc) => (
-            <div key={doc.id} className="rounded-xl border border-gray-200 bg-white p-4 hover:shadow-md transition-shadow">
+            <div key={doc.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 hover:shadow-md transition-shadow">
               <div className="flex items-start gap-3">
                 {doc.mimeType?.startsWith('image/') ? (
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
                     <ImageIcon className="w-6 h-6 text-blue-600" />
                   </div>
                 ) : (
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-                    <FileText className="w-6 h-6 text-gray-600" />
+                  <div className="w-12 h-12 bg-[var(--surface-hover)] rounded-lg flex items-center justify-center shrink-0">
+                    <FileText className="w-6 h-6 text-[var(--text-secondary)]" />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{doc.title}</p>
-                  <p className="text-xs text-gray-500 truncate">{doc.fileName}</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">{doc.title}</p>
+                  <p className="text-xs text-[var(--text-muted)] truncate">{doc.fileName}</p>
                 </div>
               </div>
 
@@ -170,13 +173,13 @@ export default function DmsPage() {
                   {categoryLabel(doc.category)}
                 </span>
                 {doc.version > 1 && (
-                  <span className="text-xs text-gray-400">{t('dms.version', { version: doc.version })}</span>
+                  <span className="text-xs text-[var(--text-disabled)]">{t('dms.version', { version: doc.version })}</span>
                 )}
-                <span className="text-xs text-gray-400 ml-auto">{formatSize(doc.fileSize)}</span>
+                <span className="text-xs text-[var(--text-disabled)] ml-auto">{formatSize(doc.fileSize)}</span>
               </div>
 
               {doc.patientName && (
-                <p className="text-xs text-gray-500 mt-1">{t('dms.patient')}: {doc.patientName}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">{t('dms.patient')}: {doc.patientName}</p>
               )}
 
               <div className="flex gap-1 mt-3">
@@ -196,7 +199,7 @@ export default function DmsPage() {
                 />
               </div>
 
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs text-[var(--text-disabled)] mt-2">
                 {formatDate(doc.createdAt)}
               </p>
             </div>
@@ -219,7 +222,7 @@ export default function DmsPage() {
           </>
         }
       >
-        <p className="text-gray-700">{t('dms.deleteConfirm')}</p>
+        <p className="text-[var(--text-primary)]">{t('dms.deleteConfirm')}</p>
       </Modal>
 
       {/* Image/File Viewer */}

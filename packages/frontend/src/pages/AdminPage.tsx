@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Shield, Users, Database, Settings, Key, Activity, UserCog } from 'lucide-react';
 import { Card, CardBody } from '../components/ui';
 import { useAuth } from '../stores/authStore';
+import { Can } from '../components/Can';
 
 interface AdminSection {
   titleKey: string;
@@ -39,7 +40,7 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">{t('admin.title')}</h1>
+      <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('admin.title')}</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {visibleSections.map((s) => (
           <Card
@@ -52,9 +53,9 @@ export default function AdminPage() {
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <s.icon className="w-5 h-5 text-blue-600" />
                 </div>
-                <h3 className="font-semibold text-gray-900">{t(s.titleKey)}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)]">{t(s.titleKey)}</h3>
               </div>
-              <p className="text-sm text-gray-500">{t(s.descKey)}</p>
+              <p className="text-sm text-[var(--text-muted)]">{t(s.descKey)}</p>
             </CardBody>
           </Card>
         ))}

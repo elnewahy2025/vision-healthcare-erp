@@ -58,12 +58,12 @@ export default function LoginPage() {
 
   if (mfaRequired) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--surface-secondary)] flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <Smartphone className="w-12 h-12 text-primary-600 mx-auto mb-3" />
-            <h1 className="text-2xl font-bold text-gray-900">Two-Factor Authentication</h1>
-            <p className="text-sm text-gray-500 mt-1">Enter the code from your authenticator app</p>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Two-Factor Authentication</h1>
+            <p className="text-sm text-[var(--text-muted)] mt-1">Enter the code from your authenticator app</p>
           </div>
           <div className="card p-6 text-center">
             <input className="input text-center text-2xl tracking-[1em] max-w-[200px] mx-auto font-mono"
@@ -73,7 +73,7 @@ export default function LoginPage() {
             <button onClick={handleMfaVerify} disabled={loading || mfaCode.length !== 6} className="btn-primary w-full mt-4">
               {loading && <Loader2 className="w-4 h-4 animate-spin" />} Verify
             </button>
-            <p className="text-xs text-gray-400 mt-3">Lost access? Contact your administrator.</p>
+            <p className="text-xs text-[var(--text-disabled)] mt-3">Lost access? Contact your administrator.</p>
           </div>
         </div>
       </div>
@@ -81,14 +81,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[var(--surface-secondary)] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="w-14 h-14 bg-primary-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <Stethoscope className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('app.name')}</h1>
-          <p className="text-sm text-gray-500 mt-1">Sign in to your healthcare platform</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('app.name')}</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Sign in to your healthcare platform</p>
         </div>
         <form onSubmit={handleLogin} className="card p-6 space-y-4">
           <div>
@@ -108,7 +108,7 @@ export default function LoginPage() {
                 placeholder="••••••••" value={password}
                 onChange={e => setPassword(e.target.value)} required />
               <button type="button" onClick={() => setShowPwd(!showPwd)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-disabled)]">
                 {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
@@ -119,10 +119,10 @@ export default function LoginPage() {
           <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading && <Loader2 className="w-4 h-4 animate-spin" />} {t('auth.login')}
           </button>
-          <p className="text-center text-sm text-gray-500">
+          <p className="text-center text-sm text-[var(--text-muted)]">
             Don't have an account? <Link to="/register" className="text-primary-600 hover:underline font-medium">Register</Link>
           </p>
-          <p className="text-center text-sm text-gray-500 border-t border-gray-100 pt-3">
+          <p className="text-center text-sm text-[var(--text-muted)] border-t border-[var(--border)] pt-3">
             <Link to="/portal" className="text-primary-600 hover:underline font-medium">Patient portal →</Link>
           </p>
         </form>

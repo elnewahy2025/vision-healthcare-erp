@@ -27,6 +27,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 type TabType = 'reports' | 'schedules' | 'executions';
 
@@ -266,13 +267,15 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">{t('reports.title')}</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[var(--text-muted)] mt-1">
             {t('reports.reportCount', { count: reports.length })}
           </p>
         </div>
         {tab === 'reports' && (
           <Button onClick={() => { setShowReportModal(true); setFormErrors({}); }}>
+            <Can permission="reports.create">
             <Plus className="w-4 h-4 mr-1" /> {t('reports.newReport')}
+          </Can>
           </Button>
         )}
       </div>
@@ -315,16 +318,16 @@ export default function ReportsPage() {
 
       {/* Reports Tab */}
       {tab === 'reports' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.name')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.category')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.columns')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.formats')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.scheduled')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.actions')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.name')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.category')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.columns')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.formats')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.scheduled')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -340,11 +343,11 @@ export default function ReportsPage() {
                 </tr>
               ) : (
                 filteredReports.map((r) => (
-                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3 text-sm font-medium">{escapeHtml(r.name)}</td>
                     <td className="p-3"><Badge>{escapeHtml(r.category)}</Badge></td>
                     <td className="p-3 text-sm">{r.columns?.length ?? 0}</td>
-                    <td className="p-3 text-sm text-gray-500">
+                    <td className="p-3 text-sm text-[var(--text-muted)]">
                       {(r.exportFormats ?? []).join(', ')}
                     </td>
                     <td className="p-3">
@@ -387,16 +390,16 @@ export default function ReportsPage() {
 
       {/* Schedules Tab */}
       {tab === 'schedules' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.name')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.cron')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.formats')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.recipients')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.status')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.nextRun')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.name')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.cron')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.formats')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.recipients')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.nextRun')}</th>
               </tr>
             </thead>
             <tbody>
@@ -412,13 +415,13 @@ export default function ReportsPage() {
                 </tr>
               ) : (
                 schedules.map((s) => (
-                  <tr key={s.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={s.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3 text-sm font-medium">
                       {selectedReport ? escapeHtml(selectedReport.name) : '-'}
                     </td>
-                    <td className="p-3 text-sm font-mono text-gray-500">{escapeHtml(s.cron)}</td>
+                    <td className="p-3 text-sm font-mono text-[var(--text-muted)]">{escapeHtml(s.cron)}</td>
                     <td className="p-3"><Badge>{escapeHtml(s.format)}</Badge></td>
-                    <td className="p-3 text-sm text-gray-500">
+                    <td className="p-3 text-sm text-[var(--text-muted)]">
                       {(s.recipients ?? []).join(', ') || '-'}
                     </td>
                     <td className="p-3">
@@ -426,7 +429,7 @@ export default function ReportsPage() {
                         {s.isActive ? t('reports.active') : t('reports.paused')}
                       </Badge>
                     </td>
-                    <td className="p-3 text-sm text-gray-500">
+                    <td className="p-3 text-sm text-[var(--text-muted)]">
                       {s.nextRunAt ?? '-'}
                     </td>
                   </tr>
@@ -439,17 +442,17 @@ export default function ReportsPage() {
 
       {/* Executions Tab */}
       {tab === 'executions' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.name')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.status')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.formats')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.rowCount')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.trigger')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('reports.started')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.actions')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.name')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.formats')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.rowCount')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.trigger')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('reports.started')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -465,7 +468,7 @@ export default function ReportsPage() {
                 </tr>
               ) : (
                 executions.map((e) => (
-                  <tr key={e.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={e.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3 text-sm font-medium">
                       {selectedReport ? escapeHtml(selectedReport.name) : '-'}
                     </td>
@@ -485,7 +488,7 @@ export default function ReportsPage() {
                     <td className="p-3"><Badge>{escapeHtml(e.format)}</Badge></td>
                     <td className="p-3 text-sm">{e.rowCount.toLocaleString()}</td>
                     <td className="p-3"><Badge>{escapeHtml(e.trigger)}</Badge></td>
-                    <td className="p-3 text-sm text-gray-500">
+                    <td className="p-3 text-sm text-[var(--text-muted)]">
                       {formatDateTime(e.startedAt) || '-'}
                     </td>
                     <td className="p-3">
@@ -558,7 +561,7 @@ export default function ReportsPage() {
                 {schedules.map((s) => (
                   <div
                     key={s.id}
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs mb-1"
+                    className="flex items-center justify-between p-2 bg-[var(--surface-secondary)] rounded text-xs mb-1"
                   >
                     <span>
                       <Clock className="w-3 h-3 inline mr-1" />

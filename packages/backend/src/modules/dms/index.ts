@@ -6,7 +6,7 @@ import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { uploadFile, getFile, deleteFile, isImage, isPdf } from '../../services/storage.js';
 import { logAudit } from '../../services/audit.js';
 import { authenticate } from '../auth-guard.js';
-import { authorize } from '../../services/authorization.js';
+import { authorize, hasPermission, type Principal } from '../../services/authorization.js';
 
 const CATEGORIES = ['lab_report', 'radiology_report', 'prescription', 'consent', 'id_scan', 'insurance', 'medical_record', 'discharge_summary', 'referral', 'other'];
 
@@ -29,7 +29,6 @@ interface DmsDocumentRow {
   deleted_at: Date | null;
   created_at: Date;
   updated_at: Date;
-  // Joined fields
   pf?: string;
   pl?: string;
 }
@@ -46,9 +45,26 @@ interface DmsDocumentVersionRow {
   created_at: Date;
 }
 
+/**
+ * Scope resolution for DMS module.
+ * Documents are patient-associated; filter through patients table for branch scope.
+ */
+function resolveDmsScope(principal: Principal): { denied: boolean; branchIds?: string[]; patientIds?: string[] } {
+  if (hasPermission(principal, 'documents.view', 'system') || hasPermission(principal, 'documents.view', 'tenant')) {
+    return { denied: false };
+  }
+  if (hasPermission(principal, 'documents.view', 'branch') || hasPermission(principal, 'documents.view', 'branches')) {
+    return { denied: false, branchIds: principal.branches };
+  }
+  if (hasPermission(principal, 'documents.view', 'department') || hasPermission(principal, 'documents.view', 'assigned_patients')) {
+    return { denied: false, patientIds: [] }; // Will be resolved per-query
+  }
+  return { denied: true, branchIds: [], patientIds: [] };
+}
+
 export async function registerDmsModule(app: FastifyInstance) {
 
-  // ==================== FILE UPLOAD (multipart) ====================
+  // ==================== FILE UPLOAD ====================
   app.post('/api/v1/dms/upload', { preHandler: [authenticate, authorize('documents.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
@@ -96,9 +112,12 @@ export async function registerDmsModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: doc.id, title: doc.title, fileName: doc.file_name, fileSize: doc.file_size, mimeType: doc.mime_type }, 'File uploaded', 201);
   });
 
-  // ==================== LIST DOCUMENTS ====================
+  // ==================== LIST DOCUMENTS (scope-enforced) ====================
   app.get('/api/v1/dms/documents', { preHandler: [authenticate, authorize('documents.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
+    const scope = resolveDmsScope(principal);
+
     const query = z.object({
       page: z.coerce.number().optional().default(1),
       limit: z.coerce.number().optional().default(20),
@@ -108,9 +127,21 @@ export async function registerDmsModule(app: FastifyInstance) {
     }).parse(request.query);
 
     const qb = db('documents').where('documents.tenant_id', tenantId).whereNull('documents.deleted_at');
+
+    // Apply scope filters
+    if (scope.denied) {
+      qb.where(db.raw('false'));
+    } else if (scope.branchIds !== undefined && scope.branchIds.length > 0) {
+      qb.whereIn('documents.patient_id', function () {
+        this.select('id').from('patients').whereIn('branch_id', scope.branchIds!);
+      });
+    } else if (scope.branchIds !== undefined && scope.branchIds.length === 0) {
+      qb.where(db.raw('false'));
+    }
+
     if (query.category) qb.andWhere('documents.category', query.category);
     if (query.patientId) qb.andWhere('documents.patient_id', query.patientId);
-    if (query.search) qb.andWhere(function() { this.where('title', 'ilike', `%${query.search}%`).orWhere('file_name', 'ilike', `%${query.search}%`); });
+    if (query.search) qb.andWhere(function () { this.where('title', 'ilike', `%${query.search}%`).orWhere('file_name', 'ilike', `%${query.search}%`); });
 
     const total = await qb.clone().count('id as count').first();
     const docs = await qb.leftJoin('patients', 'documents.patient_id', 'patients.id')
@@ -121,41 +152,50 @@ export async function registerDmsModule(app: FastifyInstance) {
     return sendPaginated(reply, docs.map((d: DmsDocumentRow) => ({
       id: d.id, title: d.title, category: d.category, fileName: d.file_name,
       fileType: d.file_type, fileSize: d.file_size, mimeType: d.mime_type,
-      patientId: d.patient_id, patientName: d.pf ? `${d.pf} ${d.pl}` : null,
-      status: d.status, version: d.version, description: d.description,
+      patientId: d.patient_id, patientName: d.pf && d.pl ? `${d.pf} ${d.pl}` : null,
+      description: d.description, status: d.status, version: d.version,
       uploadedBy: d.uploaded_by, createdAt: d.created_at,
+      isImage: isImage(d.mime_type || ''), isPdf: isPdf(d.mime_type || ''),
     })), Number((total as Record<string, unknown>)?.count || 0), query.page, query.limit);
   });
 
-  // ==================== GET SINGLE DOCUMENT ====================
-  app.get('/api/v1/dms/documents/:id', { preHandler: [authenticate, authorize('documents.edit')] }, async (request, reply) => {
+  // ==================== GET DOCUMENT ====================
+  app.get('/api/v1/dms/documents/:id', { preHandler: [authenticate, authorize('documents.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const doc = await db('documents').where({ id, tenant_id: tenantId }).whereNull('deleted_at').first();
     if (!doc) return reply.code(404).send({ error: 'Document not found' });
-
-    const versions = await db('document_versions').where({ document_id: id }).orderBy('version', 'desc');
     return sendSuccess(reply, {
       id: doc.id, title: doc.title, category: doc.category, fileName: doc.file_name,
       fileType: doc.file_type, fileSize: doc.file_size, mimeType: doc.mime_type,
-      storagePath: doc.storage_path, description: doc.description, status: doc.status,
-      version: doc.version, patientId: doc.patient_id, uploadedBy: doc.uploaded_by,
-      isImage: isImage(doc.mime_type), isPdf: isPdf(doc.mime_type),
-      createdAt: doc.created_at, updatedAt: doc.updated_at,
-      versions: versions.map((v: DmsDocumentVersionRow) => ({ id: v.id, version: v.version, fileName: v.file_name, fileSize: v.file_size, changeNotes: v.change_notes, createdAt: v.created_at })),
+      patientId: doc.patient_id, description: doc.description, status: doc.status,
+      version: doc.version, uploadedBy: doc.uploaded_by, createdAt: doc.created_at,
+      isImage: isImage(doc.mime_type || ''), isPdf: isPdf(doc.mime_type || ''),
     });
   });
 
-  // ==================== DOWNLOAD / VIEW FILE ====================
-  app.get('/api/v1/dms/files/:id/download', { preHandler: [authenticate, authorize('documents.download')] }, async (request, reply) => {
+  // ==================== GET VERSIONS ====================
+  app.get('/api/v1/dms/documents/:id/versions', { preHandler: [authenticate, authorize('documents.view')] }, async (request, reply) => {
+    const tenantId = getTenantId(request);
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const doc = await db('documents').where({ id, tenant_id: tenantId }).first();
+    if (!doc) return reply.code(404).send({ error: 'Document not found' });
+    const versions = await db('document_versions').where({ document_id: id }).orderBy('version', 'desc');
+    return sendSuccess(reply, versions.map((v: DmsDocumentVersionRow) => ({
+      id: v.id, documentId: v.document_id, version: v.version, fileName: v.file_name,
+      fileSize: v.file_size, changeNotes: v.change_notes, uploadedBy: v.uploaded_by,
+      createdAt: v.created_at,
+    })));
+  });
+
+  // ==================== VIEW FILE ====================
+  app.get('/api/v1/dms/files/:id/view', { preHandler: [authenticate, authorize('documents.download')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const doc = await db('documents').where({ id, tenant_id: tenantId }).whereNull('deleted_at').first();
     if (!doc) return reply.code(404).send({ error: 'File not found' });
-
     const file = await getFile(doc.storage_path);
     if (!file) return reply.code(404).send({ error: 'File not found on storage' });
-
     reply.header('Content-Type', file.mimeType);
     reply.header('Content-Disposition', `inline; filename="${doc.file_name}"`);
     reply.header('Content-Length', file.buffer.length);
@@ -168,10 +208,8 @@ export async function registerDmsModule(app: FastifyInstance) {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const doc = await db('documents').where({ id, tenant_id: tenantId }).whereNull('deleted_at').first();
     if (!doc) return reply.code(404).send({ error: 'File not found' });
-
     const file = await getFile(doc.storage_path);
     if (!file) return reply.code(404).send({ error: 'File not found on storage' });
-
     reply.header('Content-Type', file.mimeType);
     reply.header('Content-Disposition', `attachment; filename="${doc.file_name}"`);
     return reply.send(file.buffer);
@@ -202,7 +240,7 @@ export async function registerDmsModule(app: FastifyInstance) {
   });
 
   // ==================== DELETE DOCUMENT ====================
-  app.delete('/api/v1/dms/documents/:id', { preHandler: [authenticate, authorize('documents.edit')] }, async (request, reply) => {
+  app.delete('/api/v1/dms/documents/:id', { preHandler: [authenticate, authorize('documents.delete')] }, async (request, reply) => {
     const { tenantId, userId } = getCtx(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const doc = await db('documents').where({ id, tenant_id: tenantId }).first();

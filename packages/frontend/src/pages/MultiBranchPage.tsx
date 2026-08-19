@@ -8,6 +8,7 @@ import {
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 interface Branch {
   id: string;
@@ -214,12 +215,14 @@ export default function MultiBranchPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('branches.title')}</h1>
-          <p className="text-sm text-gray-500 mt-1">{t('branches.subtitle')}</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('branches.title')}</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">{t('branches.subtitle')}</p>
         </div>
-        <Button onClick={openCreate}>
+        <Can permission="branches.create">
+          <Button onClick={openCreate}>
           <Plus className="w-4 h-4" /> {t('branches.addBranch')}
         </Button>
+        </Can>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -227,7 +230,7 @@ export default function MultiBranchPage() {
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-lg"><Building2 className="w-5 h-5 text-blue-600" /></div>
-              <div><p className="text-sm text-gray-500">{t('branches.totalBranches')}</p><p className="text-xl font-bold">{branches.length}</p></div>
+              <div><p className="text-sm text-[var(--text-muted)]">{t('branches.totalBranches')}</p><p className="text-xl font-bold">{branches.length}</p></div>
             </div>
           </CardBody>
         </Card>
@@ -235,7 +238,7 @@ export default function MultiBranchPage() {
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-100 rounded-lg"><Building2 className="w-5 h-5 text-green-600" /></div>
-              <div><p className="text-sm text-gray-500">{t('branches.activeBranches')}</p><p className="text-xl font-bold">{branches.filter((b) => b.is_active).length}</p></div>
+              <div><p className="text-sm text-[var(--text-muted)]">{t('branches.activeBranches')}</p><p className="text-xl font-bold">{branches.filter((b) => b.is_active).length}</p></div>
             </div>
           </CardBody>
         </Card>
@@ -243,7 +246,7 @@ export default function MultiBranchPage() {
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-100 rounded-lg"><Users className="w-5 h-5 text-purple-600" /></div>
-              <div><p className="text-sm text-gray-500">{t('branches.totalPatients')}</p><p className="text-xl font-bold">{totalPatients}</p></div>
+              <div><p className="text-sm text-[var(--text-muted)]">{t('branches.totalPatients')}</p><p className="text-xl font-bold">{totalPatients}</p></div>
             </div>
           </CardBody>
         </Card>
@@ -251,7 +254,7 @@ export default function MultiBranchPage() {
           <CardBody className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-yellow-100 rounded-lg"><Users className="w-5 h-5 text-yellow-600" /></div>
-              <div><p className="text-sm text-gray-500">{t('branches.todayAppts')}</p><p className="text-xl font-bold">{totalAppts}</p></div>
+              <div><p className="text-sm text-[var(--text-muted)]">{t('branches.todayAppts')}</p><p className="text-xl font-bold">{totalAppts}</p></div>
             </div>
           </CardBody>
         </Card>
@@ -262,7 +265,7 @@ export default function MultiBranchPage() {
           <Input placeholder={t('branches.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <select
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          className="rounded-lg border border-[var(--border-strong)] px-3 py-2 text-sm"
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
         >
@@ -284,37 +287,37 @@ export default function MultiBranchPage() {
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary-100 rounded-lg"><Building2 className="w-5 h-5 text-primary-600" /></div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">{sanitizeString(b.name)}</h3>
-                      <p className="text-xs text-gray-500">{sanitizeString(b.code)}</p>
+                      <h3 className="font-semibold text-[var(--text-primary)]">{sanitizeString(b.name)}</h3>
+                      <p className="text-xs text-[var(--text-muted)]">{sanitizeString(b.code)}</p>
                     </div>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${TYPE_COLORS[b.type] ?? 'bg-gray-100 text-gray-700'}`}>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${TYPE_COLORS[b.type] ?? 'bg-[var(--surface-hover)] text-[var(--text-primary)]'}`}>
                     {sanitizeString(b.type)}
                   </span>
                 </div>
                 {b.address && (
-                  <p className="text-sm text-gray-600 flex items-center gap-1 mb-2">
+                  <p className="text-sm text-[var(--text-secondary)] flex items-center gap-1 mb-2">
                     <MapPin className="w-3.5 h-3.5" /> {sanitizeString(b.address)}, {sanitizeString(b.city ?? '')}, {sanitizeString(b.governorate ?? '')}
                   </p>
                 )}
                 {b.phone && (
-                  <p className="text-sm text-gray-600 flex items-center gap-1 mb-2">
+                  <p className="text-sm text-[var(--text-secondary)] flex items-center gap-1 mb-2">
                     <Phone className="w-3.5 h-3.5" /> {sanitizeString(b.phone)}
                   </p>
                 )}
-                {b.manager_name && <p className="text-sm text-gray-600 mb-2">{t('branches.manager')}: {sanitizeString(b.manager_name)}</p>}
-                <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-gray-100">
+                {b.manager_name && <p className="text-sm text-[var(--text-secondary)] mb-2">{t('branches.manager')}: {sanitizeString(b.manager_name)}</p>}
+                <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-[var(--border)]">
                   <div className="text-center">
                     <p className="text-lg font-bold text-blue-600">{b.patient_count ?? 0}</p>
-                    <p className="text-xs text-gray-500">{t('branches.patients')}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{t('branches.patients')}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-lg font-bold text-green-600">{b.today_appointments ?? 0}</p>
-                    <p className="text-xs text-gray-500">{t('branches.apptsToday')}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{t('branches.apptsToday')}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-lg font-bold text-yellow-600">{formatCurrency(b.total_revenue ?? 0)}</p>
-                    <p className="text-xs text-gray-500">{t('branches.revenue')}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{t('branches.revenue')}</p>
                   </div>
                 </div>
                 <div className="flex gap-2 mt-4">
@@ -366,7 +369,7 @@ export default function MultiBranchPage() {
 
       <Modal open={showDeleteModal} onClose={() => { setShowDeleteModal(false); setDeleteBranch(null); }} title={t('branches.delete')} size="sm">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">{t('branches.confirmDelete')}</p>
+          <p className="text-sm text-[var(--text-secondary)]">{t('branches.confirmDelete')}</p>
           <div className="flex gap-2">
             <Button variant="secondary" className="flex-1" onClick={() => { setShowDeleteModal(false); setDeleteBranch(null); }}>{t('branches.cancel')}</Button>
             <Button variant="danger" className="flex-1" onClick={handleDelete} loading={deleting}>{t('branches.delete')}</Button>

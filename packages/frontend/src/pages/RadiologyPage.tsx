@@ -4,6 +4,7 @@ import { apiClient as api } from '../lib/api';
 import { Modal, Input, Select, PatientSearchField } from '../components/ui';
 import { Plus, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 interface RadiologyOrderForm {
   patientId: string;
@@ -83,8 +84,11 @@ export default function RadiologyPage() {
   return (
     <div>
       <div className="page-header">
-        <div><h1 className="page-title">{t('radiology.title')}</h1><p className="text-gray-500 mt-1">{orders.length} orders</p></div>
-        <button onClick={() => setShowNewModal(true)} className="btn-primary"><Plus className="w-4 h-4" />{t('radiology.newOrder')}</button>
+        <div><h1 className="page-title">{t('radiology.title')}</h1><p className="text-[var(--text-muted)] mt-1">{orders.length} orders</p></div>
+        <Can permission="radiology.create">
+          <button onClick={() => setShowNewModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />{t('radiology.newOrder')}</button>
+        </Can>
       </div>
 
       <div className="card mb-6"><div className="card-body">
@@ -95,11 +99,11 @@ export default function RadiologyPage() {
         <table>
           <thead><tr><th>{t('radiology.orderNumber')}</th><th>{t('radiology.patient')}</th><th>{t('radiology.studyType')}</th><th>{t('radiology.bodyPart')}</th><th>{t('radiology.status')}</th><th>{t('radiology.priority')}</th><th>{t('radiology.date')}</th></tr></thead>
           <tbody>
-            {filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-12 text-gray-500">{t('radiology.noOrders')}</td></tr> :
+            {filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-12 text-[var(--text-muted)]">{t('radiology.noOrders')}</td></tr> :
               filtered.map(o => (
-                <tr key={o.id} className="hover:bg-gray-50">
+                <tr key={o.id} className="hover:bg-[var(--surface-secondary)]">
                   <td className="font-mono text-xs text-primary-600">{o.orderNumber}</td>
-                  <td><p className="font-medium">{o.patientName}</p><p className="text-xs text-gray-500 font-mono">{o.patientMrn}</p></td>
+                  <td><p className="font-medium">{o.patientName}</p><p className="text-xs text-[var(--text-muted)] font-mono">{o.patientMrn}</p></td>
                   <td><span className="badge-info">{o.studyType}</span></td>
                   <td>{o.bodyPart || '-'}</td>
                   <td><span className={`badge ${o.status === 'completed' ? 'badge-success' : 'badge-info'}`}>{o.status}</span></td>
@@ -150,7 +154,7 @@ export default function RadiologyPage() {
             ]} />
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('radiology.clinicalIndication')}</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('radiology.clinicalIndication')}</label>
             <textarea className="input" rows={3} placeholder="Reason for study, symptoms, relevant history..."
               value={newOrder.clinicalIndication}
               onChange={e => setNewOrder(prev => ({ ...prev, clinicalIndication: e.target.value }))} />

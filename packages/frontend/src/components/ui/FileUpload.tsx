@@ -41,7 +41,7 @@ export function FileUpload({ onUpload, categories = [], showPatientSelect, patie
   const fileIcon = (type: string) => {
     if (type.startsWith('image/')) return <ImageIcon className="w-5 h-5 text-blue-500" />;
     if (type === 'application/pdf') return <FileText className="w-5 h-5 text-red-500" />;
-    return <File className="w-5 h-5 text-gray-500" />;
+    return <File className="w-5 h-5 text-[var(--text-muted)]" />;
   };
 
   const handleUpload = async () => {
@@ -67,27 +67,27 @@ export function FileUpload({ onUpload, categories = [], showPatientSelect, patie
       {!selectedFile ? (
         <div
           className={clsx('border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
-            dragOver ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50')}
+            dragOver ? 'border-primary-500 bg-primary-50' : 'border-[var(--border-strong)] hover:border-gray-400 hover:bg-[var(--surface-secondary)]')}
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
         >
-          <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-700">Drop a file here or click to browse</p>
-          <p className="text-xs text-gray-500 mt-1">PDF, images, documents — up to 50MB</p>
+          <Upload className="w-10 h-10 text-[var(--text-disabled)] mx-auto mb-3" />
+          <p className="text-sm font-medium text-[var(--text-primary)]">Drop a file here or click to browse</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">PDF, images, documents — up to 50MB</p>
           <input ref={inputRef} type="file" className="hidden" onChange={handleSelect} />
         </div>
       ) : (
-        <div className="p-4 bg-gray-50 rounded-xl space-y-3">
+        <div className="p-4 bg-[var(--surface-secondary)] rounded-xl space-y-3">
           <div className="flex items-center gap-3">
             {fileIcon(selectedFile.type)}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{selectedFile.name}</p>
-              <p className="text-xs text-gray-500">{formatSize(selectedFile.size)}</p>
+              <p className="text-sm font-medium text-[var(--text-primary)] truncate">{selectedFile.name}</p>
+              <p className="text-xs text-[var(--text-muted)]">{formatSize(selectedFile.size)}</p>
             </div>
             <button onClick={() => setSelectedFile(null)} className="p-1 hover:bg-gray-200 rounded" disabled={uploading}>
-              <X className="w-4 h-4 text-gray-500" />
+              <X className="w-4 h-4 text-[var(--text-muted)]" />
             </button>
           </div>
           <input className="input" placeholder="Document title" value={title} onChange={e => setTitle(e.target.value)} />

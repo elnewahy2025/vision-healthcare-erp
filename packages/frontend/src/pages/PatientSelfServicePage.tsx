@@ -14,6 +14,7 @@ import { apiClient as api } from '../lib/api';
 import { sanitizeString, escapeHtml } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
 import { isValidDate, isFutureDate } from '../lib/validators';
+import { Can } from '../components/Can';
 
 const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 
@@ -413,7 +414,7 @@ export default function PatientSelfServicePage() {
       key: 'reason',
       header: t('selfService.reasonCol'),
       render: (item) => (
-        <span className="text-gray-600 truncate max-w-[200px] block">
+        <span className="text-[var(--text-secondary)] truncate max-w-[200px] block">
           {escapeHtml(item.reason || '-')}
         </span>
       ),
@@ -444,7 +445,7 @@ export default function PatientSelfServicePage() {
       key: 'notes',
       header: t('common.reason'),
       render: (item) => (
-        <span className="text-gray-600 truncate max-w-[200px] block">
+        <span className="text-[var(--text-secondary)] truncate max-w-[200px] block">
           {escapeHtml(item.notes || '-')}
         </span>
       ),
@@ -542,15 +543,15 @@ export default function PatientSelfServicePage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
           <User className="w-6 h-6 text-primary-600" />
           {t('selfService.title')}
         </h1>
-        <p className="text-sm text-gray-500 mt-1">{t('selfService.subtitle')}</p>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{t('selfService.subtitle')}</p>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-2">
+      <div className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-2">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -558,7 +559,7 @@ export default function PatientSelfServicePage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === tab.key
                 ? 'bg-primary-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {tab.icon}
@@ -580,12 +581,14 @@ export default function PatientSelfServicePage() {
                   {bookingSuccess ? (
                     <div className="text-center py-12">
                       <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">
                         {t('selfService.bookingSuccess')}
                       </h3>
-                      <Button onClick={resetBooking} className="mt-4">
+                      <Can permission="patient_self_service.view">
+          <Button onClick={resetBooking} className="mt-4">
                         {t('selfService.bookNow')}
                       </Button>
+        </Can>
                     </div>
                   ) : (
                     <>
@@ -597,16 +600,16 @@ export default function PatientSelfServicePage() {
                               className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
                                 step >= s.num
                                   ? 'bg-primary-600 text-white'
-                                  : 'bg-gray-200 text-gray-500'
+                                  : 'bg-gray-200 text-[var(--text-muted)]'
                               }`}
                             >
                               {s.num}
                             </div>
-                            <span className="ml-2 text-sm text-gray-600 hidden sm:inline">
+                            <span className="ml-2 text-sm text-[var(--text-secondary)] hidden sm:inline">
                               {s.label}
                             </span>
                             {idx < steps.length - 1 && (
-                              <ChevronRight className="w-4 h-4 text-gray-400 mx-2 hidden sm:block" />
+                              <ChevronRight className="w-4 h-4 text-[var(--text-disabled)] mx-2 hidden sm:block" />
                             )}
                           </div>
                         ))}
@@ -620,7 +623,7 @@ export default function PatientSelfServicePage() {
                           </h3>
                           {doctors.length === 0 ? (
                             <EmptyState
-                              icon={<Stethoscope className="w-8 h-8 text-gray-400" />}
+                              icon={<Stethoscope className="w-8 h-8 text-[var(--text-disabled)]" />}
                               title={t('selfService.noDoctors')}
                               message={t('selfService.loadDoctorsFailed')}
                             />
@@ -633,7 +636,7 @@ export default function PatientSelfServicePage() {
                                   className={`p-4 rounded-xl border-2 text-left transition-all ${
                                     selectedDoctorId === doc.id
                                       ? 'border-primary-600 bg-primary-50 shadow-md'
-                                      : 'border-gray-200 hover:border-gray-300'
+                                      : 'border-[var(--border)] hover:border-[var(--border-strong)]'
                                   }`}
                                 >
                                   <div className="flex items-center gap-3">
@@ -641,10 +644,10 @@ export default function PatientSelfServicePage() {
                                       <Stethoscope className="w-5 h-5 text-primary-600" />
                                     </div>
                                     <div>
-                                      <p className="font-medium text-gray-900">
+                                      <p className="font-medium text-[var(--text-primary)]">
                                         {escapeHtml(doc.name)}
                                       </p>
-                                      <p className="text-sm text-gray-500">
+                                      <p className="text-sm text-[var(--text-muted)]">
                                         {escapeHtml(doc.email)}
                                       </p>
                                     </div>
@@ -682,7 +685,7 @@ export default function PatientSelfServicePage() {
                           </h3>
                           {slots.length === 0 ? (
                             <EmptyState
-                              icon={<Clock className="w-8 h-8 text-gray-400" />}
+                              icon={<Clock className="w-8 h-8 text-[var(--text-disabled)]" />}
                               title={t('selfService.noSlots')}
                             />
                           ) : (
@@ -694,10 +697,10 @@ export default function PatientSelfServicePage() {
                                   onClick={() => setSelectedSlotId(slot.id)}
                                   className={`p-3 rounded-lg border-2 text-center text-sm font-medium transition-all ${
                                     !slot.available
-                                      ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                                      ? 'border-[var(--border)] bg-[var(--surface-secondary)] text-gray-300 cursor-not-allowed'
                                       : selectedSlotId === slot.id
                                         ? 'border-primary-600 bg-primary-50 text-primary-700 shadow-md'
-                                        : 'border-gray-200 hover:border-primary-300 text-gray-700'
+                                        : 'border-[var(--border)] hover:border-primary-300 text-[var(--text-primary)]'
                                   }`}
                                 >
                                   {escapeHtml(slot.startTime)}
@@ -716,7 +719,7 @@ export default function PatientSelfServicePage() {
                           </h3>
 
                           <div className="space-y-3">
-                            <h4 className="text-sm font-medium text-gray-700">
+                            <h4 className="text-sm font-medium text-[var(--text-primary)]">
                               {t('selfService.patientInfo')}
                             </h4>
                             <Input
@@ -743,21 +746,21 @@ export default function PatientSelfServicePage() {
                             />
                           </div>
 
-                          <div className="bg-gray-50 rounded-xl p-6 space-y-4">
+                          <div className="bg-[var(--surface-secondary)] rounded-xl p-6 space-y-4">
                             <div className="flex justify-between">
-                              <span className="text-gray-500">{t('selfService.doctor')}</span>
+                              <span className="text-[var(--text-muted)]">{t('selfService.doctor')}</span>
                               <span className="font-medium">{escapeHtml(selectedDoctor?.name ?? '')}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-500">{t('selfService.date')}</span>
+                              <span className="text-[var(--text-muted)]">{t('selfService.date')}</span>
                               <span className="font-medium">{escapeHtml(selectedDate)}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-500">{t('selfService.time')}</span>
+                              <span className="text-[var(--text-muted)]">{t('selfService.time')}</span>
                               <span className="font-medium">{escapeHtml(selectedSlot?.startTime ?? '')}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-500">{t('selfService.type')}</span>
+                              <span className="text-[var(--text-muted)]">{t('selfService.type')}</span>
                               <Badge variant="info">
                                 {t(`selfService.${appointmentType}`)}
                               </Badge>
@@ -786,7 +789,7 @@ export default function PatientSelfServicePage() {
                       )}
 
                       {/* Navigation Buttons */}
-                      <div className="flex justify-between mt-8 pt-4 border-t border-gray-200">
+                      <div className="flex justify-between mt-8 pt-4 border-t border-[var(--border)]">
                         {step > 1 ? (
                           <Button variant="secondary" onClick={handlePrevStep}>
                             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -923,24 +926,24 @@ export default function PatientSelfServicePage() {
       >
         <div className="space-y-3 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-500">{t('selfService.doctor')}</span>
+            <span className="text-[var(--text-muted)]">{t('selfService.doctor')}</span>
             <span className="font-medium">{escapeHtml(selectedDoctor?.name ?? '')}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">{t('selfService.date')}</span>
+            <span className="text-[var(--text-muted)]">{t('selfService.date')}</span>
             <span className="font-medium">{escapeHtml(selectedDate)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">{t('selfService.time')}</span>
+            <span className="text-[var(--text-muted)]">{t('selfService.time')}</span>
             <span className="font-medium">{escapeHtml(selectedSlot?.startTime ?? '')}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">{t('selfService.type')}</span>
+            <span className="text-[var(--text-muted)]">{t('selfService.type')}</span>
             <Badge variant="info">{t(`selfService.${appointmentType}`)}</Badge>
           </div>
           {reason && (
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('selfService.reason')}</span>
+              <span className="text-[var(--text-muted)]">{t('selfService.reason')}</span>
               <span className="font-medium">{escapeHtml(reason)}</span>
             </div>
           )}

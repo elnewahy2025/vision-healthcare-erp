@@ -8,6 +8,7 @@ import {
   PageLoader, Card, CardBody, Button, Badge,
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
+import { Can } from '../components/Can';
 
 type DwTab = 'overview' | 'appointments' | 'revenue' | 'patients';
 
@@ -155,12 +156,14 @@ export default function DataWarehousePage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('dw.title')}</h1>
-          <p className="text-gray-500 mt-1">{t('dw.subtitle')}</p>
+          <p className="text-[var(--text-muted)] mt-1">{t('dw.subtitle')}</p>
         </div>
-        <Button onClick={handleRefresh} disabled={refreshing}>
+        <Can permission="data_warehouse.create">
+          <Button onClick={handleRefresh} disabled={refreshing}>
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           {refreshing ? t('dw.refreshing') : t('dw.refreshNow')}
         </Button>
+        </Can>
       </div>
 
       <div className="flex gap-2 mb-6">
@@ -189,11 +192,11 @@ export default function DataWarehousePage() {
         <Card>
           <CardBody>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-500">{t('dw.appointments')}</h3>
+              <h3 className="text-sm font-medium text-[var(--text-muted)]">{t('dw.appointments')}</h3>
               <Calendar className="w-5 h-5 text-primary-500" />
             </div>
             <p className="text-3xl font-bold">{apptStats?.totals?.total ?? 0}</p>
-            <div className="flex gap-3 mt-2 text-xs text-gray-500">
+            <div className="flex gap-3 mt-2 text-xs text-[var(--text-muted)]">
               <span className="flex items-center gap-1"><Badge variant="success">{apptStats?.totals?.completed ?? 0}</Badge> {t('dw.completed')}</span>
               <span className="flex items-center gap-1"><Badge variant="danger">{apptStats?.totals?.cancelled ?? 0}</Badge> {t('dw.cancelled')}</span>
             </div>
@@ -203,11 +206,11 @@ export default function DataWarehousePage() {
         <Card>
           <CardBody>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-500">{t('dw.revenue')}</h3>
+              <h3 className="text-sm font-medium text-[var(--text-muted)]">{t('dw.revenue')}</h3>
               <DollarSign className="w-5 h-5 text-green-500" />
             </div>
             <p className="text-3xl font-bold">{formatCurrency(revStats?.totals?.total ?? 0)}</p>
-            <div className="flex gap-3 mt-2 text-xs text-gray-500">
+            <div className="flex gap-3 mt-2 text-xs text-[var(--text-muted)]">
               <span className="flex items-center gap-1"><Badge variant="success">{formatCurrency(revStats?.totals?.collected ?? 0)}</Badge> {t('dw.collected')}</span>
               <span className="flex items-center gap-1"><Badge variant="warning">{formatCurrency(revStats?.totals?.pending ?? 0)}</Badge> {t('dw.pending')}</span>
             </div>
@@ -217,11 +220,11 @@ export default function DataWarehousePage() {
         <Card>
           <CardBody>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-500">{t('dw.patients')}</h3>
+              <h3 className="text-sm font-medium text-[var(--text-muted)]">{t('dw.patients')}</h3>
               <Users className="w-5 h-5 text-blue-500" />
             </div>
             <p className="text-3xl font-bold">{patStats?.totals?.active ?? 0}</p>
-            <div className="flex gap-3 mt-2 text-xs text-gray-500">
+            <div className="flex gap-3 mt-2 text-xs text-[var(--text-muted)]">
               <span className="flex items-center gap-1"><Badge variant="info">{patStats?.totals?.new ?? 0}</Badge> {t('dw.newPatients')}</span>
               <span className="flex items-center gap-1"><Badge variant="gray">{t('dw.active')}</Badge></span>
             </div>
@@ -238,7 +241,7 @@ export default function DataWarehousePage() {
                 <div className="space-y-2">
                   {apptStats.daily.slice(-7).map((d) => (
                     <div key={d.date} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{d.date}</span>
+                      <span className="text-[var(--text-secondary)]">{d.date}</span>
                       <div className="flex gap-3">
                         <span className="text-green-600">{d.completed_appointments} {t('dw.completed')}</span>
                         <span className="text-red-600">{d.cancelled_appointments} {t('dw.cancelled')}</span>
@@ -247,7 +250,7 @@ export default function DataWarehousePage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-400 text-sm py-8 text-center">{t('dw.noDataYet')}</p>
+                <p className="text-[var(--text-disabled)] text-sm py-8 text-center">{t('dw.noDataYet')}</p>
               )}
             </CardBody>
           </Card>
@@ -259,7 +262,7 @@ export default function DataWarehousePage() {
                 <div className="space-y-2">
                   {revStats.daily.slice(-7).map((d) => (
                     <div key={d.date} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{d.date}</span>
+                      <span className="text-[var(--text-secondary)]">{d.date}</span>
                       <div className="flex gap-3">
                         <span className="text-green-600">{formatCurrency(d.collected_revenue)}</span>
                         <span className="text-yellow-600">{formatCurrency(d.pending_revenue)}</span>
@@ -268,7 +271,7 @@ export default function DataWarehousePage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-400 text-sm py-8 text-center">{t('dw.noDataYet')}</p>
+                <p className="text-[var(--text-disabled)] text-sm py-8 text-center">{t('dw.noDataYet')}</p>
               )}
             </CardBody>
           </Card>
@@ -294,7 +297,7 @@ export default function DataWarehousePage() {
                   </thead>
                   <tbody>
                     {apptStats.daily.map((d) => (
-                      <tr key={d.date} className="hover:bg-gray-50">
+                      <tr key={d.date} className="hover:bg-[var(--surface-secondary)]">
                         <td>{d.date}</td>
                         <td className="font-medium">{d.total_appointments}</td>
                         <td><Badge variant="success">{d.completed_appointments}</Badge></td>
@@ -307,7 +310,7 @@ export default function DataWarehousePage() {
                 </table>
               </div>
             ) : (
-              <p className="text-gray-400 text-sm py-8 text-center">{t('dw.noDataYet')}</p>
+              <p className="text-[var(--text-disabled)] text-sm py-8 text-center">{t('dw.noDataYet')}</p>
             )}
           </CardBody>
         </Card>
@@ -332,7 +335,7 @@ export default function DataWarehousePage() {
                   </thead>
                   <tbody>
                     {revStats.daily.map((d) => (
-                      <tr key={d.date} className="hover:bg-gray-50">
+                      <tr key={d.date} className="hover:bg-[var(--surface-secondary)]">
                         <td>{d.date}</td>
                         <td className="font-medium">{formatCurrency(d.total_revenue)}</td>
                         <td className="text-green-600">{formatCurrency(d.collected_revenue)}</td>
@@ -345,7 +348,7 @@ export default function DataWarehousePage() {
                 </table>
               </div>
             ) : (
-              <p className="text-gray-400 text-sm py-8 text-center">{t('dw.noDataYet')}</p>
+              <p className="text-[var(--text-disabled)] text-sm py-8 text-center">{t('dw.noDataYet')}</p>
             )}
           </CardBody>
         </Card>
@@ -372,11 +375,11 @@ export default function DataWarehousePage() {
                         ? Object.entries(d.gender_distribution).map(([k, v]) => `${k}: ${v}`).join(', ')
                         : '-';
                       return (
-                        <tr key={d.date} className="hover:bg-gray-50">
+                        <tr key={d.date} className="hover:bg-[var(--surface-secondary)]">
                           <td>{d.date}</td>
                           <td><Badge variant="info">{d.new_patients}</Badge></td>
                           <td className="font-medium">{d.total_active_patients}</td>
-                          <td className="text-xs text-gray-500">{genderInfo}</td>
+                          <td className="text-xs text-[var(--text-muted)]">{genderInfo}</td>
                         </tr>
                       );
                     })}
@@ -384,7 +387,7 @@ export default function DataWarehousePage() {
                 </table>
               </div>
             ) : (
-              <p className="text-gray-400 text-sm py-8 text-center">{t('dw.noDataYet')}</p>
+              <p className="text-[var(--text-disabled)] text-sm py-8 text-center">{t('dw.noDataYet')}</p>
             )}
           </CardBody>
         </Card>

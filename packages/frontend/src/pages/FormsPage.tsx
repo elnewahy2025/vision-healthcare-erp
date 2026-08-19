@@ -6,6 +6,7 @@ import { Plus, ClipboardList, FileJson } from 'lucide-react';
 import { sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 type TabType = 'definitions' | 'submissions';
 
@@ -122,13 +123,15 @@ export default function FormsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('forms.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('forms.formCount', { count: definitions.length })}, {t('forms.submissionCount', { count: submissions.length })}
           </p>
         </div>
-        <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowModal(true)}>
+        <Can permission="forms.create">
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowModal(true)}>
           {t('forms.newForm')}
         </Button>
+        </Can>
       </div>
 
       {/* Tab Buttons */}
@@ -155,25 +158,25 @@ export default function FormsPage() {
         filteredDefinitions.length === 0 ? (
           <EmptyState title={t('forms.noDefinitions')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('forms.name')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('forms.slug')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('forms.category')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('forms.version')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('forms.isActive')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('forms.name')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('forms.slug')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('forms.category')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('forms.version')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('forms.isActive')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {filteredDefinitions.map((def) => (
-                    <tr key={def.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{def.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{def.slug}</td>
+                    <tr key={def.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{def.name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">{def.slug}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{def.category}</Badge></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">v{def.version}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">v{def.version}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={def.isActive ? 'success' : 'gray'}>{def.isActive ? t('forms.yes') : t('forms.no')}</Badge>
                       </td>
@@ -191,26 +194,26 @@ export default function FormsPage() {
         submissions.length === 0 ? (
           <EmptyState title={t('forms.noSubmissions')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('workflow.id')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('forms.definitions')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('forms.patient')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('common.status')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('forms.submitted')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('workflow.id')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('forms.definitions')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('forms.patient')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('common.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('forms.submitted')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {submissions.map((sub) => (
-                    <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{sub.id.slice(0, 8)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sub.formName}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{sub.patientName || '-'}</td>
+                    <tr key={sub.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">{sub.id.slice(0, 8)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{sub.formName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{sub.patientName || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{sub.status}</Badge></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(sub.submittedAt)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{formatDateTime(sub.submittedAt)}</td>
                     </tr>
                   ))}
                 </tbody>

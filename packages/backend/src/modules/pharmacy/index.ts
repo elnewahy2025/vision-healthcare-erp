@@ -3,8 +3,28 @@ import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { authenticate } from '../auth-guard.js';
-import { authorize } from '../../services/authorization.js';
+import { authorize, hasPermission, assignedPatientIds, type Principal } from '../../services/authorization.js';
 import { logAudit } from '../../services/audit.js';
+
+/**
+ * Scope resolution for pharmacy module.
+ * Prescriptions are branch-scoped; inventory is branch-scoped.
+ */
+async function resolvePharmacyListScope(principal: Principal): Promise<{
+  branchIds?: string[];
+  patientIds?: string[];
+}> {
+  if (hasPermission(principal, 'pharmacy.view', 'system') || hasPermission(principal, 'pharmacy.view', 'tenant')) {
+    return {};
+  }
+  if (hasPermission(principal, 'pharmacy.view', 'branch') || hasPermission(principal, 'pharmacy.view', 'branches')) {
+    return { branchIds: principal.branches };
+  }
+  if (hasPermission(principal, 'pharmacy.view', 'assigned_patients') || hasPermission(principal, 'pharmacy.view', 'department')) {
+    return { patientIds: await assignedPatientIds(principal) };
+  }
+  return { patientIds: [] };
+}
 
 interface PharmacyInventoryRow {
   id: string;
@@ -40,18 +60,28 @@ interface PharmacyPrescriptionItemRow {
 }
 
 export async function registerPharmacyModule(app: FastifyInstance) {
-  // Inventory
+  // ── Inventory (branch-scoped) ──
   app.get('/api/v1/pharmacy/inventory', { preHandler: [authenticate, authorize('pharmacy.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
     const { search, status } = request.query as { search?: string; status?: string };
+    const scope = await resolvePharmacyListScope(principal);
+
     let q = db('pharmacy_inventory').where({ tenant_id: tenantId });
+    if (scope.branchIds !== undefined) {
+      if (scope.branchIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else if (scope.branchIds.length > 0) {
+        q = q.whereIn('branch_id', scope.branchIds);
+      }
+    }
     if (status) q = q.andWhere('status', status);
-    if (search) q = q.andWhere(function() { this.where('drug_name', 'ilike', '%'+search+'%').orWhere('generic_name', 'ilike', '%'+search+'%'); });
+    if (search) q = q.andWhere(function () { this.where('drug_name', 'ilike', '%' + search + '%').orWhere('generic_name', 'ilike', '%' + search + '%'); });
     const items = await q.orderBy('drug_name');
     return sendSuccess(reply, items.map(mapDrug));
   });
 
-  app.post('/api/v1/pharmacy/inventory', { preHandler: [authenticate, authorize('pharmacy.view')] }, async (request, reply) => {
+  app.post('/api/v1/pharmacy/inventory', { preHandler: [authenticate, authorize('pharmacy.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
@@ -69,7 +99,7 @@ export async function registerPharmacyModule(app: FastifyInstance) {
     return sendSuccess(reply, mapDrug(item), 'Drug added', 201);
   });
 
-  app.put('/api/v1/pharmacy/inventory/:id/stock', { preHandler: [authenticate, authorize('pharmacy.view')] }, async (request, reply) => {
+  app.put('/api/v1/pharmacy/inventory/:id/stock', { preHandler: [authenticate, authorize('pharmacy.edit')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const { id } = request.params as { id: string };
@@ -81,28 +111,58 @@ export async function registerPharmacyModule(app: FastifyInstance) {
     return sendSuccess(reply, null, 'Stock updated');
   });
 
-  // Prescriptions
+  // ── Prescriptions (scope-enforced) ──
   app.get('/api/v1/pharmacy/prescriptions', { preHandler: [authenticate, authorize('pharmacy.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
     const { status, patientId } = request.query as { patientId?: string; status?: string };
+    const scope = await resolvePharmacyListScope(principal);
+
     let q = db('pharmacy_prescriptions').where('pharmacy_prescriptions.tenant_id', tenantId).whereNull('pharmacy_prescriptions.deleted_at');
+
+    if (scope.branchIds !== undefined) {
+      if (scope.branchIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('pharmacy_prescriptions.patient_id', function () {
+          this.select('id').from('patients').whereIn('branch_id', scope.branchIds!);
+        });
+      }
+    }
+    if (scope.patientIds !== undefined) {
+      if (scope.patientIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('pharmacy_prescriptions.patient_id', scope.patientIds);
+      }
+    }
+
     if (status) q = q.andWhere('pharmacy_prescriptions.status', status);
     if (patientId) q = q.andWhere('pharmacy_prescriptions.patient_id', patientId);
+
     const rows = await q.join('patients', 'pharmacy_prescriptions.patient_id', 'patients.id')
       .select('pharmacy_prescriptions.*', 'patients.first_name as p_first', 'patients.last_name as p_last')
       .orderBy('created_at', 'desc').limit(50);
+
+    await logAudit({ tenantId, userId: principal.userId, action: 'pharmacy.prescriptions_listed', entityType: 'pharmacy_prescriptions' });
+
     return sendSuccess(reply, await Promise.all(rows.map(async (r: Record<string, unknown>) => {
       const items = await db('pharmacy_prescription_items').where({ prescription_id: r.id });
-      return { id: r.id, prescriptionNumber: r.prescription_number, patientId: r.patient_id,
+      return {
+        id: r.id, prescriptionNumber: r.prescription_number, patientId: r.patient_id,
         patientName: `${r.p_first || ''} ${r.p_last || ''}`.trim(), status: r.status, notes: r.notes,
-        items: items.map((i: PharmacyPrescriptionItemRow) => ({ id: i.id, drugName: i.drug_name, dosage: i.dosage,
-          route: i.route, frequency: i.frequency, duration: i.duration, quantity: i.quantity,
-          quantityDispensed: i.quantity_dispensed, refills: i.refills, instructions: i.instructions,
-          status: i.status })), createdAt: r.created_at };
+        items: items.map((i: PharmacyPrescriptionItemRow) => ({
+          id: i.id, drugName: i.drug_name, dosage: i.dosage, route: i.route,
+          frequency: i.frequency, duration: i.duration, quantity: i.quantity,
+          quantityDispensed: i.quantity_dispensed, refills: i.refills,
+          instructions: i.instructions, status: i.status,
+        })),
+        createdAt: r.created_at,
+      };
     })));
   });
 
-  app.post('/api/v1/pharmacy/prescriptions', { preHandler: [authenticate, authorize('pharmacy.view')] }, async (request, reply) => {
+  app.post('/api/v1/pharmacy/prescriptions', { preHandler: [authenticate, authorize('pharmacy.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
@@ -125,7 +185,7 @@ export async function registerPharmacyModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: presc.id, prescriptionNumber: presc.prescription_number }, 'Prescription created', 201);
   });
 
-  app.post('/api/v1/pharmacy/prescriptions/:id/dispense', { preHandler: [authenticate, authorize('pharmacy.view')] }, async (request, reply) => {
+  app.post('/api/v1/pharmacy/prescriptions/:id/dispense', { preHandler: [authenticate, authorize('pharmacy.edit')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const { id } = request.params as { id: string };

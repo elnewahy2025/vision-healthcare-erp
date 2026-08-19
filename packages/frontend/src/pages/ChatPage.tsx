@@ -9,6 +9,7 @@ import {
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import { sanitizeString, escapeHtml } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -219,9 +220,8 @@ export default function ChatPage() {
     try {
       const participantIds = selectedParticipants.map((p) => p.id);
       await api.post('/chat/conversations', {
-        title: sanitizeString(convForm.title),
+        name: sanitizeString(convForm.title),
         participantIds,
-        participantRoles: participantIds.map(() => convForm.role),
       });
       toast.success(t('chat.convCreated'));
       setShowNewConv(false);
@@ -255,35 +255,37 @@ export default function ChatPage() {
             <MessageSquare className="w-6 h-6 text-indigo-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('chat.title')}</h1>
-            <p className="text-sm text-gray-500">{t('chat.subtitle')}</p>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('chat.title')}</h1>
+            <p className="text-sm text-[var(--text-muted)]">{t('chat.subtitle')}</p>
           </div>
         </div>
-        <Button onClick={() => setShowNewConv(true)}>
+        <Can permission="chat.create">
+          <Button onClick={() => setShowNewConv(true)}>
           <Plus className="w-4 h-4 mr-1" />
           {t('chat.newConversation')}
         </Button>
+        </Can>
       </div>
 
       {/* Chat Layout */}
-      <div className="flex h-[600px] border border-gray-200 rounded-xl overflow-hidden bg-white">
+      <div className="flex h-[600px] border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--surface)]">
         {/* Conversations Sidebar */}
-        <div className={`w-full sm:w-80 border-r border-gray-200 flex flex-col ${mobileShowChat && activeConv ? 'hidden sm:flex' : 'flex'}`}>
-          <div className="p-3 border-b border-gray-200">
+        <div className={`w-full sm:w-80 border-r border-[var(--border)] flex flex-col ${mobileShowChat && activeConv ? 'hidden sm:flex' : 'flex'}`}>
+          <div className="p-3 border-b border-[var(--border)]">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-disabled)]" />
               <input
                 type="text"
                 placeholder={t('chat.searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-[var(--border-strong)] text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
             {filteredConversations.length === 0 ? (
-              <div className="p-4 text-center text-gray-400 text-sm">
+              <div className="p-4 text-center text-[var(--text-disabled)] text-sm">
                 {t('chat.noConversations')}
               </div>
             ) : (
@@ -291,7 +293,7 @@ export default function ChatPage() {
                 <button
                   key={conv.id}
                   onClick={() => handleSelectConv(conv.id)}
-                  className={`w-full p-3 text-left border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                  className={`w-full p-3 text-left border-b border-[var(--border)] hover:bg-[var(--surface-secondary)] transition-colors ${
                     activeConv === conv.id ? 'bg-primary-50 border-l-2 border-l-primary-600' : ''
                   }`}
                 >
@@ -302,15 +304,15 @@ export default function ChatPage() {
                     )}
                   </div>
                   {conv.last_message && (
-                    <p className="text-xs text-gray-500 truncate mt-1">{escapeHtml(conv.last_message)}</p>
+                    <p className="text-xs text-[var(--text-muted)] truncate mt-1">{escapeHtml(conv.last_message)}</p>
                   )}
                 </button>
               ))
             )}
           </div>
           {unreadCount > 0 && (
-            <div className="p-3 border-t border-gray-200 text-center">
-              <span className="text-sm text-gray-500">{unreadCount} unread</span>
+            <div className="p-3 border-t border-[var(--border)] text-center">
+              <span className="text-sm text-[var(--text-muted)]">{unreadCount} unread</span>
             </div>
           )}
         </div>
@@ -320,9 +322,9 @@ export default function ChatPage() {
           {activeConv ? (
             <>
               {/* Chat Header */}
-              <div className="p-3 border-b border-gray-200 flex items-center gap-2">
+              <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
                 <button
-                  className="sm:hidden p-1 rounded hover:bg-gray-100"
+                  className="sm:hidden p-1 rounded hover:bg-[var(--surface-hover)]"
                   onClick={() => setMobileShowChat(false)}
                 >
                   <ArrowLeft className="w-5 h-5" />
@@ -333,11 +335,11 @@ export default function ChatPage() {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-gray-50/50">
+              <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-[var(--surface-secondary)]/50">
                 {messagesLoading ? (
                   <PageLoader message={t('common.loading')} />
                 ) : messages.length === 0 ? (
-                  <div className="text-center text-gray-400 py-8">
+                  <div className="text-center text-[var(--text-disabled)] py-8">
                     <p>{t('chat.noMessages')}</p>
                   </div>
                 ) : (
@@ -347,7 +349,7 @@ export default function ChatPage() {
                       className={`flex ${msg.sender_role === 'system' ? 'justify-center' : 'justify-start'}`}
                     >
                       {msg.sender_role === 'system' ? (
-                        <div className="bg-gray-200 text-gray-500 text-xs px-3 py-1 rounded-full">
+                        <div className="bg-gray-200 text-[var(--text-muted)] text-xs px-3 py-1 rounded-full">
                           {escapeHtml(msg.content)}
                         </div>
                       ) : (
@@ -367,7 +369,7 @@ export default function ChatPage() {
                               </div>
                             </div>
                           ) : (
-                            <div className="text-sm text-gray-700">
+                            <div className="text-sm text-[var(--text-primary)]">
                               <p className="italic">[{msg.message_type}] {escapeHtml(msg.content)}</p>
                             </div>
                           )}
@@ -380,11 +382,11 @@ export default function ChatPage() {
               </div>
 
               {/* Message Input */}
-              <div className="p-4 border-t border-gray-200">
+              <div className="p-4 border-t border-[var(--border)]">
                 <div className="flex items-end gap-2">
                   <div className="flex-1">
                     <textarea
-                      className="w-full rounded-xl border border-gray-300 p-3 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px] max-h-32 text-sm"
+                      className="w-full rounded-xl border border-[var(--border-strong)] p-3 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px] max-h-32 text-sm"
                       placeholder={t('chat.typeMessage')}
                       rows={1}
                       value={newMessage}
@@ -400,13 +402,13 @@ export default function ChatPage() {
                     <Send className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">{t('chat.pressEnter')}</p>
+                <p className="text-xs text-[var(--text-disabled)] mt-1">{t('chat.pressEnter')}</p>
               </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <EmptyState
-                icon={<MessageSquare className="w-8 h-8 text-gray-400" />}
+                icon={<MessageSquare className="w-8 h-8 text-[var(--text-disabled)]" />}
                 title={t('chat.selectConversation')}
               />
             </div>
@@ -440,7 +442,7 @@ export default function ChatPage() {
             error={convFormErrors.title}
           />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
               {t('chat.participantIds')}
             </label>
             <div className="relative">
@@ -451,21 +453,21 @@ export default function ChatPage() {
                 error={convFormErrors.participantIds}
               />
               {participantSearch.trim() && (
-                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                <div className="absolute z-10 mt-1 w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-lg max-h-56 overflow-y-auto">
                   {participantSearching ? (
-                    <p className="p-3 text-sm text-gray-500">{t('common.loading')}</p>
+                    <p className="p-3 text-sm text-[var(--text-muted)]">{t('common.loading')}</p>
                   ) : participantResults.length === 0 ? (
-                    <p className="p-3 text-sm text-gray-400">{t('chat.noResults')}</p>
+                    <p className="p-3 text-sm text-[var(--text-disabled)]">{t('chat.noResults')}</p>
                   ) : (
                     participantResults.map((u) => (
                       <button
                         key={u.id}
                         type="button"
-                        className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between gap-2"
+                        className="w-full text-left px-3 py-2 hover:bg-[var(--surface-secondary)] flex items-center justify-between gap-2"
                         onClick={() => addParticipant({ id: u.id, name: u.name })}
                       >
                         <span className="text-sm font-medium truncate">{escapeHtml(u.name)}</span>
-                        <span className="text-xs text-gray-400 capitalize truncate">
+                        <span className="text-xs text-[var(--text-disabled)] capitalize truncate">
                           {escapeHtml(u.employeeType || 'staff')}
                         </span>
                       </button>
@@ -488,11 +490,11 @@ export default function ChatPage() {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
               {t('chat.participantRole')}
             </label>
             <select
-              className="w-full rounded-lg border border-gray-300 p-2 text-sm"
+              className="w-full rounded-lg border border-[var(--border-strong)] p-2 text-sm"
               value={convForm.role}
               onChange={(e) => setConvForm((p) => ({ ...p, role: e.target.value }))}
             >

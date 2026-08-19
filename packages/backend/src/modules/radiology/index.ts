@@ -4,23 +4,68 @@ import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { PatientNotFoundError } from '@healthcare/shared/errors';
 import { authenticate } from '../auth-guard.js';
-import { authorize } from '../../services/authorization.js';
+import { authorize, hasPermission, assignedPatientIds, type Principal } from '../../services/authorization.js';
 import { logAudit } from '../../services/audit.js';
+
+/**
+ * Scope resolution for radiology module.
+ */
+async function resolveRadiologyListScope(principal: Principal): Promise<{
+  branchIds?: string[];
+  patientIds?: string[];
+}> {
+  if (hasPermission(principal, 'radiology.view', 'system') || hasPermission(principal, 'radiology.view', 'tenant')) {
+    return {};
+  }
+  if (hasPermission(principal, 'radiology.view', 'branch') || hasPermission(principal, 'radiology.view', 'branches')) {
+    return { branchIds: principal.branches };
+  }
+  if (hasPermission(principal, 'radiology.view', 'department') || hasPermission(principal, 'radiology.view', 'assigned_patients')) {
+    return { patientIds: await assignedPatientIds(principal) };
+  }
+  return { patientIds: [] };
+}
 
 export async function registerRadiologyModule(app: FastifyInstance) {
   app.get('/api/v1/radiology/orders', { preHandler: [authenticate, authorize('radiology.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
     const { status, patientId } = request.query as { patientId?: string; status?: string };
-    let q = db('radiology_orders').where('radiology_orders.tenant_id', tenantId).whereNull('radiology_orders.deleted_at');
+    const scope = await resolveRadiologyListScope(principal);
+
+    let q = db('radiology_orders')
+      .where('radiology_orders.tenant_id', tenantId)
+      .whereNull('radiology_orders.deleted_at');
+
+    if (scope.branchIds !== undefined) {
+      if (scope.branchIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('radiology_orders.patient_id', function () {
+          this.select('id').from('patients').whereIn('branch_id', scope.branchIds!);
+        });
+      }
+    }
+    if (scope.patientIds !== undefined) {
+      if (scope.patientIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('radiology_orders.patient_id', scope.patientIds);
+      }
+    }
+
     if (status) q = q.andWhere('radiology_orders.status', status);
     if (patientId) q = q.andWhere('radiology_orders.patient_id', patientId);
+
     const orders = await q.join('patients', 'radiology_orders.patient_id', 'patients.id')
       .select('radiology_orders.*', 'patients.first_name as p_first', 'patients.last_name as p_last', 'patients.medical_record_number')
       .orderBy('created_at', 'desc').limit(50);
+
+    await logAudit({ tenantId, userId: principal.userId, action: 'radiology.orders_listed', entityType: 'radiology_orders' });
     return sendSuccess(reply, orders.map(mapOrder));
   });
 
-  app.post('/api/v1/radiology/orders', { preHandler: [authenticate, authorize('radiology.view')] }, async (request, reply) => {
+  app.post('/api/v1/radiology/orders', { preHandler: [authenticate, authorize('radiology.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
@@ -40,7 +85,7 @@ export async function registerRadiologyModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: order.id, orderNumber: order.order_number }, 'Radiology order created', 201);
   });
 
-  app.put('/api/v1/radiology/orders/:id', { preHandler: [authenticate, authorize('radiology.view')] }, async (request, reply) => {
+  app.put('/api/v1/radiology/orders/:id', { preHandler: [authenticate, authorize('radiology.edit')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const { id } = request.params as { id: string };

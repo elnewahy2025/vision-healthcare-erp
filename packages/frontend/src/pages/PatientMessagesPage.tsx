@@ -8,6 +8,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 interface Conversation {
   patientId: string;
@@ -126,7 +127,7 @@ export default function PatientMessagesPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('messages.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('messages.conversationCount', { count: conversations.length })}
           </p>
         </div>
@@ -146,7 +147,7 @@ export default function PatientMessagesPage() {
                     className={`p-3 rounded-lg cursor-pointer mb-2 transition-all ${
                       selectedPatient?.patientId === c.patientId
                         ? 'bg-primary-50 ring-1 ring-primary-200'
-                        : 'hover:bg-gray-50'
+                        : 'hover:bg-[var(--surface-secondary)]'
                     }`}
                     onClick={() => selectConversation(c)}
                     role="button"
@@ -157,8 +158,8 @@ export default function PatientMessagesPage() {
                       <p className="font-medium text-sm">{sanitizeString(c.patientName)}</p>
                       {c.unread > 0 && <Badge variant="warning">{c.unread}</Badge>}
                     </div>
-                    <p className="text-xs text-gray-500">{sanitizeString(c.patientPhone)}</p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-[var(--text-muted)]">{sanitizeString(c.patientPhone)}</p>
+                    <p className="text-xs text-[var(--text-disabled)] mt-1">
                       {c.totalMessages} {t('messages.messages')} · {t('messages.last')} {formatTime(c.lastMessageAt)}
                     </p>
                   </div>
@@ -175,7 +176,7 @@ export default function PatientMessagesPage() {
                 <div className="flex items-center justify-between mb-4 pb-3 border-b">
                   <div>
                     <h3 className="font-semibold">{sanitizeString(selectedPatient.patientName)}</h3>
-                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <p className="text-xs text-[var(--text-muted)] flex items-center gap-1">
                       <Phone className="w-3 h-3" /> {sanitizeString(selectedPatient.patientPhone)}
                     </p>
                   </div>
@@ -193,7 +194,7 @@ export default function PatientMessagesPage() {
                         <div
                           className={`max-w-[80%] p-3 rounded-lg ${
                             m.direction === 'outbound'
-                              ? 'bg-gray-100 rounded-tl-none'
+                              ? 'bg-[var(--surface-hover)] rounded-tl-none'
                               : 'bg-primary-50 rounded-tr-none'
                           }`}
                         >
@@ -208,7 +209,7 @@ export default function PatientMessagesPage() {
                             )}
                           </div>
                           <p className="text-sm">{sanitizeString(m.body)}</p>
-                          <p className="text-xs text-gray-400 mt-1">{formatTime(m.createdAt)}</p>
+                          <p className="text-xs text-[var(--text-disabled)] mt-1">{formatTime(m.createdAt)}</p>
                         </div>
                       </div>
                     ))
@@ -226,13 +227,15 @@ export default function PatientMessagesPage() {
                       error={!newMessage.trim() && sending ? t('messages.emptyMessage') : undefined}
                     />
                   </div>
-                  <Button
+                  <Can permission="patient_messages.create">
+          <Button
                     onClick={handleSend}
                     loading={sending}
                     disabled={!newMessage.trim()}
                   >
                     <Send className="w-4 h-4" />
                   </Button>
+        </Can>
                 </div>
               </CardBody>
             </Card>
@@ -240,7 +243,7 @@ export default function PatientMessagesPage() {
             <Card>
               <CardBody className="text-center py-16">
                 <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">{t('messages.selectConversation')}</p>
+                <p className="text-[var(--text-muted)]">{t('messages.selectConversation')}</p>
               </CardBody>
             </Card>
           )}

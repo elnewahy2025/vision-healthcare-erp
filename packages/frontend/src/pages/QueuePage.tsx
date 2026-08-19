@@ -5,6 +5,7 @@ import { Modal, Input, Select, PatientSearchField } from '../components/ui';
 import { confirmDialog } from '../components/ui';
 import { ListOrdered, SkipForward, CheckCircle, XCircle, Plus, Loader2, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 interface QueueEntryForm {
   patientId: string;
@@ -93,22 +94,25 @@ export default function QueuePage() {
   return (
     <div>
       <div className="page-header">
-        <div><h1 className="page-title">{t('queue.title')}</h1><p className="text-gray-500 mt-1">{waiting.length} waiting, {inProgress.length} in progress</p></div>
-        <button onClick={() => setShowAddModal(true)} className="btn-primary"><Plus className="w-4 h-4" />{t('queue.addToQueue')}</button>
+        <div><h1 className="page-title">{t('queue.title')}</h1><p className="text-[var(--text-muted)] mt-1">{waiting.length} waiting, {inProgress.length} in progress</p></div>
+        <Can permission="queue.manage">
+          <button onClick={() => setShowAddModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />{t('queue.addToQueue')}</button>
+        </Can>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
           <div className="card-header"><h3 className="font-semibold flex items-center gap-2"><ListOrdered className="w-5 h-5 text-primary-600" />{t('queue.waiting')} ({waiting.length})</h3></div>
           <div className="card-body">
-            {waiting.length === 0 ? <p className="text-gray-500 text-sm">{t('queue.queueEmpty')}</p> : (
+            {waiting.length === 0 ? <p className="text-[var(--text-muted)] text-sm">{t('queue.queueEmpty')}</p> : (
               <div className="space-y-2">
                 {waiting.map(e => (
-                  <div key={e.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div key={e.id} className="flex items-center gap-3 p-3 bg-[var(--surface-secondary)] rounded-lg">
                     <span className="text-lg font-bold text-primary-600 w-8 text-center">{e.position}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2"><p className="text-sm font-medium truncate">{e.patientName}</p><span className="font-mono text-xs text-gray-400">{e.queueNumber}</span></div>
-                      <p className="text-xs text-gray-500">{e.serviceType}</p>
+                      <div className="flex items-center gap-2"><p className="text-sm font-medium truncate">{e.patientName}</p><span className="font-mono text-xs text-[var(--text-disabled)]">{e.queueNumber}</span></div>
+                      <p className="text-xs text-[var(--text-muted)]">{e.serviceType}</p>
                     </div>
                     <button onClick={() => updateStatus(e.id, 'in_progress')} disabled={actionLoading === e.id} className="btn-primary btn-sm">
                       {actionLoading === e.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <SkipForward className="w-3 h-3" />}{t('queue.call')}
@@ -123,19 +127,19 @@ export default function QueuePage() {
         <div className="card">
           <div className="card-header"><h3 className="font-semibold flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-600" />{t('queue.inProgress')} ({inProgress.length})</h3></div>
           <div className="card-body">
-            {inProgress.length === 0 ? <p className="text-gray-500 text-sm">{t('queue.noActiveVisits')}</p> : (
+            {inProgress.length === 0 ? <p className="text-[var(--text-muted)] text-sm">{t('queue.noActiveVisits')}</p> : (
               <div className="space-y-2">
                 {inProgress.map(e => (
                   <div key={e.id} className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2"><p className="text-sm font-medium truncate">{e.patientName}</p><span className="font-mono text-xs text-gray-400">{e.queueNumber}</span></div>
-                      <p className="text-xs text-gray-500 flex items-center gap-1"><Clock className="w-3 h-3" />{e.serviceType}{e.startedAt && <span className="ml-1">• {new Date(e.startedAt).toLocaleTimeString()}</span>}</p>
+                      <div className="flex items-center gap-2"><p className="text-sm font-medium truncate">{e.patientName}</p><span className="font-mono text-xs text-[var(--text-disabled)]">{e.queueNumber}</span></div>
+                      <p className="text-xs text-[var(--text-muted)] flex items-center gap-1"><Clock className="w-3 h-3" />{e.serviceType}{e.startedAt && <span className="ml-1">• {new Date(e.startedAt).toLocaleTimeString()}</span>}</p>
                     </div>
                     <div className="flex gap-1">
                       <button onClick={() => updateStatus(e.id, 'completed')} disabled={actionLoading === e.id} className="btn-ghost btn-sm text-green-600">
                         {actionLoading === e.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}{t('queue.done')}
                       </button>
-                      <button onClick={() => updateStatus(e.id, 'skipped')} disabled={actionLoading === e.id} className="btn-ghost btn-sm text-gray-500"><XCircle className="w-3 h-3" /></button>
+                      <button onClick={() => updateStatus(e.id, 'skipped')} disabled={actionLoading === e.id} className="btn-ghost btn-sm text-[var(--text-muted)]"><XCircle className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}

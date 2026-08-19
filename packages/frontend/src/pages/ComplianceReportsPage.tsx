@@ -25,6 +25,7 @@ import {
   Clock,
   AlertTriangle,
 } from 'lucide-react';
+import { Can } from '../components/Can';
 
 
 type TabType = 'reports' | 'hipaa' | 'retention' | 'baa';
@@ -113,7 +114,7 @@ export default function ComplianceReportsPage() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <ScrollText className="w-6 h-6" /> {t('compRep.title')}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[var(--text-muted)] mt-1">
             {t('compRep.reportCount', { count: reports.length })} ·{' '}
             {t('compRep.baaCount', { count: baas.length })}
           </p>
@@ -153,16 +154,16 @@ export default function ComplianceReportsPage() {
 
       {/* Reports Tab */}
       {tab === 'reports' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.title2')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.type')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.period')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.status')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.generated')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.actions')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.title2')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.type')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.period')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.generated')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -178,7 +179,7 @@ export default function ComplianceReportsPage() {
                 </tr>
               ) : (
                 reports.map((r) => (
-                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3 text-sm font-medium">{escapeHtml(r.title)}</td>
                     <td className="p-3"><Badge>{escapeHtml(r.type)}</Badge></td>
                     <td className="p-3 text-xs">
@@ -214,22 +215,22 @@ export default function ComplianceReportsPage() {
         <div>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-              <p className="text-sm text-gray-500">{t('compRep.events90d')}</p>
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+              <p className="text-sm text-[var(--text-muted)]">{t('compRep.events90d')}</p>
               <p className="text-2xl font-bold">{hipaaSummary?.totalEvents ?? 0}</p>
             </div>
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-              <p className="text-sm text-gray-500">{t('compRep.uniqueUsers')}</p>
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+              <p className="text-sm text-[var(--text-muted)]">{t('compRep.uniqueUsers')}</p>
               <p className="text-2xl font-bold">{hipaaSummary?.uniqueUsers ?? 0}</p>
             </div>
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-              <p className="text-sm text-gray-500">{t('compRep.topAction')}</p>
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+              <p className="text-sm text-[var(--text-muted)]">{t('compRep.topAction')}</p>
               <p className="text-lg font-bold">
                 {hipaaSummary?.byAction?.[0]?.action ?? '-'}
               </p>
             </div>
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-              <p className="text-sm text-gray-500">{t('compRep.topEntity')}</p>
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+              <p className="text-sm text-[var(--text-muted)]">{t('compRep.topEntity')}</p>
               <p className="text-lg font-bold">
                 {hipaaSummary?.byEntity?.[0]?.entity ?? '-'}
               </p>
@@ -237,7 +238,7 @@ export default function ComplianceReportsPage() {
           </div>
 
           {/* Actions Breakdown */}
-          <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800 mb-4">
+          <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800 mb-4">
             <h3 className="font-semibold mb-2">{t('compRep.actionsBreakdown')}</h3>
             <div className="flex gap-2 flex-wrap">
               {(hipaaSummary?.byAction ?? []).length > 0 ? (
@@ -245,22 +246,22 @@ export default function ComplianceReportsPage() {
                   <Badge key={a.action}>{escapeHtml(a.action)}: {a.count}</Badge>
                 ))
               ) : (
-                <p className="text-sm text-gray-500">{t('common.noData')}</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('common.noData')}</p>
               )}
             </div>
           </div>
 
           {/* Audit Logs Table */}
-          <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+          <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.action')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.entity')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.entityId')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.user')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.ip')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.timestamp')}</th>
+                <tr className="border-b bg-[var(--surface-secondary)]">
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.action')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.entity')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.entityId')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.user')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.ip')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.timestamp')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -276,7 +277,7 @@ export default function ComplianceReportsPage() {
                   </tr>
                 ) : (
                   hipaaLogs.slice(0, 50).map((l) => (
-                    <tr key={l.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <tr key={l.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                       <td className="p-3"><Badge>{escapeHtml(l.action)}</Badge></td>
                       <td className="p-3 text-xs">{escapeHtml(l.entity)}</td>
                       <td className="p-3 font-mono text-xs">
@@ -300,15 +301,15 @@ export default function ComplianceReportsPage() {
 
       {/* Retention Tab */}
       {tab === 'retention' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.entity')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.retentionDays')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.action')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.status')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.lastCleanup')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.entity')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.retentionDays')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.action')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.lastCleanup')}</th>
               </tr>
             </thead>
             <tbody>
@@ -324,7 +325,7 @@ export default function ComplianceReportsPage() {
                 </tr>
               ) : (
                 policies.map((p) => (
-                  <tr key={p.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={p.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3 text-sm font-medium">{escapeHtml(p.entity)}</td>
                     <td className="p-3">
                       {p.retentionDays} {t('compRep.days')}
@@ -348,15 +349,15 @@ export default function ComplianceReportsPage() {
 
       {/* BAA Tab */}
       {tab === 'baa' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.organization')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.contact')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.executed')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.expiry')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('compRep.status')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.organization')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.contact')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.executed')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.expiry')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('compRep.status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -372,7 +373,7 @@ export default function ComplianceReportsPage() {
                 </tr>
               ) : (
                 baas.map((b) => (
-                  <tr key={b.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={b.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3 text-sm font-medium">{escapeHtml(b.organizationName)}</td>
                     <td className="p-3 text-xs">
                       {b.contactName ? escapeHtml(b.contactName) : '-'}
@@ -420,7 +421,7 @@ export default function ComplianceReportsPage() {
             {selectedReport.findings && (
               <div>
                 <strong>{t('compRep.findings')}:</strong>
-                <p className="mt-1 p-2 bg-gray-50 rounded text-xs">
+                <p className="mt-1 p-2 bg-[var(--surface-secondary)] rounded text-xs">
                   {escapeHtml(selectedReport.findings)}
                 </p>
               </div>
@@ -428,7 +429,7 @@ export default function ComplianceReportsPage() {
             {selectedReport.recommendations && (
               <div>
                 <strong>{t('compRep.recommendations')}:</strong>
-                <p className="mt-1 p-2 bg-gray-50 rounded text-xs">
+                <p className="mt-1 p-2 bg-[var(--surface-secondary)] rounded text-xs">
                   {escapeHtml(selectedReport.recommendations)}
                 </p>
               </div>

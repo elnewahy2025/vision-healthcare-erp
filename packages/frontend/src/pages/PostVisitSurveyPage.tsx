@@ -5,6 +5,7 @@ import { Star, Send, Heart, MessageSquare } from 'lucide-react';
 import { Button, Spinner } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 interface SurveyQuestion {
   id: string;
@@ -125,17 +126,17 @@ export default function PostVisitSurveyPage() {
   if (step === 'intro') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-xl p-8 dark:bg-gray-900 dark:border-gray-800 max-w-md w-full text-center">
+        <div className="bg-[var(--surface)] rounded-3xl shadow-xl p-8 dark:bg-[var(--background)] dark:border-gray-800 max-w-md w-full text-center">
           <Heart className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-4">{t('survey.title')}</h1>
-          <p className="text-gray-500 mb-8">{t('survey.subtitle')}</p>
+          <p className="text-[var(--text-muted)] mb-8">{t('survey.subtitle')}</p>
           <button
             onClick={() => setStep('questions')}
             className="bg-blue-600 text-white w-full py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition-colors min-h-[56px]"
           >
             {t('survey.startFeedback')}
           </button>
-          <p className="text-xs text-gray-400 mt-4">{t('survey.anonymousNote')}</p>
+          <p className="text-xs text-[var(--text-disabled)] mt-4">{t('survey.anonymousNote')}</p>
         </div>
       </div>
     );
@@ -144,12 +145,12 @@ export default function PostVisitSurveyPage() {
   if (step === 'thankyou') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-xl p-8 dark:bg-gray-900 dark:border-gray-800 max-w-md w-full text-center">
+        <div className="bg-[var(--surface)] rounded-3xl shadow-xl p-8 dark:bg-[var(--background)] dark:border-gray-800 max-w-md w-full text-center">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Send className="w-8 h-8 text-green-600" />
           </div>
           <h1 className="text-2xl font-bold mb-2">{t('survey.thankYou')}</h1>
-          <p className="text-gray-500 mb-6">{t('survey.thankYouMessage')}</p>
+          <p className="text-[var(--text-muted)] mb-6">{t('survey.thankYouMessage')}</p>
           <button
             onClick={() => window.close()}
             className="bg-green-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-green-700 transition-colors min-h-[48px]"
@@ -164,11 +165,11 @@ export default function PostVisitSurveyPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-4">
       <div className="max-w-md mx-auto py-8">
-        <div className="bg-white rounded-3xl shadow-xl p-8 dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-3xl shadow-xl p-8 dark:bg-[var(--background)] dark:border-gray-800">
           <h1 className="text-2xl font-bold mb-2">
             {survey?.name || t('survey.visitFeedback')}
           </h1>
-          <p className="text-gray-500 mb-6">{t('survey.rateExperience')}</p>
+          <p className="text-[var(--text-muted)] mb-6">{t('survey.rateExperience')}</p>
 
           <div className="space-y-8">
             {survey?.questions?.map((q) => (
@@ -216,7 +217,7 @@ export default function PostVisitSurveyPage() {
                         className={`w-full p-4 rounded-xl border-2 text-left transition-colors min-h-[48px] ${
                           answers[q.id] === opt
                             ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'border-gray-200'
+                            : 'border-[var(--border)]'
                         }`}
                       >
                         {sanitizeString(opt)}
@@ -242,7 +243,8 @@ export default function PostVisitSurveyPage() {
               />
             </div>
 
-            <Button
+            <Can permission="crm.view">
+          <Button
               onClick={handleSubmit}
               loading={submitting}
               className="w-full min-h-[56px] text-lg font-bold"
@@ -250,6 +252,7 @@ export default function PostVisitSurveyPage() {
             >
               {submitting ? t('survey.submitting') : t('survey.submitFeedback')}
             </Button>
+        </Can>
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { Plus, GitBranch, PlayCircle } from 'lucide-react';
 import { sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 type TabType = 'definitions' | 'instances';
 
@@ -122,13 +123,15 @@ export default function WorkflowPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('workflow.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('workflow.runCount', { count: definitions.length, count2: instances.length })}
           </p>
         </div>
-        <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowModal(true)}>
+        <Can permission="workflow.create">
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowModal(true)}>
           {t('workflow.newDefinition')}
         </Button>
+        </Can>
       </div>
 
       {/* Tab Buttons */}
@@ -155,25 +158,25 @@ export default function WorkflowPage() {
         filteredDefinitions.length === 0 ? (
           <EmptyState title={t('workflow.noDefinitions')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('workflow.name')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('workflow.slug')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('workflow.category')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('workflow.steps')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('workflow.isActive')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('workflow.name')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('workflow.slug')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('workflow.category')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('workflow.steps')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('workflow.isActive')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {filteredDefinitions.map((def) => (
-                    <tr key={def.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{def.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{def.slug}</td>
+                    <tr key={def.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{def.name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">{def.slug}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{def.category}</Badge></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{Array.isArray(def.steps) ? def.steps.length : 0}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{Array.isArray(def.steps) ? def.steps.length : 0}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={def.isActive ? 'success' : 'gray'}>{def.isActive ? t('workflow.yes') : t('workflow.no')}</Badge>
                       </td>
@@ -191,34 +194,34 @@ export default function WorkflowPage() {
         instances.length === 0 ? (
           <EmptyState title={t('workflow.noInstances')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('workflow.id')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('workflow.definitions')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('workflow.reference')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('workflow.steps')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('common.status')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('workflow.started')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('workflow.id')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('workflow.definitions')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('workflow.reference')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('workflow.steps')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('common.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('workflow.started')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {instances.map((inst) => (
-                    <tr key={inst.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{inst.id.slice(0, 8)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{inst.definitionName}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    <tr key={inst.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">{inst.id.slice(0, 8)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{inst.definitionName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">
                         {inst.referenceType ? `${inst.referenceType}:${inst.referenceId?.slice(0, 8)}` : '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">
                         {t('workflow.step', { step: inst.currentStep })}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={inst.status === 'active' ? 'success' : inst.status === 'completed' ? 'info' : 'gray'}>{inst.status}</Badge>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(inst.startedAt)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{formatDateTime(inst.startedAt)}</td>
                     </tr>
                   ))}
                 </tbody>

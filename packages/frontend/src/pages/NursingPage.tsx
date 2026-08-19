@@ -6,6 +6,7 @@ import { confirmDialog } from '../components/ui';
 import { formatDateTime } from '../lib/format';
 import { Plus, Loader2, CheckCircle2, Play } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 interface NursingTaskForm {
   patientId: string;
@@ -108,8 +109,11 @@ export default function NursingPage() {
   return (
     <div>
       <div className="page-header">
-        <div><h1 className="page-title">{t('nursing.title')}</h1><p className="text-gray-500 mt-1">{tasks.length} tasks</p></div>
-        <button onClick={() => setShowNewModal(true)} className="btn-primary"><Plus className="w-4 h-4" />{t('nursing.newTask')}</button>
+        <div><h1 className="page-title">{t('nursing.title')}</h1><p className="text-[var(--text-muted)] mt-1">{tasks.length} tasks</p></div>
+        <Can permission="nursing.create">
+          <button onClick={() => setShowNewModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />{t('nursing.newTask')}</button>
+        </Can>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-6">
@@ -122,10 +126,10 @@ export default function NursingPage() {
         <table>
           <thead><tr><th>{t('nursing.title_')}</th><th>{t('nursing.patient')}</th><th>{t('nursing.category')}</th><th>{t('nursing.priority')}</th><th>{t('nursing.status')}</th><th>{t('nursing.dueAt')}</th><th>{t('common.actions')}</th></tr></thead>
           <tbody>
-            {filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-12 text-gray-500">{t('nursing.noTasks')}</td></tr> :
+            {filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-12 text-[var(--text-muted)]">{t('nursing.noTasks')}</td></tr> :
               filtered.map(task => (
-                <tr key={task.id} className="hover:bg-gray-50">
-                  <td><p className="font-medium">{task.title}</p>{task.description && <p className="text-xs text-gray-500 truncate max-w-xs">{task.description}</p>}</td>
+                <tr key={task.id} className="hover:bg-[var(--surface-secondary)]">
+                  <td><p className="font-medium">{task.title}</p>{task.description && <p className="text-xs text-[var(--text-muted)] truncate max-w-xs">{task.description}</p>}</td>
                   <td className="font-medium">{task.patientName}</td>
                   <td><span className="badge-info">{t(`nursing.${task.category}`) || task.category}</span></td>
                   <td><span className={`badge ${task.priority === 'urgent' ? 'badge-danger' : task.priority === 'high' ? 'badge-warning' : 'badge-info'}`}>{t(`nursing.${task.priority}`) || task.priority}</span></td>
@@ -160,7 +164,7 @@ export default function NursingPage() {
             error={formErrors.title} required />
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('nursing.description')}</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('nursing.description')}</label>
             <textarea className="input" rows={2} placeholder="Task details..." value={newTask.description}
               onChange={e => setNewTask(prev => ({ ...prev, description: e.target.value }))} />
           </div>

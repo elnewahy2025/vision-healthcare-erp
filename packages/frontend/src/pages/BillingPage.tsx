@@ -6,6 +6,7 @@ import { Modal, Input, Select, PatientSearchField, Button, Badge, EmptyState, Pa
 import { Plus, Trash2, DollarSign, FileText, TrendingUp, AlertTriangle, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { sanitizeNumber } from '../lib/sanitize';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 interface InvoiceItemForm {
   description: string;
@@ -345,12 +346,14 @@ export default function BillingPage() {
           <h1 className="page-title">{t('billing.title')}</h1>
           <p className="text-muted-txt mt-1">{t('billing.invoiceCount', { count: pagination.total })}</p>
         </div>
-        <Button
-          icon={<Plus className="w-4 h-4" />}
-          onClick={() => setShowNewModal(true)}
-        >
-          {t('billing.new')}
-        </Button>
+        <Can permission="billing.create">
+          <Button
+            icon={<Plus className="w-4 h-4" />}
+            onClick={() => setShowNewModal(true)}
+          >
+            {t('billing.new')}
+          </Button>
+        </Can>
       </div>
 
       {/* Revenue Summary Cards */}
@@ -440,29 +443,29 @@ export default function BillingPage() {
               <thead>
                 <tr>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none"
+                    className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none"
                     onClick={() => toggleSort('createdAt')}
                   >
                     <span className="flex items-center gap-1">
                       {t('billing.invoiceNumber')} <SortIndicator active={sortField === "createdAt"} direction={sortDirection} />
                     </span>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('billing.patient')}
                   </th>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none"
+                    className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none"
                     onClick={() => toggleSort('total')}
                   >
                     <span className="flex items-center gap-1">
                       {t('billing.total')} <SortIndicator active={sortField === "total"} direction={sortDirection} />
                     </span>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('billing.paid')}
                   </th>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none"
+                    className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none"
                     onClick={() => toggleSort('due')}
                   >
                     <span className="flex items-center gap-1">
@@ -470,21 +473,21 @@ export default function BillingPage() {
                     </span>
                   </th>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none"
+                    className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:bg-[var(--surface-hover)] select-none"
                     onClick={() => toggleSort('status')}
                   >
                     <span className="flex items-center gap-1">
                       {t('common.status')} <SortIndicator active={sortField === "status"} direction={sortDirection} />
                     </span>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('common.actions')}
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {invoices.map((invoice) => (
-                  <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={invoice.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">
                       {invoice.invoiceNumber}
                     </td>
@@ -526,7 +529,7 @@ export default function BillingPage() {
           {/* Pagination */}
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between px-6 py-3 border-t border-line bg-[var(--surface-secondary)]">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[var(--text-muted)]">
                 {t('common.pageOf', { current: page, total: pagination.totalPages })}
               </p>
               <div className="flex gap-2">

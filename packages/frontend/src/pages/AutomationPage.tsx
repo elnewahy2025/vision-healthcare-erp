@@ -10,6 +10,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 type AutomationTab = 'rules' | 'logs';
 
@@ -200,13 +201,15 @@ export default function AutomationPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('automation.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('automation.ruleCount', { count: rules.length })} · {t('automation.executionCount', { count: logs.length })}
           </p>
         </div>
-        <Button onClick={() => { setShowNewModal(true); void loadTriggerEvents(); }}>
+        <Can permission="automation.create">
+          <Button onClick={() => { setShowNewModal(true); void loadTriggerEvents(); }}>
           <Plus className="w-4 h-4" /> {t('automation.newRule')}
         </Button>
+        </Can>
       </div>
 
       <div className="flex gap-2 mb-6 flex-wrap">
@@ -254,12 +257,12 @@ export default function AutomationPage() {
                       <div className="flex items-center gap-3 flex-1">
                         <button
                           onClick={() => setExpandedRule(expandedRule === rule.id ? null : rule.id)}
-                          className="p-1 hover:bg-gray-100 rounded"
+                          className="p-1 hover:bg-[var(--surface-hover)] rounded"
                           aria-label={expandedRule === rule.id ? 'Collapse' : 'Expand'}
                         >
                           {expandedRule === rule.id
-                            ? <ChevronDown className="w-4 h-4 text-gray-400" />
-                            : <ChevronRight className="w-4 h-4 text-gray-400" />}
+                            ? <ChevronDown className="w-4 h-4 text-[var(--text-disabled)]" />
+                            : <ChevronRight className="w-4 h-4 text-[var(--text-disabled)]" />}
                         </button>
                         <Zap className={`w-5 h-5 ${rule.isActive ? 'text-primary-600' : 'text-gray-300'}`} />
                         <div>
@@ -288,15 +291,15 @@ export default function AutomationPage() {
 
                     {expandedRule === rule.id && (
                       <div className="mt-4 pt-4 border-t text-sm space-y-2">
-                        {rule.description && <p className="text-gray-600">{sanitizeString(rule.description)}</p>}
+                        {rule.description && <p className="text-[var(--text-secondary)]">{sanitizeString(rule.description)}</p>}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div><span className="text-gray-500">{t('automation.priority')}:</span> <span className="font-medium">{rule.priority}</span></div>
-                          <div><span className="text-gray-500">{t('automation.trigger')}:</span> <span className="font-medium">{sanitizeString(rule.triggerType)}</span></div>
+                          <div><span className="text-[var(--text-muted)]">{t('automation.priority')}:</span> <span className="font-medium">{rule.priority}</span></div>
+                          <div><span className="text-[var(--text-muted)]">{t('automation.trigger')}:</span> <span className="font-medium">{sanitizeString(rule.triggerType)}</span></div>
                           <div>
-                            <span className="text-gray-500">{t('automation.lastTriggered')}:</span>{' '}
+                            <span className="text-[var(--text-muted)]">{t('automation.lastTriggered')}:</span>{' '}
                             <span className="font-medium">{rule.lastTriggeredAt ? formatDateTime(rule.lastTriggeredAt) : t('automation.never')}</span>
                           </div>
-                          <div><span className="text-gray-500">{t('automation.cooldown')}:</span> <span className="font-medium">{rule.cooldownMinutes} min</span></div>
+                          <div><span className="text-[var(--text-muted)]">{t('automation.cooldown')}:</span> <span className="font-medium">{rule.cooldownMinutes} min</span></div>
                         </div>
                       </div>
                     )}
@@ -330,7 +333,7 @@ export default function AutomationPage() {
                 </tr>
               ) : (
                 logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
+                  <tr key={log.id} className="hover:bg-[var(--surface-secondary)]">
                     <td className="font-medium text-sm">{sanitizeString(log.ruleName)}</td>
                     <td><Badge>{sanitizeString(log.triggerType)}</Badge></td>
                     <td>
@@ -360,7 +363,7 @@ export default function AutomationPage() {
 
       <Modal open={showTriggerModal} onClose={() => { setShowTriggerModal(false); setTriggerRule(null); }} title={`${t('automation.trigger')}: ${triggerRule?.name ?? ''}`} size="md">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">{t('automation.triggerDescription')}</p>
+          <p className="text-sm text-[var(--text-secondary)]">{t('automation.triggerDescription')}</p>
           <Button className="w-full" onClick={handleTrigger} loading={triggering}>
             <Play className="w-4 h-4" /> {t('automation.triggerNow')}
           </Button>
@@ -369,7 +372,7 @@ export default function AutomationPage() {
 
       <Modal open={showDeleteModal} onClose={() => { setShowDeleteModal(false); setDeleteRule(null); }} title={t('automation.confirmDeleteTitle')} size="sm">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">{t('automation.confirmDeleteMessage')}</p>
+          <p className="text-sm text-[var(--text-secondary)]">{t('automation.confirmDeleteMessage')}</p>
           <div className="flex gap-2">
             <Button variant="secondary" className="flex-1" onClick={() => { setShowDeleteModal(false); setDeleteRule(null); }}>
               {t('automation.cancel')}

@@ -9,6 +9,7 @@ import { Plus, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate } from '../lib/format';
 
+import { Can } from '../components/Can';
 interface PatientFormData {
   firstName: string;
   lastName: string;
@@ -183,12 +184,14 @@ export default function PatientsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('patient.title')}</h1>
-          <p className="text-gray-500 mt-1">{pagination.total} total patients</p>
+          <p className="text-[var(--text-muted)] mt-1">{pagination.total} total patients</p>
         </div>
-        <button onClick={() => setShowNewModal(true)} className="btn-primary">
-          <Plus className="w-4 h-4" />
-          {t('patient.new')}
-        </button>
+        <Can permission="patients.create">
+          <button onClick={() => setShowNewModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />
+            {t('patient.new')}
+          </button>
+        </Can>
       </div>
 
       <div className="card mb-6">
@@ -222,10 +225,10 @@ export default function PatientsPage() {
             {loading ? (
               <tr><td colSpan={10} className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary-600" /></td></tr>
             ) : patients.length === 0 ? (
-              <tr><td colSpan={10} className="text-center py-12 text-gray-500">{t('common.noData')}</td></tr>
+              <tr><td colSpan={10} className="text-center py-12 text-[var(--text-muted)]">{t('common.noData')}</td></tr>
             ) : (
               patients.map((p: PatientListItem) => (
-                <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/patients/${p.id}`)}>
+                <tr key={p.id} className="hover:bg-[var(--surface-secondary)] cursor-pointer" onClick={() => navigate(`/patients/${p.id}`)}>
                   <td className="font-mono text-xs text-primary-600">{p.medicalRecordNumber}</td>
                   <td className="font-medium">{p.firstName}</td>
                   <td>{p.lastName}</td>
@@ -237,8 +240,12 @@ export default function PatientsPage() {
                   <td><span className={p.status === 'active' ? 'badge-success' : 'badge-gray'}>{p.status}</span></td>
                   <td>
                     <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                      <Link to={`/patients/${p.id}`} className="btn-ghost btn-sm">{t('common.edit')}</Link>
-                      <button onClick={() => handleDelete(p.id)} className="btn-ghost btn-sm text-red-600">{t('common.delete')}</button>
+                      <Can permission="patients.update">
+                        <Link to={`/patients/${p.id}`} className="btn-ghost btn-sm">{t('common.edit')}</Link>
+                      </Can>
+                      <Can permission="patients.delete">
+                        <button onClick={() => handleDelete(p.id)} className="btn-ghost btn-sm text-red-600">{t('common.delete')}</button>
+                      </Can>
                     </div>
                   </td>
                 </tr>
@@ -250,7 +257,7 @@ export default function PatientsPage() {
 
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
-          <p className="text-sm text-gray-500">Page {page} of {pagination.totalPages}</p>
+          <p className="text-sm text-[var(--text-muted)]">Page {page} of {pagination.totalPages}</p>
           <div className="flex gap-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary btn-sm"><ChevronLeft className="w-4 h-4" /></button>
             <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page === pagination.totalPages} className="btn-secondary btn-sm"><ChevronRight className="w-4 h-4" /></button>

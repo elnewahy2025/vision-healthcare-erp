@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   ArrowUp,
 } from 'lucide-react';
+import { Can } from '../components/Can';
 
 type PeriodKey = 'week' | 'month' | 'quarter' | 'year';
 type TabType = 'overview' | 'pl';
@@ -100,7 +101,7 @@ export default function FinancialReportsPage() {
     return (
       <div className="p-6 text-center py-12">
         <AlertTriangle className="mx-auto w-12 h-12 text-red-400" />
-        <p className="mt-4 text-gray-500">{error}</p>
+        <p className="mt-4 text-[var(--text-muted)]">{error}</p>
       </div>
     );
   }
@@ -122,11 +123,11 @@ export default function FinancialReportsPage() {
         </select>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-200 pb-2">
+      <div className="flex gap-2 border-b border-[var(--border)] pb-2">
         <button
           onClick={() => setTab('overview')}
           className={`px-4 py-2 rounded-t-lg font-medium text-sm ${
-            tab === 'overview' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+            tab === 'overview' ? 'bg-blue-600 text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
           }`}
         >
           {t('finRep.overview')}
@@ -134,7 +135,7 @@ export default function FinancialReportsPage() {
         <button
           onClick={() => setTab('pl')}
           className={`px-4 py-2 rounded-t-lg font-medium text-sm ${
-            tab === 'pl' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+            tab === 'pl' ? 'bg-blue-600 text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
           }`}
         >
           {t('finRep.plStatement')}
@@ -144,52 +145,52 @@ export default function FinancialReportsPage() {
       {tab === 'overview' && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                   <DollarSign className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">{t('finRep.totalRevenue')}</p>
+                  <p className="text-sm text-[var(--text-muted)]">{t('finRep.totalRevenue')}</p>
                   <p className="text-xl font-bold text-green-600">
                     {(revenue?.totalRevenue ?? 0).toLocaleString()} EGP
                   </p>
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                   <TrendingUp className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">{t('finRep.collected')}</p>
+                  <p className="text-sm text-[var(--text-muted)]">{t('finRep.collected')}</p>
                   <p className="text-xl font-bold text-blue-600">
                     {(revenue?.totalCollected ?? 0).toLocaleString()} EGP
                   </p>
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
                   <ArrowUp className="w-5 h-5 text-yellow-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">{t('finRep.outstanding')}</p>
+                  <p className="text-sm text-[var(--text-muted)]">{t('finRep.outstanding')}</p>
                   <p className="text-xl font-bold text-yellow-600">
                     {(revenue?.totalOutstanding ?? 0).toLocaleString()} EGP
                   </p>
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                   <Wallet className="w-5 h-5 text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">{t('finRep.collectionRate')}</p>
+                  <p className="text-sm text-[var(--text-muted)]">{t('finRep.collectionRate')}</p>
                   <p className="text-xl font-bold text-purple-600">{calcRate()}%</p>
                 </div>
               </div>
@@ -198,13 +199,13 @@ export default function FinancialReportsPage() {
 
           {/* Revenue by Category */}
           {(revenue?.revenueByCategory ?? []).length > 0 && (
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 {t('finRep.revenue')} {t('finRep.byCategory')}
               </h3>
               <div className="space-y-2">
                 {revenue!.revenueByCategory.map((cat) => (
-                  <div key={cat.category} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                  <div key={cat.category} className="flex justify-between items-center p-2 bg-[var(--surface-secondary)] rounded">
                     <span className="text-sm font-medium">{cat.category}</span>
                     <span className="text-sm font-semibold">{Number(cat.total).toLocaleString()} EGP</span>
                   </div>
@@ -215,16 +216,16 @@ export default function FinancialReportsPage() {
 
           {/* Aging */}
           {agingData.length > 0 && (
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 {t('finRep.agingBuckets')}
               </h3>
               <div className="space-y-2">
                 {agingData.map((bucket) => (
-                  <div key={bucket.range} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                  <div key={bucket.range} className="flex justify-between items-center p-2 bg-[var(--surface-secondary)] rounded text-sm">
                     <span className="font-medium">{bucket.range}</span>
                     <div className="flex gap-4">
-                      <span className="text-gray-500">{bucket.count} {t('finRep.count').toLowerCase()}</span>
+                      <span className="text-[var(--text-muted)]">{bucket.count} {t('finRep.count').toLowerCase()}</span>
                       <span className="font-semibold">{Number(bucket.total).toLocaleString()} EGP</span>
                     </div>
                   </div>
@@ -235,18 +236,18 @@ export default function FinancialReportsPage() {
 
           {/* Top Patients */}
           {topPatientsData.length > 0 && (
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 {t('finRep.topPatients')}
               </h3>
               <div className="space-y-2">
                 {topPatientsData.map((p, idx) => (
-                  <div key={p.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                  <div key={p.id} className="flex justify-between items-center p-2 bg-[var(--surface-secondary)] rounded text-sm">
                     <div className="flex items-center gap-3">
-                      <span className="font-bold text-gray-400 w-6 text-center">{idx + 1}</span>
+                      <span className="font-bold text-[var(--text-disabled)] w-6 text-center">{idx + 1}</span>
                       <span className="font-medium">{p.name}</span>
                     </div>
-                    <div className="flex gap-4 text-xs text-gray-500">
+                    <div className="flex gap-4 text-xs text-[var(--text-muted)]">
                       <span>{p.invoiceCount} {t('finRep.invoiceCount').toLowerCase()}</span>
                       <span className="font-semibold text-green-600">{Number(p.total).toLocaleString()} EGP</span>
                     </div>
@@ -261,11 +262,11 @@ export default function FinancialReportsPage() {
       {/* P&L Statement Tab */}
       {tab === 'pl' && plReport && (
         <div className="space-y-6">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[var(--text-muted)]">
             {t('finRep.period')}: {plReport.period.from} — {plReport.period.to}
           </p>
 
-          <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+          <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
             <h3 className="font-semibold text-lg text-green-700 mb-3 flex items-center gap-2">
               <TrendingUp className="w-5 h-5" /> {t('finRep.revenue')}
             </h3>
@@ -275,17 +276,17 @@ export default function FinancialReportsPage() {
                 <span className="font-bold text-green-700">{plReport.revenue.total.toLocaleString()} EGP</span>
               </div>
               <div className="flex justify-between items-center p-2">
-                <span className="text-sm text-gray-600 ml-4">{t('finRep.collected')}</span>
+                <span className="text-sm text-[var(--text-secondary)] ml-4">{t('finRep.collected')}</span>
                 <span className="font-medium">{plReport.revenue.collected.toLocaleString()} EGP</span>
               </div>
               <div className="flex justify-between items-center p-2">
-                <span className="text-sm text-gray-600 ml-4">{t('finRep.outstanding')}</span>
+                <span className="text-sm text-[var(--text-secondary)] ml-4">{t('finRep.outstanding')}</span>
                 <span className="font-medium text-yellow-600">{plReport.revenue.outstanding.toLocaleString()} EGP</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+          <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
             <h3 className="font-semibold text-lg text-orange-700 mb-3 flex items-center gap-2">
               <Wallet className="w-5 h-5" /> {t('finRep.expenses')}
             </h3>
@@ -296,14 +297,14 @@ export default function FinancialReportsPage() {
               </div>
               {plReport.expenses.byCategory?.map((cat) => (
                 <div key={cat.category} className="flex justify-between items-center p-2">
-                  <span className="text-sm text-gray-600 ml-4">{cat.category}</span>
+                  <span className="text-sm text-[var(--text-secondary)] ml-4">{cat.category}</span>
                   <span className="font-medium">{Number(cat.total).toLocaleString()} EGP</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+          <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
             <div className="space-y-3">
               <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
                 <span className="text-lg font-bold">{t('finRep.grossProfit')}</span>
@@ -312,7 +313,7 @@ export default function FinancialReportsPage() {
                 </span>
               </div>
               <div className="flex justify-between items-center p-3">
-                <span className="font-medium text-gray-700">{t('finRep.profitMargin')}</span>
+                <span className="font-medium text-[var(--text-primary)]">{t('finRep.profitMargin')}</span>
                 <span className={`font-bold ${plReport.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {plReport.profitMargin.toFixed(1)}%
                 </span>
@@ -321,7 +322,7 @@ export default function FinancialReportsPage() {
           </div>
 
           {(plReport.revenueByMonth ?? []).length > 0 && (
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
               <h3 className="font-semibold mb-3">{t('finRep.monthlyTrend')}</h3>
               <div className="space-y-2">
                 {plReport.revenueByMonth.map((m) => {
@@ -330,7 +331,7 @@ export default function FinancialReportsPage() {
                   const exp = Number(expMonth?.total || 0);
                   const profit = rev - exp;
                   return (
-                    <div key={m.month} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <div key={m.month} className="flex items-center justify-between p-2 bg-[var(--surface-secondary)] rounded">
                       <span className="text-sm font-medium w-20">{m.month}</span>
                       <div className="flex-1 flex gap-4 text-xs">
                         <span className="text-green-600">Rev: {rev.toLocaleString()}</span>

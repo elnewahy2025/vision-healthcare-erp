@@ -2,10 +2,30 @@ import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { db } from '../../core/database.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
-import { PatientNotFoundError } from '@healthcare/shared/errors';
+import { PatientNotFoundError, ForbiddenError } from '@healthcare/shared/errors';
 import { authenticate } from '../auth-guard.js';
-import { authorize } from '../../services/authorization.js';
+import { authorize, hasPermission, assignedPatientIds, type Principal } from '../../services/authorization.js';
 import { logAudit } from '../../services/audit.js';
+
+/**
+ * Scope resolution for laboratory module.
+ * Enforces branch/department/assignment-level data isolation.
+ */
+async function resolveLabListScope(principal: Principal): Promise<{
+  branchIds?: string[];
+  patientIds?: string[];
+}> {
+  if (hasPermission(principal, 'laboratory.view', 'system') || hasPermission(principal, 'laboratory.view', 'tenant')) {
+    return {};
+  }
+  if (hasPermission(principal, 'laboratory.view', 'branch') || hasPermission(principal, 'laboratory.view', 'branches')) {
+    return { branchIds: principal.branches };
+  }
+  if (hasPermission(principal, 'laboratory.view', 'department') || hasPermission(principal, 'laboratory.view', 'assigned_patients')) {
+    return { patientIds: await assignedPatientIds(principal) };
+  }
+  return { patientIds: [] };
+}
 
 interface LabCatalogRow {
   id: string;
@@ -36,9 +56,11 @@ interface LabOrderRow {
   p_first?: string;
   p_last?: string;
   medical_record_number?: string;
+  branch_id?: string;
 }
 
 export async function registerLaboratoryModule(app: FastifyInstance) {
+  // ── Lab Catalog (tenant-wide — catalog is shared) ──
   app.get('/api/v1/lab/catalog', { preHandler: [authenticate, authorize('laboratory.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const catalog = await db('lab_catalog').where({ tenant_id: tenantId, is_active: true }).orderBy('test_name');
@@ -49,7 +71,7 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/lab/catalog', { preHandler: [authenticate, authorize('laboratory.view')] }, async (request, reply) => {
+  app.post('/api/v1/lab/catalog', { preHandler: [authenticate, authorize('laboratory.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
@@ -64,19 +86,47 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
     return sendSuccess(reply, item, 'Lab test added', 201);
   });
 
+  // ── Lab Orders (scope-enforced) ──
   app.get('/api/v1/lab/orders', { preHandler: [authenticate, authorize('laboratory.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
     const { status, patientId } = request.query as { patientId?: string; status?: string };
-    let q = db('lab_orders').where('lab_orders.tenant_id', tenantId).whereNull('lab_orders.deleted_at');
+    const scope = await resolveLabListScope(principal);
+
+    let q = db('lab_orders')
+      .where('lab_orders.tenant_id', tenantId)
+      .whereNull('lab_orders.deleted_at');
+
+    // Apply scope filters
+    if (scope.branchIds !== undefined) {
+      if (scope.branchIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('lab_orders.patient_id', function () {
+          this.select('id').from('patients').whereIn('branch_id', scope.branchIds!);
+        });
+      }
+    }
+    if (scope.patientIds !== undefined) {
+      if (scope.patientIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('lab_orders.patient_id', scope.patientIds);
+      }
+    }
+
     if (status) q = q.andWhere('lab_orders.status', status);
     if (patientId) q = q.andWhere('lab_orders.patient_id', patientId);
+
     const orders = await q.join('patients', 'lab_orders.patient_id', 'patients.id')
       .select('lab_orders.*', 'patients.first_name as p_first', 'patients.last_name as p_last', 'patients.medical_record_number')
       .orderBy('created_at', 'desc').limit(50);
+
+    await logAudit({ tenantId, userId: principal.userId, action: 'lab.orders_listed', entityType: 'lab_orders' });
     return sendSuccess(reply, orders.map(mapLabOrder));
   });
 
-  app.post('/api/v1/lab/orders', { preHandler: [authenticate, authorize('laboratory.view')] }, async (request, reply) => {
+  app.post('/api/v1/lab/orders', { preHandler: [authenticate, authorize('laboratory.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
@@ -102,7 +152,7 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
     return sendSuccess(reply, { id: order.id, orderNumber: order.order_number }, 'Lab order created', 201);
   });
 
-  app.put('/api/v1/lab/orders/:id/status', { preHandler: [authenticate, authorize('laboratory.view')] }, async (request, reply) => {
+  app.put('/api/v1/lab/orders/:id/status', { preHandler: [authenticate, authorize('laboratory.edit')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const { id } = request.params as { id: string };
@@ -118,7 +168,7 @@ export async function registerLaboratoryModule(app: FastifyInstance) {
     return sendSuccess(reply, null, "Lab order updated");
   });
 
-  app.post('/api/v1/lab/orders/:id/results', { preHandler: [authenticate, authorize('laboratory.view')] }, async (request, reply) => {
+  app.post('/api/v1/lab/orders/:id/results', { preHandler: [authenticate, authorize('laboratory.edit')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const { id } = request.params as { id: string };

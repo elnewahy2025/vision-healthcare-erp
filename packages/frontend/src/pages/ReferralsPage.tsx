@@ -4,6 +4,7 @@ import { apiClient as api } from '../lib/api';
 import { Modal, Input, Select, PatientSearchField } from '../components/ui';
 import { Plus, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 interface ReferralForm {
   patientId: string;
@@ -83,8 +84,11 @@ export default function ReferralsPage() {
   return (
     <div>
       <div className="page-header">
-        <div><h1 className="page-title">{t('referral.title')}</h1><p className="text-gray-500 mt-1">{referrals.length} referrals</p></div>
-        <button onClick={() => setShowNewModal(true)} className="btn-primary"><Plus className="w-4 h-4" />{t('referral.newReferral')}</button>
+        <div><h1 className="page-title">{t('referral.title')}</h1><p className="text-[var(--text-muted)] mt-1">{referrals.length} referrals</p></div>
+        <Can permission="referrals.create">
+          <button onClick={() => setShowNewModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />{t('referral.newReferral')}</button>
+        </Can>
       </div>
 
       <div className="card mb-6"><div className="card-body">
@@ -95,9 +99,9 @@ export default function ReferralsPage() {
         <table>
           <thead><tr><th>{t('referral.referralNumber')}</th><th>{t('referral.patient')}</th><th>{t('referral.type')}</th><th>{t('referral.status')}</th><th>{t('referral.priority')}</th><th>{t('referral.date')}</th></tr></thead>
           <tbody>
-            {filtered.length === 0 ? <tr><td colSpan={6} className="text-center py-12 text-gray-500">{t('referral.noReferrals')}</td></tr> :
+            {filtered.length === 0 ? <tr><td colSpan={6} className="text-center py-12 text-[var(--text-muted)]">{t('referral.noReferrals')}</td></tr> :
               filtered.map(r => (
-                <tr key={r.id} className="hover:bg-gray-50">
+                <tr key={r.id} className="hover:bg-[var(--surface-secondary)]">
                   <td className="font-mono text-xs text-primary-600">{r.referralNumber}</td>
                   <td className="font-medium">{r.patientName}</td>
                   <td><span className="badge-info">{t(`referral.${r.referralType}`)}</span></td>
@@ -130,21 +134,21 @@ export default function ReferralsPage() {
           </div>
 
           {isExternal && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-[var(--surface-secondary)] rounded-lg">
               <Input label={t('referral.externalFacility')} value={newRef.externalFacility} onChange={e => setNewRef(prev => ({ ...prev, externalFacility: e.target.value }))} />
               <Input label={t('referral.externalDoctor')} value={newRef.externalDoctor} onChange={e => setNewRef(prev => ({ ...prev, externalDoctor: e.target.value }))} />
             </div>
           )}
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('referral.reason')} *</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('referral.reason')} *</label>
             <textarea className={`input ${formErrors.reason ? 'border-red-500' : ''}`} rows={2} placeholder="Reason for referral..."
               value={newRef.reason} onChange={e => setNewRef(prev => ({ ...prev, reason: e.target.value }))} />
             {formErrors.reason && <p className="text-sm text-red-600">{formErrors.reason}</p>}
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('referral.clinicalNotes')}</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('referral.clinicalNotes')}</label>
             <textarea className="input" rows={3} placeholder="Relevant history, diagnoses, medications..."
               value={newRef.clinicalNotes} onChange={e => setNewRef(prev => ({ ...prev, clinicalNotes: e.target.value }))} />
           </div>
@@ -152,7 +156,7 @@ export default function ReferralsPage() {
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={newRef.consentObtained}
               onChange={e => setNewRef(prev => ({ ...prev, consentObtained: e.target.checked }))}
-              className="rounded border-gray-300 text-primary-600" />
+              className="rounded border-[var(--border-strong)] text-primary-600" />
             <span className="text-sm">{t('referral.consentObtained')}</span>
           </label>
         </form>

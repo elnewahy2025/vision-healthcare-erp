@@ -18,6 +18,7 @@ import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 import { isValidPortalPhone } from '@healthcare/shared/utils/portal';
 import { COUNTRY_CODES } from '../lib/countryCodes';
+import { Can } from '../components/Can';
 
 type Page = 'home' | 'appointments' | 'records' | 'surveys' | 'notifications' | 'bills' | 'documents' | 'messages';
 
@@ -162,17 +163,17 @@ export default function PatientMobileAppPage() {
   if (!loggedIn) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full">
+        <div className="bg-[var(--surface)] rounded-2xl shadow-2xl p-8 max-w-sm w-full">
           <Smartphone className="w-12 h-12 text-blue-600 mx-auto mb-4" />
           <h1 className="text-xl font-bold text-center mb-6">{t('patientApp.title')}</h1>
 
           {otpStep === 'phone' && (
             <>
-              <label className="block text-xs font-medium text-gray-500 mb-1">
+              <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">
                 {t('patientApp.countryCode')}
               </label>
               <select
-                className="w-full p-3 border rounded-lg mb-3 text-base bg-white"
+                className="w-full p-3 border rounded-lg mb-3 text-base bg-[var(--surface)]"
                 value={countryCode}
                 onChange={(e) => setCountryCode(e.target.value)}
               >
@@ -186,13 +187,15 @@ export default function PatientMobileAppPage() {
                 inputMode="tel"
                 type="tel"
               />
-              <Button
+              <Can permission="patient_self_service.view">
+          <Button
                 onClick={handleRequestOtp}
                 loading={requestingOtp}
                 className="w-full min-h-[48px] text-base font-bold"
               >
                 {requestingOtp ? t('patientApp.requestingOtp') : t('patientApp.login')}
               </Button>
+        </Can>
             </>
           )}
 
@@ -223,7 +226,7 @@ export default function PatientMobileAppPage() {
             </>
           )}
 
-          <p className="text-center text-xs text-gray-400 mt-4">
+          <p className="text-center text-xs text-[var(--text-disabled)] mt-4">
             {t('patientApp.enterOtpHint')}
           </p>
         </div>
@@ -232,8 +235,8 @@ export default function PatientMobileAppPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <div className="w-full max-w-sm mx-auto bg-white shadow-2xl flex flex-col h-screen max-h-[800px]">
+    <div className="min-h-screen bg-[var(--surface-secondary)] flex">
+      <div className="w-full max-w-sm mx-auto bg-[var(--surface)] shadow-2xl flex flex-col h-screen max-h-[800px]">
         <div className="bg-blue-600 text-white p-4 pt-6">
           <div className="flex justify-between items-center mb-4">
             <p className="text-sm opacity-75">{t('patientApp.title')}</p>
@@ -286,19 +289,19 @@ export default function PatientMobileAppPage() {
                 appointments.map((apt) => (
                   <div
                     key={apt.id}
-                    className="bg-white border rounded-xl dark:bg-gray-900 dark:border-gray-800 p-4 flex justify-between items-center"
+                    className="bg-[var(--surface)] border rounded-xl dark:bg-[var(--background)] dark:border-gray-800 p-4 flex justify-between items-center"
                   >
                     <div>
                       <p className="font-medium text-sm">
                         {apt.date} {apt.time} - {sanitizeString(apt.doctor_name)}
                       </p>
-                      <p className="text-xs text-gray-500">{apt.type}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{apt.type}</p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                    <ChevronRight className="w-4 h-4 text-[var(--text-disabled)]" />
                   </div>
                 ))
               ) : (
-                <p className="text-gray-400 text-center py-8">{t('patientApp.noAppointments')}</p>
+                <p className="text-[var(--text-disabled)] text-center py-8">{t('patientApp.noAppointments')}</p>
               )}
             </div>
           )}
@@ -310,19 +313,19 @@ export default function PatientMobileAppPage() {
                 records.map((rec) => (
                   <div
                     key={rec.id}
-                    className="bg-white border rounded-xl dark:bg-gray-900 dark:border-gray-800 p-4 flex justify-between items-center"
+                    className="bg-[var(--surface)] border rounded-xl dark:bg-[var(--background)] dark:border-gray-800 p-4 flex justify-between items-center"
                   >
                     <div>
                       <p className="font-medium text-sm">{sanitizeString(rec.title)}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-[var(--text-muted)]">
                         {rec.type} - {rec.date}
                       </p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                    <ChevronRight className="w-4 h-4 text-[var(--text-disabled)]" />
                   </div>
                 ))
               ) : (
-                <p className="text-gray-400 text-center py-8">{t('patientApp.noRecords')}</p>
+                <p className="text-[var(--text-disabled)] text-center py-8">{t('patientApp.noRecords')}</p>
               )}
             </div>
           )}
@@ -334,23 +337,23 @@ export default function PatientMobileAppPage() {
                 bills.map((bill) => (
                   <div
                     key={bill.id}
-                    className="bg-white border rounded-xl dark:bg-gray-900 dark:border-gray-800 p-4 flex justify-between items-center"
+                    className="bg-[var(--surface)] border rounded-xl dark:bg-[var(--background)] dark:border-gray-800 p-4 flex justify-between items-center"
                   >
                     <div>
                       <p className="font-medium text-sm">{sanitizeString(bill.description)}</p>
-                      <p className="text-xs text-gray-500">{bill.date}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{bill.date}</p>
                     </div>
                     <span className="font-bold text-sm">{bill.amount} EGP</span>
                   </div>
                 ))
               ) : (
-                <p className="text-gray-400 text-center py-8">{t('patientApp.noBills')}</p>
+                <p className="text-[var(--text-disabled)] text-center py-8">{t('patientApp.noBills')}</p>
               )}
             </div>
           )}
 
           {page === 'surveys' && (
-            <div className="text-center py-8 text-gray-400">
+            <div className="text-center py-8 text-[var(--text-disabled)]">
               <Heart className="w-12 h-12 mx-auto mb-2" />
               <p className="font-medium">{t('patientApp.noSurveys')}</p>
             </div>
@@ -363,14 +366,14 @@ export default function PatientMobileAppPage() {
                 notifications.map((n) => (
                   <div
                     key={n.id}
-                    className={`bg-white border rounded-xl dark:bg-gray-900 dark:border-gray-800 p-4 ${n.read ? '' : 'border-l-4 border-l-blue-500'}`}
+                    className={`bg-[var(--surface)] border rounded-xl dark:bg-[var(--background)] dark:border-gray-800 p-4 ${n.read ? '' : 'border-l-4 border-l-blue-500'}`}
                   >
                     <p className="text-sm font-medium">{sanitizeString(n.message)}</p>
-                    <p className="text-xs text-gray-400 mt-1">{formatDateTime(n.created_at)}</p>
+                    <p className="text-xs text-[var(--text-disabled)] mt-1">{formatDateTime(n.created_at)}</p>
                   </div>
                 ))
               ) : (
-                <p className="text-gray-400 text-center py-8">{t('patientApp.noNotifications')}</p>
+                <p className="text-[var(--text-disabled)] text-center py-8">{t('patientApp.noNotifications')}</p>
               )}
             </div>
           )}
@@ -378,12 +381,12 @@ export default function PatientMobileAppPage() {
           {page === 'messages' && (
             <div className="space-y-3">
               <h3 className="font-semibold text-lg">{t('patientApp.messages')}</h3>
-              <p className="text-gray-400 text-center py-8">{t('patientApp.noMessages')}</p>
+              <p className="text-[var(--text-disabled)] text-center py-8">{t('patientApp.noMessages')}</p>
             </div>
           )}
         </div>
 
-        <div className="border-t bg-white p-2 flex justify-around">
+        <div className="border-t bg-[var(--surface)] p-2 flex justify-around">
           {[
             { page: 'home' as Page, label: t('patientApp.home') },
             { page: 'appointments' as Page, label: t('patientApp.appointments') },
@@ -395,7 +398,7 @@ export default function PatientMobileAppPage() {
               key={item.page}
               onClick={() => setPage(item.page)}
               className={`p-2 text-center min-w-[48px] ${
-                page === item.page ? 'text-blue-600 font-medium' : 'text-gray-500'
+                page === item.page ? 'text-blue-600 font-medium' : 'text-[var(--text-muted)]'
               }`}
               type="button"
             >

@@ -13,6 +13,7 @@ import {
   PageLoader, Card, CardBody, Button,
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
+import { Can } from '../components/Can';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
 
@@ -224,12 +225,14 @@ export default function AnalyticsDashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('analytics.title')}</h1>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('analytics.title')}</h1>
         </div>
-        <Button onClick={handleRefresh} disabled={refreshing}>
+        <Can permission="analytics_dashboard.view">
+          <Button onClick={handleRefresh} disabled={refreshing}>
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           {refreshing ? t('analytics.refreshing') : t('analytics.refresh')}
         </Button>
+        </Can>
       </div>
 
       {/* KPI Cards */}
@@ -237,37 +240,37 @@ export default function AnalyticsDashboardPage() {
         <Card><CardBody className="p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 bg-blue-100 rounded-lg"><Users className="w-4 h-4 text-blue-600" /></div>
-            <p className="text-xs text-gray-500">{t('analytics.totalPatients')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('analytics.totalPatients')}</p>
           </div>
-          <p className="text-lg font-bold text-gray-900">{data.totals.patients.toLocaleString()}</p>
+          <p className="text-lg font-bold text-[var(--text-primary)]">{data.totals.patients.toLocaleString()}</p>
         </CardBody></Card>
         <Card><CardBody className="p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 bg-green-100 rounded-lg"><Calendar className="w-4 h-4 text-green-600" /></div>
-            <p className="text-xs text-gray-500">{t('analytics.totalAppointments')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('analytics.totalAppointments')}</p>
           </div>
-          <p className="text-lg font-bold text-gray-900">{data.totals.appointments.toLocaleString()}</p>
+          <p className="text-lg font-bold text-[var(--text-primary)]">{data.totals.appointments.toLocaleString()}</p>
         </CardBody></Card>
         <Card><CardBody className="p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 bg-yellow-100 rounded-lg"><DollarSign className="w-4 h-4 text-yellow-600" /></div>
-            <p className="text-xs text-gray-500">{t('analytics.totalRevenue')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('analytics.totalRevenue')}</p>
           </div>
-          <p className="text-lg font-bold text-gray-900">{formatCurrency(data.totals.revenue)}</p>
+          <p className="text-lg font-bold text-[var(--text-primary)]">{formatCurrency(data.totals.revenue)}</p>
         </CardBody></Card>
         <Card><CardBody className="p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 bg-purple-100 rounded-lg"><BarChart3 className="w-4 h-4 text-purple-600" /></div>
-            <p className="text-xs text-gray-500">{t('analytics.doctorPerformance')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('analytics.doctorPerformance')}</p>
           </div>
-          <p className="text-lg font-bold text-gray-900">{data.doctorPerformance.length}</p>
+          <p className="text-lg font-bold text-[var(--text-primary)]">{data.doctorPerformance.length}</p>
         </CardBody></Card>
       </div>
 
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card><CardBody className="p-4">
-          <h3 className="font-semibold text-gray-900 mb-4">{t('analytics.appointmentTrend')}</h3>
+          <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('analytics.appointmentTrend')}</h3>
           <ResponsiveContainer width="100%" height={250}>
             <AreaChart data={data.appointmentTrend}>
               <defs>
@@ -286,7 +289,7 @@ export default function AnalyticsDashboardPage() {
         </CardBody></Card>
 
         <Card><CardBody className="p-4">
-          <h3 className="font-semibold text-gray-900 mb-4">{t('analytics.revenueTrend')}</h3>
+          <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('analytics.revenueTrend')}</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={data.revenueTrend}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -302,7 +305,7 @@ export default function AnalyticsDashboardPage() {
       {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card><CardBody className="p-4">
-          <h3 className="font-semibold text-gray-900 mb-4">{t('analytics.patientDemographics')}</h3>
+          <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('analytics.patientDemographics')}</h3>
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
               <Pie data={data.patientDemographics} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
@@ -314,7 +317,7 @@ export default function AnalyticsDashboardPage() {
         </CardBody></Card>
 
         <Card><CardBody className="p-4">
-          <h3 className="font-semibold text-gray-900 mb-4">{t('analytics.appointmentTypes')}</h3>
+          <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('analytics.appointmentTypes')}</h3>
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
               <Pie data={data.appointmentTypes} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} label>
@@ -326,7 +329,7 @@ export default function AnalyticsDashboardPage() {
         </CardBody></Card>
 
         <Card><CardBody className="p-4">
-          <h3 className="font-semibold text-gray-900 mb-4">{t('analytics.monthlyRevenue')}</h3>
+          <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('analytics.monthlyRevenue')}</h3>
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={data.monthlyRevenue}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -341,7 +344,7 @@ export default function AnalyticsDashboardPage() {
 
       {/* Doctor Performance */}
       <Card><CardBody className="p-4">
-        <h3 className="font-semibold text-gray-900 mb-4">{t('analytics.doctorPerformance')}</h3>
+        <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('analytics.doctorPerformance')}</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data.doctorPerformance} layout="vertical">
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />

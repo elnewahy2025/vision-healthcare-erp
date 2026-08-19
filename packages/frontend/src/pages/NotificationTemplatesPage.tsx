@@ -5,6 +5,7 @@ import { MessageSquare, Plus, Send, Edit3, X, Check } from 'lucide-react';
 import { Button, Input, PageLoader, EmptyState, Badge, Modal, Select } from '../components/ui';
 import { communicationsApi } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 interface NotificationTemplate {
   id: string;
@@ -152,13 +153,15 @@ export default function NotificationTemplatesPage() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <MessageSquare className="w-6 h-6" /> {t('notifTmpl.title')}
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('notifTmpl.templateCount', { count: templates.length })}
           </p>
         </div>
-        <Button onClick={openCreate} icon={<Plus className="w-4 h-4" />}>
+        <Can permission="communications.create">
+          <Button onClick={openCreate} icon={<Plus className="w-4 h-4" />}>
           {t('notifTmpl.newTemplate')}
         </Button>
+        </Can>
       </div>
 
       {templates.length === 0 ? (
@@ -170,15 +173,15 @@ export default function NotificationTemplatesPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {templates.map((tmpl) => (
-            <div key={tmpl.id} className="bg-white border rounded-lg p-4 dark:bg-gray-900 dark:border-gray-800">
+            <div key={tmpl.id} className="bg-[var(--surface)] border rounded-lg p-4 dark:bg-[var(--background)] dark:border-gray-800">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-sm font-medium text-gray-900">
+                    <span className="font-mono text-sm font-medium text-[var(--text-primary)]">
                       {sanitizeString(tmpl.code)}
                     </span>
                     {tmpl.name && (
-                      <span className="text-sm text-gray-500">{sanitizeString(tmpl.name)}</span>
+                      <span className="text-sm text-[var(--text-muted)]">{sanitizeString(tmpl.name)}</span>
                     )}
                     <Badge variant={tmpl.channel === 'email' ? 'info' : 'success'}>
                       {tmpl.channel}
@@ -225,11 +228,11 @@ export default function NotificationTemplatesPage() {
                   ) : (
                     <>
                       {tmpl.subject && (
-                        <p className="text-sm text-gray-600 mt-1">
+                        <p className="text-sm text-[var(--text-secondary)] mt-1">
                           {t('notifTmpl.subject')}: <strong>{sanitizeString(tmpl.subject)}</strong>
                         </p>
                       )}
-                      <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap line-clamp-3">
+                      <p className="text-sm text-[var(--text-muted)] mt-1 whitespace-pre-wrap line-clamp-3">
                         {sanitizeString(tmpl.body)}
                       </p>
                       <div className="flex gap-2 mt-2">
@@ -319,7 +322,7 @@ export default function NotificationTemplatesPage() {
             />
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
               {t('notifTmpl.templateBody')}
             </label>
             <textarea

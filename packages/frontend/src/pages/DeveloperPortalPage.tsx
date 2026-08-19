@@ -12,6 +12,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { formatDateTime } from '../lib/format';
 import { sanitizeString, escapeHtml } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -244,7 +245,7 @@ export default function DeveloperPortalPage() {
       render: (item) => (
         <div>
           <p className="font-medium">{escapeHtml(item.name)}</p>
-          <p className="text-xs text-gray-500 font-mono">{escapeHtml(item.keyPrefix)}...</p>
+          <p className="text-xs text-[var(--text-muted)] font-mono">{escapeHtml(item.keyPrefix)}...</p>
         </div>
       ),
     },
@@ -299,7 +300,7 @@ export default function DeveloperPortalPage() {
     {
       key: 'events',
       header: t('devPortal.webhookEvents'),
-      render: (item) => <span className="text-sm text-gray-500">{escapeHtml(item.events)}</span>,
+      render: (item) => <span className="text-sm text-[var(--text-muted)]">{escapeHtml(item.events)}</span>,
     },
     {
       key: 'isActive',
@@ -327,15 +328,15 @@ export default function DeveloperPortalPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
           <Code className="w-6 h-6 text-primary-600" />
           {t('devPortal.title')}
         </h1>
-        <p className="text-sm text-gray-500 mt-1">{t('devPortal.subtitle')}</p>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{t('devPortal.subtitle')}</p>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-2">
+      <div className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-2">
         {tabs.map((tabItem) => (
           <button
             key={tabItem.key}
@@ -343,7 +344,7 @@ export default function DeveloperPortalPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === tabItem.key
                 ? 'bg-primary-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {tabItem.icon}
@@ -361,10 +362,12 @@ export default function DeveloperPortalPage() {
           {tab === 'keys' && (
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button onClick={() => setShowNewKey(true)}>
+                <Can permission="developer_portal.create">
+          <Button onClick={() => setShowNewKey(true)}>
                   <Plus className="w-4 h-4 mr-1" />
                   {t('devPortal.createNewKey')}
                 </Button>
+        </Can>
               </div>
               <Card>
                 <CardBody className="p-0">
@@ -383,7 +386,7 @@ export default function DeveloperPortalPage() {
           {tab === 'docs' && (
             <Card>
               <CardBody className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">{t('devPortal.apiEndpoints')}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-3">{t('devPortal.apiEndpoints')}</h3>
                 <div className="flex flex-wrap gap-3 mb-4">
                   <Input
                     placeholder={t('devPortal.searchEndpoints')}
@@ -401,18 +404,18 @@ export default function DeveloperPortalPage() {
                 </div>
                 <div className="space-y-2">
                   {filteredEndpoints.map((ep, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50">
+                    <div key={idx} className="flex items-center gap-3 p-3 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-secondary)]">
                       <span className={`text-xs font-bold px-2 py-1 rounded ${METHOD_COLORS[ep.method] ?? ''}`}>
                         {ep.method}
                       </span>
                       <code className="text-sm font-mono flex-1">{ep.path}</code>
-                      <span className="text-sm text-gray-500 hidden sm:block">{ep.description}</span>
+                      <span className="text-sm text-[var(--text-muted)] hidden sm:block">{ep.description}</span>
                       <Badge>{ep.category}</Badge>
                     </div>
                   ))}
                 </div>
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-2">{t('devPortal.quickStart')}</h4>
+                <div className="mt-6 p-4 bg-[var(--surface-secondary)] rounded-lg">
+                  <h4 className="font-medium text-[var(--text-primary)] mb-2">{t('devPortal.quickStart')}</h4>
                   <pre className="text-xs bg-gray-800 text-green-400 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">
 {`curl -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
@@ -451,10 +454,10 @@ export default function DeveloperPortalPage() {
               {RATE_LIMITS.map((rl) => (
                 <Card key={rl.tier}>
                   <CardBody className="p-5 text-center">
-                    <h3 className="font-bold text-lg text-gray-900 mb-2">{rl.tier}</h3>
+                    <h3 className="font-bold text-lg text-[var(--text-primary)] mb-2">{rl.tier}</h3>
                     <p className="text-2xl font-bold text-primary-600 mb-1">{rl.requests}</p>
-                    <p className="text-sm text-gray-500">{t('devPortal.burst')}: {rl.burst}</p>
-                    <p className="text-xs text-gray-400 mt-3">{rl.description}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{t('devPortal.burst')}: {rl.burst}</p>
+                    <p className="text-xs text-[var(--text-disabled)] mt-3">{rl.description}</p>
                   </CardBody>
                 </Card>
               ))}
@@ -517,7 +520,7 @@ export default function DeveloperPortalPage() {
           </div>
         }
       >
-        <p className="text-sm text-gray-600">{t('devPortal.revokeConfirm')}</p>
+        <p className="text-sm text-[var(--text-secondary)]">{t('devPortal.revokeConfirm')}</p>
       </Modal>
 
       {/* ── Add Webhook Modal ── */}

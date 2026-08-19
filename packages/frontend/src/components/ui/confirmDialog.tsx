@@ -61,7 +61,7 @@ export function confirmDialog(options: ConfirmDialogOptions): Promise<boolean | 
             </>
           }
         >
-          <p className="text-sm text-gray-600">{options.message}</p>
+          <p className="text-sm text-[var(--text-secondary)]">{options.message}</p>
           {hasInput && (
             <input
               className="input mt-3 w-full"

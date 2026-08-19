@@ -8,6 +8,7 @@ import {
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import { sanitizeString, escapeHtml } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -122,20 +123,22 @@ export default function WhatsAppTemplatesPage() {
             <MessageCircle className="w-6 h-6 text-green-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('waTmpl.title')}</h1>
-            <p className="text-sm text-gray-500">{t('waTmpl.subtitle')}</p>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('waTmpl.title')}</h1>
+            <p className="text-sm text-[var(--text-muted)]">{t('waTmpl.subtitle')}</p>
           </div>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
+        <Can permission="communications.create">
+          <Button onClick={() => setShowCreate(true)}>
           <Plus className="w-4 h-4 mr-1" />
           {t('waTmpl.newTemplate')}
         </Button>
+        </Can>
       </div>
 
       {/* Templates List */}
       {templates.length === 0 ? (
         <EmptyState
-          icon={<MessageCircle className="w-8 h-8 text-gray-400" />}
+          icon={<MessageCircle className="w-8 h-8 text-[var(--text-disabled)]" />}
           title={t('waTmpl.noTemplates')}
           message={t('waTmpl.createFirst')}
         />
@@ -152,11 +155,11 @@ export default function WhatsAppTemplatesPage() {
                         {tmpl.category}
                       </Badge>
                       <Badge>{tmpl.language}</Badge>
-                      <span className={`text-xs ${tmpl.is_active ? 'text-green-600' : 'text-gray-400'}`}>
+                      <span className={`text-xs ${tmpl.is_active ? 'text-green-600' : 'text-[var(--text-disabled)]'}`}>
                         {tmpl.is_active ? t('waTmpl.active') : t('waTmpl.inactive')}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-600 line-clamp-2">{escapeHtml(tmpl.body_text)}</p>
+                    <p className="text-sm text-[var(--text-secondary)] line-clamp-2">{escapeHtml(tmpl.body_text)}</p>
                     {tmpl.variables?.length > 0 && (
                       <div className="flex gap-1 mt-1 flex-wrap">
                         {tmpl.variables.map((v) => (
@@ -170,10 +173,10 @@ export default function WhatsAppTemplatesPage() {
                   <div className="flex gap-2 shrink-0">
                     <button
                       onClick={() => setShowPreview(tmpl)}
-                      className="p-2 rounded hover:bg-gray-100"
+                      className="p-2 rounded hover:bg-[var(--surface-hover)]"
                       aria-label="Preview"
                     >
-                      <Eye className="w-4 h-4 text-gray-500" />
+                      <Eye className="w-4 h-4 text-[var(--text-muted)]" />
                     </button>
                   </div>
                 </div>
@@ -231,11 +234,11 @@ export default function WhatsAppTemplatesPage() {
             error={formErrors.language}
           />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
               {t('waTmpl.bodyText')}
             </label>
             <textarea
-              className="w-full border border-gray-300 rounded-lg p-3 h-32 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full border border-[var(--border-strong)] rounded-lg p-3 h-32 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
               placeholder={t('waTmpl.bodyPlaceholder')}
               value={form.bodyText}
               onChange={(e) => setForm((f) => ({ ...f, bodyText: e.target.value }))}

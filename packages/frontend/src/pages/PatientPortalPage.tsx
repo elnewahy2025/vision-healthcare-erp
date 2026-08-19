@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { PageLoader, EmptyState, Card, CardBody, Button, Badge, Input } from '../components/ui';
 import { staffPortalApi } from '../lib/api';
+import { Can } from '../components/Can';
 
 interface Enrollment {
   id: string;
@@ -147,8 +148,8 @@ export default function PatientPortalPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('portalAccess.title')}</h1>
-          <p className="text-sm text-gray-500 mt-1">{t('portalAccess.subtitle')}</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('portalAccess.title')}</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">{t('portalAccess.subtitle')}</p>
         </div>
         <Button variant="secondary" size="sm" onClick={refreshAll}>
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {t('portalAccess.refresh')}
@@ -161,13 +162,13 @@ export default function PatientPortalPage() {
             key={tb.key}
             onClick={() => setTab(tb.key)}
             className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg ${
-              tab === tb.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+              tab === tb.key ? 'bg-primary-600 text-white' : 'bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {tb.icon}
             {tb.label}
             {tb.badge > 0 && (
-              <span className={`px-1.5 py-0.5 text-xs rounded-full ${tab === tb.key ? 'bg-white/20' : 'bg-primary-100 text-primary-700'}`}>
+              <span className={`px-1.5 py-0.5 text-xs rounded-full ${tab === tb.key ? 'bg-[var(--surface)]/20' : 'bg-primary-100 text-primary-700'}`}>
                 {tb.badge}
               </span>
             )}
@@ -180,13 +181,13 @@ export default function PatientPortalPage() {
       ) : tab === 'requests' ? (
         <Card>
           <CardBody className="p-0">
-            <div className="p-4 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+            <div className="p-4 border-b border-[var(--border)] flex items-center gap-2 flex-wrap">
               {['pending', 'approved', 'rejected', 'all'].map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
                   className={`px-3 py-1.5 text-xs rounded-full ${
-                    statusFilter === s ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    statusFilter === s ? 'bg-gray-800 text-white' : 'bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-gray-200'
                   }`}
                 >
                   {t(`portalAccess.filter.${s}`)}
@@ -201,14 +202,14 @@ export default function PatientPortalPage() {
                   <div key={e.id} className="p-4 flex flex-col md:flex-row md:items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-gray-900">{e.firstName} {e.lastName}</span>
+                        <span className="font-semibold text-[var(--text-primary)]">{e.firstName} {e.lastName}</span>
                         <Badge variant={statusColor[e.status] || 'gray'}>{e.status}</Badge>
                       </div>
-                      <div className="text-sm text-gray-500 mt-1">
+                      <div className="text-sm text-[var(--text-muted)] mt-1">
                         {e.countryCode} {e.phone} · {e.nationalId} · {e.dateOfBirth}
                         {e.email ? ` · ${e.email}` : ''}
                       </div>
-                      <div className="text-xs text-gray-400 mt-0.5">
+                      <div className="text-xs text-[var(--text-disabled)] mt-0.5">
                         {e.patientId ? `Patient: ${e.patientId}` : t('portalAccess.unlinked')} · {t('common.date')}: {String(e.createdAt).slice(0, 10)}
                       </div>
                     </div>
@@ -236,8 +237,8 @@ export default function PatientPortalPage() {
       ) : (
         <Card>
           <CardBody className="p-0">
-            <div className="p-4 border-b border-gray-100">
-              <p className="text-sm text-gray-500">{t('portalAccess.otpQueueHint')}</p>
+            <div className="p-4 border-b border-[var(--border)]">
+              <p className="text-sm text-[var(--text-muted)]">{t('portalAccess.otpQueueHint')}</p>
             </div>
             {queue.length === 0 ? (
               <EmptyState title={t('portalAccess.emptyQueue')} icon={<MessageSquare className="w-8 h-8" />} />
@@ -247,21 +248,21 @@ export default function PatientPortalPage() {
                   <div key={q.id} className="p-4 flex flex-col md:flex-row md:items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-gray-900">{q.firstName} {q.lastName}</span>
+                        <span className="font-semibold text-[var(--text-primary)]">{q.firstName} {q.lastName}</span>
                         <Badge variant={statusColor[q.status] || 'gray'}>{q.status}</Badge>
                       </div>
-                      <div className="text-sm text-gray-500 mt-1">{q.phone}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">
+                      <div className="text-sm text-[var(--text-muted)] mt-1">{q.phone}</div>
+                      <div className="text-xs text-[var(--text-disabled)] mt-0.5">
                         {t('portalAccess.expiresIn')}: {q.expiresAt ? new Date(q.expiresAt).toLocaleTimeString() : '—'}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-2xl font-mono tracking-[0.3em] text-gray-900">{q.otp || '······'}</span>
+                        <span className="text-2xl font-mono tracking-[0.3em] text-[var(--text-primary)]">{q.otp || '······'}</span>
                         <button
                           title={t('portalAccess.copyOtp')}
                           onClick={() => copyText(q.otp || '', () => toast.success(t('portalAccess.copied')))}
-                          className="p-2 text-gray-400 hover:text-gray-700"
+                          className="p-2 text-[var(--text-disabled)] hover:text-[var(--text-primary)]"
                         >
                           <Copy className="w-4 h-4" />
                         </button>

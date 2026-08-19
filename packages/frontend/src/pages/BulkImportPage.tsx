@@ -8,6 +8,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 type ImportTab = 'import' | 'history';
 
@@ -146,7 +147,7 @@ export default function BulkImportPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('bulkImport.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('bulkImport.moduleCount', { count: modules.length })}
           </p>
         </div>
@@ -179,7 +180,7 @@ export default function BulkImportPage() {
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer capitalize transition-colors ${
                           selectedModule === m.module
                             ? 'bg-blue-100 text-blue-800'
-                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                            : 'bg-[var(--surface-hover)] text-[var(--text-primary)] hover:bg-gray-200'
                         }`}
                       >
                         {sanitizeString(m.module)}
@@ -192,14 +193,14 @@ export default function BulkImportPage() {
 
                 {modConfig && (
                   <div className="mb-4">
-                    <p className="text-sm text-gray-500 mb-2">
+                    <p className="text-sm text-[var(--text-muted)] mb-2">
                       {t('bulkImport.expectedColumns')}{' '}
-                      <code className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">
+                      <code className="text-xs font-mono bg-[var(--surface-hover)] px-2 py-0.5 rounded">
                         {modConfig.columns.join(', ')}
                       </code>
                     </p>
                     <textarea
-                      className="w-full h-64 rounded-lg border border-gray-300 p-3 text-xs font-mono resize-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      className="w-full h-64 rounded-lg border border-[var(--border-strong)] p-3 text-xs font-mono resize-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       placeholder={t('bulkImport.pastePlaceholder')}
                       value={rows}
                       onChange={(e) => setRows(e.target.value)}
@@ -207,13 +208,15 @@ export default function BulkImportPage() {
                   </div>
                 )}
 
-                <Button
+                <Can permission="bulk_import.create">
+          <Button
                   onClick={doImport}
                   loading={importing}
                   disabled={!rows.trim() || importing}
                 >
                   <Upload className="w-4 h-4" /> {t('bulkImport.importRows', { count: rowCount })}
                 </Button>
+        </Can>
               </CardBody>
             </Card>
           </div>
@@ -265,8 +268,8 @@ export default function BulkImportPage() {
                   <div className="text-xs space-y-1">
                     {modConfig.columns.map((c) => (
                       <div key={c} className="flex items-center gap-2">
-                        <code className="bg-gray-100 px-1.5 py-0.5 rounded flex-1">{c}</code>
-                        <span className="text-gray-400">{c.replace(/_/g, ' ')}</span>
+                        <code className="bg-[var(--surface-hover)] px-1.5 py-0.5 rounded flex-1">{c}</code>
+                        <span className="text-[var(--text-disabled)]">{c.replace(/_/g, ' ')}</span>
                       </div>
                     ))}
                   </div>
@@ -301,7 +304,7 @@ export default function BulkImportPage() {
                 </tr>
               ) : (
                 jobs.map((j) => (
-                  <tr key={j.id} className="hover:bg-gray-50">
+                  <tr key={j.id} className="hover:bg-[var(--surface-secondary)]">
                     <td className="font-medium capitalize">{sanitizeString(j.module)}</td>
                     <td className="text-xs max-w-xs truncate">{sanitizeString(j.fileName)}</td>
                     <td>{j.totalRows}</td>

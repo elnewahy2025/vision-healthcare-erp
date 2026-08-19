@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { insuranceApi, type InsuranceCompany, type InsuranceClaim } from '../lib/api';
 import { Modal, Input, Select, PatientSearchField, Button, Badge, EmptyState, PageLoader } from '../components/ui';
 import { Plus, ShieldCheck } from 'lucide-react';
+import { Can } from '../components/Can';
 import { sanitizeNumber, sanitizeString } from '../lib/sanitize';
 import toast from 'react-hot-toast';
 
@@ -222,11 +223,12 @@ export default function InsurancePage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('insurance.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('insurance.companyCount', { count: companies.length })}, {t('insurance.claimCount', { count: claims.length })}
           </p>
         </div>
-        <Button
+        <Can permission="insurance.create">
+          <Button
           icon={<Plus className="w-4 h-4" />}
           onClick={() => {
             if (tab === 'companies') setShowCompanyModal(true);
@@ -235,6 +237,7 @@ export default function InsurancePage() {
         >
           {tab === 'companies' ? t('insurance.newCompany') : t('insurance.newClaim')}
         </Button>
+        </Can>
       </div>
 
       {/* Tab Buttons */}
@@ -265,43 +268,43 @@ export default function InsurancePage() {
       {/* Content */}
       {filteredData.length === 0 ? (
         <EmptyState
-          icon={<ShieldCheck className="w-8 h-8 text-gray-400" />}
+          icon={<ShieldCheck className="w-8 h-8 text-[var(--text-disabled)]" />}
           title={tab === 'companies' ? t('insurance.noCompanies') : t('insurance.noClaims')}
           message={t('common.noData')}
         />
       ) : tab === 'companies' ? (
-        <div className="rounded-xl border border-gray-200 overflow-hidden">
+        <div className="rounded-xl border border-[var(--border)] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-[var(--surface-secondary)]">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('insurance.companyName')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('insurance.companyCode')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('insurance.contractType')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('insurance.discountRate')}
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                 {(filteredData as InsuranceCompany[]).map((company) => (
-                  <tr key={company.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <tr key={company.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">
                       {company.name}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">
                       {company.code}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Badge>{t(`insurance.${company.contractType}`)}</Badge>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">
                       {company.discountRate}%
                     </td>
                   </tr>
@@ -311,50 +314,50 @@ export default function InsurancePage() {
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 overflow-hidden">
+        <div className="rounded-xl border border-[var(--border)] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-[var(--surface-secondary)]">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('insurance.claimNumber')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('insurance.patient')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('insurance.insuranceCompany')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('insurance.claimedAmount')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('common.status')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                     {t('insurance.submissionDate')}
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                 {(filteredData as InsuranceClaim[]).map((claim) => (
-                  <tr key={claim.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">
+                  <tr key={claim.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">
                       {claim.claimNumber}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">
                       {claim.patientName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">
                       {claim.insuranceName || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)] font-medium">
                       {formatEgp(claim.claimedAmount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Badge>{claimStatusLabel(claim.status)}</Badge>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">
                       {claim.submissionDate || '-'}
                     </td>
                   </tr>

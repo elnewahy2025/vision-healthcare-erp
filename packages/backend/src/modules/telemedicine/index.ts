@@ -6,18 +6,43 @@ import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import type { PaginationQuery, TelemedicineSessionRow } from "../types.js";
 import { authenticate } from '../auth-guard.js';
 import { authorize } from '../../services/authorization.js';
+import { resolveModuleScope } from '../../services/module-scope-helpers.js';
 
 export async function registerTelemedicineModule(app: FastifyInstance) {
   app.get('/api/v1/telemedicine/sessions', { preHandler: [authenticate, authorize('telemedicine.view')] }, async (request, reply) => {
-    const ctx = getCtx(request); const tenantId = getTenantId(request);
+    const ctx = getCtx(request);
+    const tenantId = getTenantId(request);
     const { status } = request.query as PaginationQuery & { status?: string };
+    const scope = await resolveModuleScope(ctx.principal, 'telemedicine');
+
     let q = db('telemedicine_sessions').where('telemedicine_sessions.tenant_id', tenantId).whereNull('telemedicine_sessions.deleted_at');
+
+    if (scope.denied) {
+      q = q.where(db.raw('false'));
+    } else if (scope.branchIds !== undefined) {
+      if (scope.branchIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('telemedicine_sessions.patient_id', function () {
+          this.select('id').from('patients').whereIn('branch_id', scope.branchIds!);
+        });
+      }
+    } else if (scope.patientIds !== undefined) {
+      if (scope.patientIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('telemedicine_sessions.patient_id', scope.patientIds);
+      }
+    }
+
     if (status) q = q.andWhere('telemedicine_sessions.status', status);
+
     const sessions = await q.join('patients', 'telemedicine_sessions.patient_id', 'patients.id')
       .leftJoin('users', 'telemedicine_sessions.doctor_id', 'users.id')
       .select('telemedicine_sessions.*', 'patients.first_name as p_first', 'patients.last_name as p_last',
         'users.first_name as d_first', 'users.last_name as d_last')
       .orderBy('created_at', 'desc').limit(50);
+
     return sendSuccess(reply, sessions.map((s: Record<string, unknown>) => ({
       id: s.id, sessionId: s.session_id, roomName: s.room_name, status: s.status,
       provider: s.provider, meetingLink: s.meeting_link, patientId: s.patient_id,
@@ -29,7 +54,7 @@ export async function registerTelemedicineModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/telemedicine/sessions', { preHandler: [authenticate, authorize('telemedicine.view')] }, async (request, reply) => {
+  app.post('/api/v1/telemedicine/sessions', { preHandler: [authenticate, authorize('telemedicine.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
     const sid = crypto.randomUUID();
     const roomName = 'room-' + sid.slice(0, 8);

@@ -11,6 +11,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { escapeHtml } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -290,13 +291,13 @@ export default function DataImportPage() {
           <Upload className="w-6 h-6 text-cyan-600" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('dataImport.title')}</h1>
-          <p className="text-sm text-gray-500">{t('dataImport.subtitle')}</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('dataImport.title')}</h1>
+          <p className="text-sm text-[var(--text-muted)]">{t('dataImport.subtitle')}</p>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-gray-200 pb-2">
+      <div className="flex gap-2 border-b border-[var(--border)] pb-2">
         {tabs.map((tabItem) => (
           <button
             key={tabItem.key}
@@ -304,7 +305,7 @@ export default function DataImportPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === tabItem.key
                 ? 'bg-primary-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {tabItem.icon}
@@ -335,7 +336,7 @@ export default function DataImportPage() {
                     />
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                         {t('dataImport.selectFile')}
                       </label>
                       <input
@@ -343,7 +344,7 @@ export default function DataImportPage() {
                         type="file"
                         accept=".csv,.xlsx,.xls"
                         onChange={handleFileSelect}
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        className="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                       />
                     </div>
 
@@ -351,20 +352,22 @@ export default function DataImportPage() {
                       <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
                         <FileSpreadsheet className="w-5 h-5 text-blue-600" />
                         <span className="text-sm font-medium">{escapeHtml(file.name)}</span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-[var(--text-muted)]">
                           ({(file.size / 1024).toFixed(1)} KB)
                         </span>
                       </div>
                     )}
 
                     <div className="flex gap-3">
-                      <Button
+                      <Can permission="bulk_import.create">
+          <Button
                         onClick={() => void handleImport()}
                         disabled={importing || !file}
                       >
                         <Upload className="w-4 h-4 mr-1" />
                         {importing ? t('dataImport.importing') : t('dataImport.startImport')}
                       </Button>
+        </Can>
                       <Button variant="secondary" onClick={() => void handleDownloadTemplate()}>
                         <Download className="w-4 h-4 mr-1" />
                         {t('dataImport.downloadTemplate')}
@@ -380,11 +383,11 @@ export default function DataImportPage() {
                   <CardBody className="p-4">
                     <h3 className="font-semibold mb-3">{t('dataImport.preview')}</h3>
                     <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm border border-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className="min-w-full text-sm border border-[var(--border)]">
+                        <thead className="bg-[var(--surface-secondary)]">
                           <tr>
                             {Object.keys(preview[0]).map((h) => (
-                              <th key={h} className="px-3 py-2 text-left font-medium text-gray-700">
+                              <th key={h} className="px-3 py-2 text-left font-medium text-[var(--text-primary)]">
                                 {escapeHtml(h)}
                               </th>
                             ))}
@@ -394,7 +397,7 @@ export default function DataImportPage() {
                           {preview.map((row, idx) => (
                             <tr key={idx}>
                               {Object.values(row).map((v, j) => (
-                                <td key={j} className="px-3 py-2 text-gray-600">
+                                <td key={j} className="px-3 py-2 text-[var(--text-secondary)]">
                                   {escapeHtml(String(v).substring(0, 50))}
                                 </td>
                               ))}
@@ -422,15 +425,15 @@ export default function DataImportPage() {
                     <div className="grid grid-cols-3 gap-4 mb-4">
                       <div className="p-3 bg-blue-50 rounded-lg text-center">
                         <p className="text-2xl font-bold text-blue-600">{result.totalRows}</p>
-                        <p className="text-sm text-gray-500">{t('dataImport.totalRows')}</p>
+                        <p className="text-sm text-[var(--text-muted)]">{t('dataImport.totalRows')}</p>
                       </div>
                       <div className="p-3 bg-green-50 rounded-lg text-center">
                         <p className="text-2xl font-bold text-green-600">{result.successful}</p>
-                        <p className="text-sm text-gray-500">{t('dataImport.imported')}</p>
+                        <p className="text-sm text-[var(--text-muted)]">{t('dataImport.imported')}</p>
                       </div>
                       <div className="p-3 bg-yellow-50 rounded-lg text-center">
                         <p className="text-2xl font-bold text-yellow-600">{result.failed}</p>
-                        <p className="text-sm text-gray-500">{t('dataImport.skipped')}</p>
+                        <p className="text-sm text-[var(--text-muted)]">{t('dataImport.skipped')}</p>
                       </div>
                     </div>
                     {result.errors && result.errors.length > 0 && (

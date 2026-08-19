@@ -13,6 +13,10 @@ export interface User {
   status: string;
   mfaEnabled: boolean;
   passwordChangedAt?: string;
+  employeeType?: string;
+  departmentId?: string | null;
+  position?: string | null;
+  branches?: string[];
 }
 
 export interface Tenant {
@@ -33,12 +37,22 @@ export interface Tenant {
   };
 }
 
+export interface Membership {
+  id: string;
+  tenant: { id: string; name: string; slug: string };
+  branch: { id: string; name: string } | null;
+  department: { id: string; name: string } | null;
+  authzVersion: number;
+}
+
 export type PermissionScope =
   | 'self' | 'assigned_patients' | 'department' | 'branch' | 'branches' | 'tenant' | 'system';
 
 interface AuthContextType {
   user: User | null;
   tenant: Tenant | null;
+  memberships: Membership[];
+  activeMembershipId: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string, tenantSlug: string) => Promise<Record<string, unknown>>;
@@ -46,6 +60,7 @@ interface AuthContextType {
   logout: () => void;
   setLocale: (locale: 'ar' | 'en') => void;
   refreshUser: () => Promise<void>;
+  switchMembership: (membershipId: string) => Promise<void>;
   /** Centralized permission check. Server remains authoritative — this is the UX mirror only. */
   can: (permission: string) => boolean;
   canAny: (permissions: string[]) => boolean;
@@ -56,6 +71,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [activeMembershipId, setActiveMembershipId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -66,6 +83,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setTenant(data.tenant);
       setIsAuthenticated(true);
       localStorage.setItem('locale', data.user.locale);
+
+      // Load memberships if available
+      try {
+        const membersData = await authApi.getMemberships();
+        setMemberships(membersData.memberships || []);
+        setActiveMembershipId(membersData.activeMembershipId || null);
+      } catch {
+        // Memberships endpoint may not be available yet
+      }
     } catch {
       setAccessToken(null);
       setIsAuthenticated(false);
@@ -81,6 +107,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setTenant(data.tenant);
         setIsAuthenticated(true);
         localStorage.setItem('locale', data.user.locale);
+        // Load memberships
+        return authApi.getMemberships().catch(() => null);
+      })
+      .then((membersData: any) => {
+        if (membersData) {
+          setMemberships(membersData.memberships || []);
+          setActiveMembershipId(membersData.activeMembershipId || null);
+        }
       })
       .catch(() => {
         setAccessToken(null);
@@ -103,17 +137,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
     setTenant(data.tenant);
     setIsAuthenticated(true);
-    // Pull the full principal (effective permissions/branches/employeeType)
-    // from the server so the UI mirror is never empty right after login.
+
+    // Store memberships from login response
+    if (data.memberships) {
+      setMemberships(data.memberships);
+    }
+    if (data.activeMembershipId) {
+      setActiveMembershipId(data.activeMembershipId);
+    }
+
+    // Pull the full principal from the server
     authApi.me()
       .then((fresh) => {
         setUser(fresh.user);
         setTenant(fresh.tenant);
         localStorage.setItem('locale', fresh.user.locale);
       })
-      .catch(() => {
-        // Session is already established; keep the login payload as fallback.
-      });
+      .catch(() => {});
     return {};
   }, []);
 
@@ -122,19 +162,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    // Ask the backend to revoke the refresh token and clear the HttpOnly
-    // cookies BEFORE navigating (capped at 2s so a dead server never hangs the
-    // UI). Without this the login page's session-restore would silently
-    // re-authenticate and bounce straight back to the dashboard.
     void (async () => {
       try {
         await Promise.race([
           authApi.logout(),
           new Promise((resolve) => setTimeout(resolve, 2000)),
         ]);
-      } catch {
-        // Backend unreachable — continue clearing local state.
-      }
+      } catch {}
     })();
     setAccessToken(null);
     setCsrfToken(null);
@@ -142,6 +176,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('locale');
     setUser(null);
     setTenant(null);
+    setMemberships([]);
+    setActiveMembershipId(null);
     setIsAuthenticated(false);
     window.location.href = '/login';
   }, []);
@@ -151,11 +187,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser((prev) => prev ? { ...prev, locale } : null);
   }, []);
 
+  const switchMembership = useCallback(async (membershipId: string) => {
+    try {
+      const data = await authApi.switchMembership(membershipId);
+      // Update tokens and user context
+      if (data.accessToken) {
+        setAccessToken(data.accessToken);
+      }
+      if (data.user) {
+        setUser(data.user);
+      }
+      if (data.tenant) {
+        setTenant(data.tenant);
+      }
+      if (data.memberships) {
+        setMemberships(data.memberships);
+      }
+      if (data.activeMembershipId) {
+        setActiveMembershipId(data.activeMembershipId);
+      }
+      // Reload the page to refresh all data with the new context
+      window.location.reload();
+    } catch (error) {
+      throw error;
+    }
+  }, []);
+
   const can = useCallback((permission: string) => canUse(user?.permissions || [], permission), [user]);
   const canAny = useCallback((permissions: string[]) => canAnyUse(user?.permissions || [], permissions), [user]);
 
   return (
-    <AuthContext.Provider value={{ user, tenant, isAuthenticated, isLoading, login, register, logout, setLocale, refreshUser, can, canAny }}>
+    <AuthContext.Provider value={{
+      user, tenant, memberships, activeMembershipId,
+      isAuthenticated, isLoading,
+      login, register, logout, setLocale, refreshUser, switchMembership,
+      can, canAny,
+    }}>
       {children}
     </AuthContext.Provider>
   );
@@ -168,11 +235,8 @@ export function useAuth() {
 }
 
 /**
- * Pure helper shared by the store and components. A '*' grant (super_admin)
- * passes everything; otherwise the exact `module.action` key must be present.
- * The backend is the source of truth — this only mirrors effective permissions
- * returned by /auth/me (which are derived server-side from role_permissions +
- * user_permissions).
+ * Pure helper. A '*' grant (super_admin) passes everything; otherwise
+ * the exact `module.action` key must be present.
  */
 export function canUse(permissions: string[], permission: string): boolean {
   if (!permissions || permissions.length === 0) return false;

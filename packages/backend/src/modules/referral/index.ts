@@ -5,13 +5,38 @@ import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { findTenantRow } from '../../utils/tenant-scope.js';
 import { authenticate } from '../auth-guard.js';
 import { authorize } from '../../services/authorization.js';
+import { resolveModuleScope } from '../../services/module-scope-helpers.js';
 
 export async function registerReferralModule(app: FastifyInstance) {
   app.get('/api/v1/referrals', { preHandler: [authenticate, authorize('referrals.view')] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { status, patientId } = request.query as { patientId?: string; status?: string };
+    const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
+    const { status, patientId } = request.query as { patientId?: string; status?: string };
+    const scope = await resolveModuleScope(principal, 'referrals');
+
     let q = db('referrals').where('referrals.tenant_id', tenantId).whereNull('referrals.deleted_at');
+
+    if (scope.denied) {
+      q = q.where(db.raw('false'));
+    } else if (scope.branchIds !== undefined) {
+      if (scope.branchIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('referrals.patient_id', function () {
+          this.select('id').from('patients').whereIn('branch_id', scope.branchIds!);
+        });
+      }
+    } else if (scope.patientIds !== undefined) {
+      if (scope.patientIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('referrals.patient_id', scope.patientIds);
+      }
+    }
+
     if (status) q = q.andWhere('referrals.status', status);
     if (patientId) q = q.andWhere('referrals.patient_id', patientId);
+
     const rows = await q.join('patients', 'referrals.patient_id', 'patients.id')
       .leftJoin('users as doc', 'referrals.receiving_doctor_id', 'doc.id')
       .select('referrals.*', 'patients.first_name as p_first', 'patients.last_name as p_last', 'doc.first_name as doc_first', 'doc.last_name as doc_last')
@@ -19,7 +44,7 @@ export async function registerReferralModule(app: FastifyInstance) {
     return sendSuccess(reply, rows.map(mapRef));
   });
 
-  app.post('/api/v1/referrals', { preHandler: [authenticate, authorize('referrals.view')] }, async (request, reply) => {
+  app.post('/api/v1/referrals', { preHandler: [authenticate, authorize('referrals.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
     const refNum = "REF-" + Date.now().toString(36).toUpperCase();
     const [ref] = await db('referrals').insert({
@@ -55,14 +80,17 @@ export async function registerReferralModule(app: FastifyInstance) {
     return sendSuccess(reply, mapRef(row));
   });
 }
-function mapRef(r: Record<string, unknown>) { return {
-  id: r.id, referralNumber: r.referral_number, patientId: r.patient_id,
-  patientName: r.p_first + ' ' + r.p_last, referralType: r.referral_type,
-  priority: r.priority, status: r.status, reason: r.reason,
-  clinicalNotes: r.clinical_notes, feedback: r.feedback,
-  referringDoctorId: r.referring_doctor_id, receivingDoctorId: r.receiving_doctor_id,
-  receivingDoctorName: r.doc_first ? r.doc_first + ' ' + r.doc_last : null,
-  externalFacility: r.external_facility, externalDoctor: r.external_doctor,
-  referralDate: r.referral_date, appointmentDate: r.appointment_date,
-  consentObtained: r.consent_obtained, createdAt: r.created_at,
-};}
+
+function mapRef(r: Record<string, unknown>) {
+  return {
+    id: r.id, referralNumber: r.referral_number, patientId: r.patient_id,
+    patientName: r.p_first + ' ' + r.p_last, referralType: r.referral_type,
+    priority: r.priority, status: r.status, reason: r.reason,
+    clinicalNotes: r.clinical_notes, feedback: r.feedback,
+    referringDoctorId: r.referring_doctor_id, receivingDoctorId: r.receiving_doctor_id,
+    receivingDoctorName: r.doc_first ? r.doc_first + ' ' + r.doc_last : null,
+    externalFacility: r.external_facility, externalDoctor: r.external_doctor,
+    referralDate: r.referral_date, appointmentDate: r.appointment_date,
+    consentObtained: r.consent_obtained, createdAt: r.created_at,
+  };
+}

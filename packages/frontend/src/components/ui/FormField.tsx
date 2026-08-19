@@ -24,7 +24,7 @@ export function FormField({ label, error, required, children, hint }: FormFieldP
         </p>
       )}
       {hint && !error && (
-        <p className="mt-1 text-xs text-gray-400">{hint}</p>
+        <p className="mt-1 text-xs text-[var(--text-disabled)]">{hint}</p>
       )}
     </div>
   );
@@ -51,7 +51,7 @@ export function PasswordStrengthBar({ score, label }: PasswordStrengthBarProps) 
           />
         ))}
       </div>
-      <p className="text-xs mt-1 text-gray-500">
+      <p className="text-xs mt-1 text-[var(--text-muted)]">
         Password strength: <span className="font-medium">{labels[Math.min(score - 1, 3)] || 'Weak'}</span>
       </p>
     </div>

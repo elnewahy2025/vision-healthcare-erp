@@ -81,3 +81,11 @@ export const otpVerifySchema = z.object({
   code: z.string(),
   purpose: z.string().optional(),
 });
+
+/**
+ * Switch active membership. Used by multi-tenant/multi-branch users
+ * to change their organizational context.
+ */
+export const switchMembershipSchema = z.object({
+  membershipId: z.string().uuid(),
+});

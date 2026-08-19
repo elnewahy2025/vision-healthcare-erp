@@ -13,6 +13,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { sanitizeString, escapeHtml } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -324,27 +325,29 @@ export default function InsuranceClaimsLifecyclePage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
             <ShieldCheck className="w-6 h-6 text-primary-600" />
             {t('insClaims.title')}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">{t('insClaims.subtitle')}</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">{t('insClaims.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => void handleBulkSubmit()}>
             {t('insClaims.bulkSubmit')}
           </Button>
+          <Can permission="insurance_claims.create">
           <Button onClick={() => setTab('new-claim')}>
             <Plus className="w-4 h-4 mr-1" />
             {t('insClaims.newClaim')}
           </Button>
+        </Can>
         </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          { label: t('insClaims.totalClaims'), value: stats.total, color: 'text-gray-900' },
+          { label: t('insClaims.totalClaims'), value: stats.total, color: 'text-[var(--text-primary)]' },
           { label: t('insClaims.pendingClaims'), value: stats.pending, color: 'text-yellow-600' },
           { label: t('insClaims.approvedClaims'), value: stats.approved, color: 'text-green-600' },
           { label: t('insClaims.deniedClaims'), value: stats.denied, color: 'text-red-600' },
@@ -353,7 +356,7 @@ export default function InsuranceClaimsLifecyclePage() {
         ].map((stat) => (
           <Card key={stat.label}>
             <CardBody className="p-4 text-center">
-              <p className="text-xs text-gray-500">{stat.label}</p>
+              <p className="text-xs text-[var(--text-muted)]">{stat.label}</p>
               <p className={`text-xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
             </CardBody>
           </Card>
@@ -369,7 +372,7 @@ export default function InsuranceClaimsLifecyclePage() {
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
               tab === tabItem.key
                 ? 'bg-primary-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {tabItem.icon}
@@ -498,7 +501,7 @@ export default function InsuranceClaimsLifecyclePage() {
           {tab === 'tracking' && (
             <Card>
               <CardBody className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-4">{t('insClaims.trackingTab')}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('insClaims.trackingTab')}</h3>
                 {claims.length === 0 ? (
                   <EmptyState title={t('insClaims.noClaims')} />
                 ) : (
@@ -506,7 +509,7 @@ export default function InsuranceClaimsLifecyclePage() {
                     {claims.slice(0, 20).map((c) => {
                       const Icon = getStatusIcon(c.status);
                       return (
-                        <div key={c.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                        <div key={c.id} className="flex items-center gap-4 p-4 bg-[var(--surface-secondary)] rounded-lg">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                             c.status === 'paid' ? 'bg-green-100' : c.status === 'denied' ? 'bg-red-100' : 'bg-blue-100'
                           }`}>
@@ -516,13 +519,13 @@ export default function InsuranceClaimsLifecyclePage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm">{escapeHtml(c.claimNumber)}</p>
-                            <p className="text-xs text-gray-500">{escapeHtml(c.patientName ?? '-')} — {escapeHtml(c.companyName ?? '-')}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{escapeHtml(c.patientName ?? '-')} — {escapeHtml(c.companyName ?? '-')}</p>
                           </div>
                           <div className="text-right shrink-0">
                             <Badge variant={getStatusVariant(c.status)}>
                               {t(`insClaims.${c.status.replace(/ /g, '')}`) || c.status}
                             </Badge>
-                            <p className="text-xs text-gray-500 mt-1">{c.claimedAmount?.toLocaleString('ar-EG')} EGP</p>
+                            <p className="text-xs text-[var(--text-muted)] mt-1">{c.claimedAmount?.toLocaleString('ar-EG')} EGP</p>
                           </div>
                         </div>
                       );
@@ -538,7 +541,7 @@ export default function InsuranceClaimsLifecyclePage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardBody className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-3">{t('insClaims.claimsByInsurer')}</h3>
+                  <h3 className="font-semibold text-[var(--text-primary)] mb-3">{t('insClaims.claimsByInsurer')}</h3>
                   {claims.length === 0 ? (
                     <EmptyState title={t('insClaims.noData')} />
                   ) : (
@@ -581,7 +584,7 @@ export default function InsuranceClaimsLifecyclePage() {
               </Card>
               <Card>
                 <CardBody className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-3">{t('insClaims.approvalRate')}</h3>
+                  <h3 className="font-semibold text-[var(--text-primary)] mb-3">{t('insClaims.approvalRate')}</h3>
                   {claims.length === 0 ? (
                     <EmptyState title={t('insClaims.noData')} />
                   ) : (
@@ -595,7 +598,7 @@ export default function InsuranceClaimsLifecyclePage() {
                             )
                           : 0}%
                       </p>
-                      <p className="text-gray-500 mt-2">
+                      <p className="text-[var(--text-muted)] mt-2">
                         {t('insClaims.approvedCount', {
                           count: String(stats.approved),
                           total: String(claims.filter((c) => c.status !== 'draft').length),
@@ -625,48 +628,48 @@ export default function InsuranceClaimsLifecyclePage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-gray-500">{t('insClaims.patient')}</span>
+                <span className="text-[var(--text-muted)]">{t('insClaims.patient')}</span>
                 <p className="font-medium">{escapeHtml(showDetail.patientName ?? '-')}</p>
               </div>
               <div>
-                <span className="text-gray-500">{t('insClaims.insurer')}</span>
+                <span className="text-[var(--text-muted)]">{t('insClaims.insurer')}</span>
                 <p className="font-medium">{escapeHtml(showDetail.companyName ?? '-')}</p>
               </div>
               <div>
-                <span className="text-gray-500">{t('insClaims.invoiceNumber')}</span>
+                <span className="text-[var(--text-muted)]">{t('insClaims.invoiceNumber')}</span>
                 <p className="font-medium">{escapeHtml(showDetail.invoiceNumber ?? '-')}</p>
               </div>
               <div>
-                <span className="text-gray-500">{t('insClaims.claimedAmount')}</span>
+                <span className="text-[var(--text-muted)]">{t('insClaims.claimedAmount')}</span>
                 <p className="font-medium">{showDetail.claimedAmount?.toLocaleString('ar-EG')} EGP</p>
               </div>
               <div>
-                <span className="text-gray-500">{t('insClaims.approvedAmount')}</span>
+                <span className="text-[var(--text-muted)]">{t('insClaims.approvedAmount')}</span>
                 <p className="font-medium">{showDetail.approvedAmount?.toLocaleString('ar-EG') || '-'} EGP</p>
               </div>
               <div>
-                <span className="text-gray-500">{t('insClaims.paidBy')}</span>
+                <span className="text-[var(--text-muted)]">{t('insClaims.paidBy')}</span>
                 <p className="font-medium">{showDetail.paidAmount?.toLocaleString('ar-EG') || '-'} EGP</p>
               </div>
               <div>
-                <span className="text-gray-500">{t('insClaims.status')}</span>
+                <span className="text-[var(--text-muted)]">{t('insClaims.status')}</span>
                 <Badge variant={getStatusVariant(showDetail.status)} className="mt-1">
                   {t(`insClaims.${showDetail.status.replace(/ /g, '')}`) || showDetail.status}
                 </Badge>
               </div>
               <div>
-                <span className="text-gray-500">{t('insClaims.date')}</span>
+                <span className="text-[var(--text-muted)]">{t('insClaims.date')}</span>
                 <p className="font-medium">{formatDateTime(showDetail.createdAt) || '-'}</p>
               </div>
               {showDetail.denialReason && (
                 <div className="col-span-2">
-                  <span className="text-gray-500">{t('insClaims.diagnosis')}</span>
+                  <span className="text-[var(--text-muted)]">{t('insClaims.diagnosis')}</span>
                   <p className="font-medium text-red-600">{escapeHtml(showDetail.denialReason)}</p>
                 </div>
               )}
               {showDetail.notes && (
                 <div className="col-span-2">
-                  <span className="text-gray-500">{t('insClaims.notes')}</span>
+                  <span className="text-[var(--text-muted)]">{t('insClaims.notes')}</span>
                   <p className="font-medium">{escapeHtml(showDetail.notes)}</p>
                 </div>
               )}

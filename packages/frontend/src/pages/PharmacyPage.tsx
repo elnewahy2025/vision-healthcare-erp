@@ -4,6 +4,7 @@ import { apiClient as api } from '../lib/api';
 import { Modal, Input, Select, PatientSearchField } from '../components/ui';
 import { confirmDialog } from '../components/ui';
 import { Plus, Package, ListChecks, Search, Loader2, Trash2 } from 'lucide-react';
+import { Can } from '../components/Can';
 import toast from 'react-hot-toast';
 import { formatDateTime } from '../lib/format';
 
@@ -171,9 +172,11 @@ interface Prescription {
     <div>
       <div className="page-header">
         <div><h1 className="page-title">{t('pharmacy.title')}</h1></div>
-        <button onClick={() => tab === 'inventory' ? setShowNewDrugModal(true) : setShowNewRxModal(true)} className="btn-primary">
-          {tab === 'inventory' ? <><Package className="w-4 h-4" />{t('pharmacy.addDrug')}</> : <><Plus className="w-4 h-4" />{t('pharmacy.newPrescription')}</>}
-        </button>
+        <Can permission="pharmacy.create">
+          <button onClick={() => tab === 'inventory' ? setShowNewDrugModal(true) : setShowNewRxModal(true)} className="btn-primary">
+            {tab === 'inventory' ? <><Package className="w-4 h-4" />{t('pharmacy.addDrug')}</> : <><Plus className="w-4 h-4" />{t('pharmacy.newPrescription')}</>}
+          </button>
+        </Can>
       </div>
 
       <div className="flex gap-2 mb-6">
@@ -191,11 +194,11 @@ interface Prescription {
             <thead><tr><th>{t('pharmacy.drugName')}</th><th>{t('pharmacy.genericName')}</th><th>{t('pharmacy.stock')}</th><th>{t('pharmacy.reorderLevel')}</th><th>{t('pharmacy.price')}</th><th>{t('pharmacy.expiry')}</th><th>{t('pharmacy.status')}</th></tr></thead>
             <tbody>
               {inventory.filter(d => !search || d.drugName?.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-12 text-gray-500">{t('pharmacy.noInventory')}</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-[var(--text-muted)]">{t('pharmacy.noInventory')}</td></tr>
               ) : inventory.filter(d => !search || d.drugName?.toLowerCase().includes(search.toLowerCase())).map(d => (
-                <tr key={d.id} className="hover:bg-gray-50">
+                <tr key={d.id} className="hover:bg-[var(--surface-secondary)]">
                   <td className="font-medium">{d.drugName}</td>
-                  <td className="text-xs text-gray-500">{d.genericName || '-'}</td>
+                  <td className="text-xs text-[var(--text-muted)]">{d.genericName || '-'}</td>
                   <td><span className={`font-medium ${d.stockQuantity < d.reorderLevel ? 'text-red-600' : 'text-green-600'}`}>{d.stockQuantity}</span></td>
                   <td className="text-xs">{d.reorderLevel}</td>
                   <td>{d.unitPrice ? d.unitPrice.toFixed(2) + ' EGP' : '-'}</td>
@@ -213,9 +216,9 @@ interface Prescription {
           <table>
             <thead><tr><th>{t('pharmacy.rxNumber')}</th><th>{t('pharmacy.patient')}</th><th>{t('pharmacy.items')}</th><th>{t('pharmacy.status')}</th><th>{t('pharmacy.date')}</th><th>{t('pharmacy.actions')}</th></tr></thead>
             <tbody>
-              {prescriptions.length === 0 ? <tr><td colSpan={6} className="text-center py-12 text-gray-500">{t('pharmacy.noPrescriptions')}</td></tr> :
+              {prescriptions.length === 0 ? <tr><td colSpan={6} className="text-center py-12 text-[var(--text-muted)]">{t('pharmacy.noPrescriptions')}</td></tr> :
                 prescriptions.map(p => (
-                  <tr key={p.id} className="hover:bg-gray-50">
+                  <tr key={p.id} className="hover:bg-[var(--surface-secondary)]">
                     <td className="font-mono text-xs text-primary-600">{p.prescriptionNumber}</td>
                     <td className="font-medium">{p.patientName}</td>
                     <td>{p.items?.length || 0} items</td>
@@ -268,8 +271,8 @@ interface Prescription {
             onChange={id => { setRxForm(prev => ({ ...prev, patientId: id })); setRxErrors(prev => { const n = { ...prev }; delete n.patientId; return n; }); }}
             error={rxErrors.patientId} required />
 
-          <div className="p-4 bg-gray-50 rounded-lg space-y-3">
-            <h3 className="text-sm font-semibold text-gray-700">{t('pharmacy.addDrugItem')}</h3>
+          <div className="p-4 bg-[var(--surface-secondary)] rounded-lg space-y-3">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t('pharmacy.addDrugItem')}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input label={`${t('pharmacy.drugName')} *`} value={drugItem.drugName} onChange={e => { setDrugItem(prev => ({ ...prev, drugName: e.target.value })); setDrugItemErrors({}); }} error={drugItemErrors.drugName} />
               <Input label={t('pharmacy.dosage')} placeholder="e.g. 500mg" value={drugItem.dosage} onChange={e => setDrugItem(prev => ({ ...prev, dosage: e.target.value }))} />
@@ -289,11 +292,11 @@ interface Prescription {
 
           {rxForm.items.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('pharmacy.drugItems')} ({rxForm.items.length})</label>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">{t('pharmacy.drugItems')} ({rxForm.items.length})</label>
               <div className="space-y-2">
                 {rxForm.items.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div><p className="text-sm font-medium">{item.drugName} - {item.dosage}</p><p className="text-xs text-gray-500">{item.route} | {item.frequency} | {item.duration} | Qty: {item.quantity}</p></div>
+                  <div key={idx} className="flex items-center justify-between p-3 bg-[var(--surface-secondary)] rounded-lg">
+                    <div><p className="text-sm font-medium">{item.drugName} - {item.dosage}</p><p className="text-xs text-[var(--text-muted)]">{item.route} | {item.frequency} | {item.duration} | Qty: {item.quantity}</p></div>
                     <button type="button" onClick={() => removeDrugItem(idx)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 ))}
@@ -303,7 +306,7 @@ interface Prescription {
           {rxErrors.items && <p className="text-sm text-red-600">{rxErrors.items}</p>}
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('pharmacy.notes')}</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('pharmacy.notes')}</label>
             <textarea className="input" rows={2} value={rxForm.notes} onChange={e => setRxForm(prev => ({ ...prev, notes: e.target.value }))} />
           </div>
         </form>

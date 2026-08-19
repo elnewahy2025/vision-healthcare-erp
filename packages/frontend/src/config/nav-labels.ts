@@ -73,6 +73,8 @@ export const navPathLabels: Record<string, string> = {
   '/system-monitor': 'nav.systemMonitor',
   '/print-templates': 'nav.printTemplates',
   '/user-preferences': 'nav.userPreferences',
+  '/departments': 'nav.departments',
+  '/emergency-access': 'nav.emergencyAccess',
 };
 
 export function resolveNavLabelKey(pathname: string): string | undefined {

@@ -23,6 +23,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 type TabType = 'subscription' | 'plans' | 'invoices' | 'usage';
 
@@ -157,24 +158,24 @@ export default function SaasBillingPage() {
         <div>
           {subscription ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-                <p className="text-sm text-gray-500">{t('saas.currentPlan')}</p>
+              <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+                <p className="text-sm text-[var(--text-muted)]">{t('saas.currentPlan')}</p>
                 <p className="text-xl font-bold">{escapeHtml(subscription.planName)}</p>
                 <Badge variant={STATUS_VARIANT[subscription.status] ?? 'gray'}>
                   {escapeHtml(subscription.status)}
                 </Badge>
               </div>
-              <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-                <p className="text-sm text-gray-500">{t('saas.amount')}</p>
+              <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+                <p className="text-sm text-[var(--text-muted)]">{t('saas.amount')}</p>
                 <p className="text-xl font-bold">
                   {Number(subscription.amount).toFixed(2)} EGP
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-[var(--text-disabled)]">
                   {escapeHtml(subscription.billingCycle)}
                 </p>
               </div>
-              <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-                <p className="text-sm text-gray-500">{t('saas.period')}</p>
+              <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+                <p className="text-sm text-[var(--text-muted)]">{t('saas.period')}</p>
                 <p className="text-sm font-medium">
                   {formatDate(subscription.currentPeriodStart)} →{' '}
                   {formatDate(subscription.currentPeriodEnd)}
@@ -187,13 +188,13 @@ export default function SaasBillingPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800 mb-6">
-              <p className="text-gray-500">{t('saas.noSubscription')}</p>
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800 mb-6">
+              <p className="text-[var(--text-muted)]">{t('saas.noSubscription')}</p>
             </div>
           )}
 
           {/* Plan Details */}
-          <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+          <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
             <h3 className="font-semibold mb-3">{t('saas.planDetails')}</h3>
             {subscription ? (
               <div className="text-sm space-y-2">
@@ -212,7 +213,7 @@ export default function SaasBillingPage() {
                 </p>
               </div>
             ) : (
-              <p className="text-sm text-gray-500">{t('saas.selectPlan')}</p>
+              <p className="text-sm text-[var(--text-muted)]">{t('saas.selectPlan')}</p>
             )}
           </div>
         </div>
@@ -231,10 +232,10 @@ export default function SaasBillingPage() {
             plans.map((p) => (
               <div
                 key={p.id}
-                className={`bg-white rounded-lg border-2 p-4 ${
+                className={`bg-[var(--surface)] rounded-lg border-2 p-4 ${
                   subscription?.planId === p.id
                     ? 'border-blue-500'
-                    : 'border-gray-200'
+                    : 'border-[var(--border)]'
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
@@ -243,12 +244,12 @@ export default function SaasBillingPage() {
                 </div>
                 <p className="text-3xl font-bold mb-1">
                   {p.priceMonthly}{' '}
-                  <span className="text-sm font-normal text-gray-500">
+                  <span className="text-sm font-normal text-[var(--text-muted)]">
                     EGP{t('saas.monthly')}
                   </span>
                 </p>
                 {p.priceYearly > 0 && (
-                  <p className="text-sm text-gray-500 mb-4">
+                  <p className="text-sm text-[var(--text-muted)] mb-4">
                     {p.priceYearly} EGP{t('saas.yearly')} ({t('saas.save')}{' '}
                     {yearlySaving(p)}%)
                   </p>
@@ -288,17 +289,17 @@ export default function SaasBillingPage() {
 
       {/* Invoices Tab */}
       {tab === 'invoices' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.invoiceNumber')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.periodRange')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.amount')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.tax')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.total')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.status')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.paid')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('saas.invoiceNumber')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('saas.periodRange')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('saas.amount')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('saas.tax')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('saas.total')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('saas.paid')}</th>
               </tr>
             </thead>
             <tbody>
@@ -314,7 +315,7 @@ export default function SaasBillingPage() {
                 </tr>
               ) : (
                 invoices.map((i) => (
-                  <tr key={i.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={i.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3 font-mono text-xs">{escapeHtml(i.invoiceNumber)}</td>
                     <td className="p-3 text-xs">
                       {escapeHtml(i.periodStart)} → {escapeHtml(i.periodEnd)}
@@ -343,12 +344,12 @@ export default function SaasBillingPage() {
       {/* Usage Tab */}
       {tab === 'usage' && (
         <div>
-          <p className="text-sm text-gray-500 mb-4">{t('saas.last30Days')}</p>
+          <p className="text-sm text-[var(--text-muted)] mb-4">{t('saas.last30Days')}</p>
           {(usage?.totals ?? []).length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               {usage!.totals.map((item) => (
-                <div key={item.metric} className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-                  <p className="text-sm text-gray-500 capitalize">
+                <div key={item.metric} className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+                  <p className="text-sm text-[var(--text-muted)] capitalize">
                     {escapeHtml(item.metric.replace(/_/g, ' '))}
                   </p>
                   <p className="text-2xl font-bold">{item.total.toLocaleString()}</p>
@@ -366,23 +367,23 @@ export default function SaasBillingPage() {
           )}
 
           {(usage?.records ?? []).length > 0 && (
-            <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+            <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b bg-gray-50">
-                    <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.metric')}</th>
-                    <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.quantity')}</th>
-                    <th className="text-left p-3 text-sm font-medium text-gray-600">{t('saas.date')}</th>
+                  <tr className="border-b bg-[var(--surface-secondary)]">
+                    <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('saas.metric')}</th>
+                    <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('saas.quantity')}</th>
+                    <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('saas.date')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {usage!.records.slice(0, 20).map((r) => (
-                    <tr key={r.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <tr key={r.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                       <td className="p-3">
                         <Badge>{escapeHtml(r.metric)}</Badge>
                       </td>
                       <td className="p-3 font-medium">{r.quantity.toLocaleString()}</td>
-                      <td className="p-3 text-xs text-gray-500">
+                      <td className="p-3 text-xs text-[var(--text-muted)]">
                         {escapeHtml(r.recordDate)}
                       </td>
                     </tr>

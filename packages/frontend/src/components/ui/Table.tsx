@@ -24,7 +24,7 @@ export function Table<T extends Record<string, any>>({
 }: TableProps<T>) {
   if (loading) {
     return (
-      <div className="rounded-xl border border-gray-200 dark:border-gray-800">
+      <div className="rounded-xl border border-[var(--border)] dark:border-gray-800">
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
         </div>
@@ -34,21 +34,21 @@ export function Table<T extends Record<string, any>>({
 
   return (
     <div>
-      <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
+      <div className="overflow-x-auto rounded-xl border border-[var(--border)] dark:border-gray-800">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
-          <thead className="bg-gray-50 dark:bg-gray-800">
+          <thead className="bg-[var(--surface-secondary)] dark:bg-gray-800">
             <tr>
               {columns.map((col) => (
-                <th key={col.key} className={clsx('px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400', col.className)}>
+                <th key={col.key} className={clsx('px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider dark:text-[var(--text-disabled)]', col.className)}>
                   {col.header}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">
+          <tbody className="divide-y divide-gray-200 bg-[var(--surface)] dark:divide-gray-800 dark:bg-[var(--background)]">
             {data.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-6 py-16 text-center text-sm text-gray-500">
+                <td colSpan={columns.length} className="px-6 py-16 text-center text-sm text-[var(--text-muted)]">
                   {emptyMessage}
                 </td>
               </tr>
@@ -57,10 +57,10 @@ export function Table<T extends Record<string, any>>({
                 <tr
                   key={item.id || idx}
                   onClick={() => onRowClick?.(item)}
-                  className={clsx(onRowClick && 'cursor-pointer', 'hover:bg-gray-50 transition-colors')}
+                  className={clsx(onRowClick && 'cursor-pointer', 'hover:bg-[var(--surface-secondary)] transition-colors')}
                 >
                   {columns.map((col) => (
-                    <td key={col.key} className={clsx('px-6 py-4 whitespace-nowrap text-sm text-gray-900', col.className)}>
+                    <td key={col.key} className={clsx('px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]', col.className)}>
                       {col.render ? col.render(item) : item[col.key]}
                     </td>
                   ))}
@@ -73,7 +73,7 @@ export function Table<T extends Record<string, any>>({
 
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[var(--text-muted)]">
             Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
           </p>
           <div className="flex gap-2">

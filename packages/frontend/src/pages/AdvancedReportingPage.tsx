@@ -12,6 +12,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { formatDateTime } from '../lib/format';
 import { escapeHtml } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -304,15 +305,15 @@ export default function AdvancedReportingPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
           <BarChart3 className="w-6 h-6 text-primary-600" />
           {t('advRep.title')}
         </h1>
-        <p className="text-sm text-gray-500 mt-1">{t('advRep.subtitle')}</p>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{t('advRep.subtitle')}</p>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-gray-200 pb-2">
+      <div className="flex gap-2 border-b border-[var(--border)] pb-2">
         {tabs.map((tabItem) => (
           <button
             key={tabItem.key}
@@ -320,7 +321,7 @@ export default function AdvancedReportingPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === tabItem.key
                 ? 'bg-primary-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {tabItem.icon}
@@ -340,7 +341,7 @@ export default function AdvancedReportingPage() {
               <CardBody className="p-6">
                 {reportDefinitions.length === 0 ? (
                   <EmptyState
-                    icon={<FileText className="w-8 h-8 text-gray-400" />}
+                    icon={<FileText className="w-8 h-8 text-[var(--text-disabled)]" />}
                     title={t('advRep.noReports')}
                     message={t('advRep.loadFailed')}
                   />
@@ -357,7 +358,7 @@ export default function AdvancedReportingPage() {
                             className={`p-4 rounded-xl border-2 text-left transition-all ${
                               selectedReportId === report.id
                                 ? 'border-primary-600 bg-primary-50 shadow-md'
-                                : 'border-gray-200 hover:border-gray-300'
+                                : 'border-[var(--border)] hover:border-[var(--border-strong)]'
                             }`}
                           >
                             <div className="flex items-start gap-3">
@@ -365,11 +366,11 @@ export default function AdvancedReportingPage() {
                                 <FileText className="w-5 h-5 text-primary-600" />
                               </div>
                               <div className="min-w-0">
-                                <p className="font-medium text-gray-900 truncate">
+                                <p className="font-medium text-[var(--text-primary)] truncate">
                                   {escapeHtml(report.name)}
                                 </p>
                                 {report.description && (
-                                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                  <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2">
                                     {escapeHtml(report.description)}
                                   </p>
                                 )}
@@ -387,7 +388,7 @@ export default function AdvancedReportingPage() {
 
                     {/* Date Range & Generate */}
                     {selectedReportId && (
-                      <div className="border-t border-gray-200 pt-4">
+                      <div className="border-t border-[var(--border)] pt-4">
                         <div className="flex flex-wrap items-end gap-4">
                           <Input
                             label={t('advRep.dateFrom')}
@@ -407,7 +408,8 @@ export default function AdvancedReportingPage() {
                             onChange={(e) => setFormat(e.target.value)}
                             options={EXPORT_FORMATS}
                           />
-                          <Button
+                          <Can permission="advanced_reporting.view">
+          <Button
                             onClick={() => void handleGenerate()}
                             loading={generating}
                             disabled={generating}
@@ -415,6 +417,7 @@ export default function AdvancedReportingPage() {
                             <Download className="w-4 h-4 mr-1" />
                             {t('advRep.generate')}
                           </Button>
+        </Can>
                           <Button
                             variant="secondary"
                             onClick={() => setShowSchedule(true)}

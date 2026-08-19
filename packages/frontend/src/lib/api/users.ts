@@ -91,4 +91,21 @@ export const branchesApi = {
 
 export const departmentsApi = {
   list: () => apiClient.get('/departments').then((r) => r.data.data),
+  create: (data: { name: string; code: string }) =>
+    apiClient.post('/departments', data).then((r) => r.data.data),
+  update: (id: string, data: { name?: string; code?: string; isActive?: boolean }) =>
+    apiClient.put(`/departments/${id}`, data).then((r) => r.data.data),
+  delete: (id: string) =>
+    apiClient.delete(`/departments/${id}`).then((r) => r.data.data),
+};
+
+export const emergencyAccessApi = {
+  activate: (data: { patientId: string; reason: string }) =>
+    apiClient.post('/emergency-access/activate', data).then((r) => r.data.data),
+  revoke: (id: string) =>
+    apiClient.post(`/emergency-access/${id}/revoke`).then((r) => r.data.data),
+  listActive: () =>
+    apiClient.get('/emergency-access/active').then((r) => r.data.data),
+  log: () =>
+    apiClient.get('/emergency-access/log').then((r) => r.data.data),
 };

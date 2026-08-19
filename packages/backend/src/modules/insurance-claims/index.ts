@@ -7,12 +7,28 @@ import { findTenantRow } from '../../utils/tenant-scope.js';
 import type { InsuranceCompanyRow, InsuranceClaimRow } from "../types.js";
 import { logAudit } from '../../services/audit.js';
 import { authenticate } from '../auth-guard.js';
-import { authorize } from '../../services/authorization.js';
+import { authorize, hasPermission, type Principal } from '../../services/authorization.js';
+
+function resolveClaimsScope(principal: Principal): { denied: boolean } {
+  if (hasPermission(principal, 'insurance_claims.view', 'system') || hasPermission(principal, 'insurance_claims.view', 'tenant')) {
+    return { denied: false };
+  }
+  if (hasPermission(principal, 'insurance_claims.view', 'branch') || hasPermission(principal, 'insurance_claims.view', 'branches')) {
+    return { denied: false };
+  }
+  if (hasPermission(principal, 'insurance_claims.view', 'department') || hasPermission(principal, 'insurance_claims.view', 'assigned_patients')) {
+    return { denied: false };
+  }
+  return { denied: true };
+}
 
 export async function registerInsuranceClaimsModule(app: FastifyInstance) {
 
   app.get('/api/v1/insurance-companies', { preHandler: [authenticate, authorize('insurance.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
+    if (resolveClaimsScope(principal).denied) return sendSuccess(reply, []);
+
     const companies = await db('insurance_companies').where({ tenant_id: tenantId, is_active: true }).orderBy('name');
     return sendSuccess(reply, companies.map((c: InsuranceCompanyRow) => ({
       id: c.id, name: c.name, code: c.code, contractType: c.contract_type,
@@ -20,7 +36,7 @@ export async function registerInsuranceClaimsModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/insurance-companies', { preHandler: [authenticate, authorize('insurance.view')] }, async (request, reply) => {
+  app.post('/api/v1/insurance-companies', { preHandler: [authenticate, authorize('insurance.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const body = z.object({
       name: z.string().min(2), code: z.string().min(2).max(50),
@@ -36,8 +52,17 @@ export async function registerInsuranceClaimsModule(app: FastifyInstance) {
 
   app.get('/api/v1/insurance-claims', { preHandler: [authenticate, authorize('insurance_claims.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
+    const scope = resolveClaimsScope(principal);
+
     const query = z.object({ page: z.coerce.number().optional().default(1), limit: z.coerce.number().optional().default(20), status: z.string().optional(), insuranceId: z.string().uuid().optional(), patientId: z.string().uuid().optional() }).parse(request.query);
+
     const qb = db('insurance_claims').leftJoin('patients', 'insurance_claims.patient_id', 'patients.id').leftJoin('insurance_companies', 'insurance_claims.insurance_id', 'insurance_companies.id').leftJoin('invoices', 'insurance_claims.invoice_id', 'invoices.id').where('insurance_claims.tenant_id', tenantId).whereNull('insurance_claims.deleted_at');
+
+    if (scope.denied) {
+      qb.where(db.raw('false'));
+    }
+
     if (query.status) qb.andWhere('insurance_claims.status', query.status);
     if (query.insuranceId) qb.andWhere('insurance_claims.insurance_id', query.insuranceId);
     if (query.patientId) qb.andWhere('insurance_claims.patient_id', query.patientId);
@@ -46,7 +71,7 @@ export async function registerInsuranceClaimsModule(app: FastifyInstance) {
     return sendPaginated(reply, claims.map((c: Record<string, unknown>) => ({ id: c.id, claimNumber: c.claim_number, status: c.status, patientName: c.pf ? `${c.pf} ${c.pl}` : null, patientMrn: c.mrn, companyName: c.cname, invoiceNumber: c.invoice_number, claimedAmount: Number(c.claimed_amount), approvedAmount: Number(c.approved_amount), paidAmount: Number(c.paid_amount), submissionDate: c.submission_date, responseDate: c.response_date, denialReason: c.denial_reason, notes: c.notes, createdAt: c.created_at })), Number((total as Record<string, unknown>)?.count || 0), query.page, query.limit);
   });
 
-  app.post('/api/v1/insurance-claims', { preHandler: [authenticate, authorize('insurance_claims.view')] }, async (request, reply) => {
+  app.post('/api/v1/insurance-claims', { preHandler: [authenticate, authorize('insurance_claims.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request);
     const body = z.object({ patientId: z.string().uuid(), invoiceId: z.string().uuid(), insuranceId: z.string().uuid(), claimedAmount: z.number().positive(), notes: z.string().optional() }).parse(request.body);
     const patient = await findTenantRow('patients', body.patientId, tenantId);
@@ -92,7 +117,13 @@ export async function registerInsuranceClaimsModule(app: FastifyInstance) {
 
   app.get('/api/v1/insurance-claims/summary', { preHandler: [authenticate, authorize('insurance_claims.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const s = await db('insurance_claims').where({ tenant_id: tenantId }).whereNull('deleted_at').select(db.raw('COUNT(*) as total'), db.raw('COALESCE(SUM(claimed_amount),0) as total_claimed'), db.raw('COALESCE(SUM(approved_amount),0) as total_approved'), db.raw('COALESCE(SUM(paid_amount),0) as total_paid'), db.raw('COUNT(CASE WHEN status=\'draft\' THEN 1 END) as draft'), db.raw('COUNT(CASE WHEN status=\'submitted\' THEN 1 END) as submitted'), db.raw('COUNT(CASE WHEN status=\'approved\' THEN 1 END) as approved'), db.raw('COUNT(CASE WHEN status=\'denied\' THEN 1 END) as denied'), db.raw('COUNT(CASE WHEN status=\'paid\' THEN 1 END) as paid')).first();
+    const { principal } = getCtx(request);
+    const scope = resolveClaimsScope(principal);
+
+    let q = db('insurance_claims').where({ tenant_id: tenantId }).whereNull('deleted_at');
+    if (scope.denied) q = q.where(db.raw('false'));
+
+    const s = await q.select(db.raw('COUNT(*) as total'), db.raw('COALESCE(SUM(claimed_amount),0) as total_claimed'), db.raw('COALESCE(SUM(approved_amount),0) as total_approved'), db.raw('COALESCE(SUM(paid_amount),0) as total_paid'), db.raw("COUNT(CASE WHEN status='draft' THEN 1 END) as draft"), db.raw("COUNT(CASE WHEN status='submitted' THEN 1 END) as submitted"), db.raw("COUNT(CASE WHEN status='approved' THEN 1 END) as approved"), db.raw("COUNT(CASE WHEN status='denied' THEN 1 END) as denied"), db.raw("COUNT(CASE WHEN status='paid' THEN 1 END) as paid")).first();
     return sendSuccess(reply, s);
   });
 }

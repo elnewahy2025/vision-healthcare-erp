@@ -5,6 +5,7 @@ import { Shield, ShieldCheck, Key, Smartphone } from 'lucide-react';
 import { Button, Input, Card, CardBody } from '../components/ui';
 import { securityApi } from '../lib/api';
 import { useAuth } from '../stores/authStore';
+import { Can } from '../components/Can';
 
 export default function SecuritySettingsPage() {
   const { t } = useTranslation();
@@ -121,9 +122,11 @@ export default function SecuritySettingsPage() {
             <h2 className="font-semibold">{t('sec.changePassword')}</h2>
           </div>
           {!showChangePwd ? (
-            <Button onClick={() => setShowChangePwd(true)} variant="secondary">
+            <Can permission="sessions.view">
+          <Button onClick={() => setShowChangePwd(true)} variant="secondary">
               {t('sec.changePassword')}
             </Button>
+        </Can>
           ) : (
             <form onSubmit={handleChangePassword} className="space-y-4">
               <Input
@@ -180,7 +183,7 @@ export default function SecuritySettingsPage() {
                 <span className="font-medium">{t('sec.enabled')}</span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-gray-500">
+              <div className="flex items-center gap-2 text-[var(--text-muted)]">
                 <Shield className="w-5 h-5" />{' '}
                 <span className="font-medium">{t('sec.notEnabled')}</span>
               </div>
@@ -188,18 +191,18 @@ export default function SecuritySettingsPage() {
           </div>
 
           {mfaStep === 'setup' && qrCode && (
-            <div className="p-4 bg-gray-50 rounded-lg mb-4">
-              <p className="text-sm text-gray-600 mb-3">{t('sec.scanQr')}</p>
+            <div className="p-4 bg-[var(--surface-secondary)] rounded-lg mb-4">
+              <p className="text-sm text-[var(--text-secondary)] mb-3">{t('sec.scanQr')}</p>
               <img
                 src={qrCode}
                 alt="QR Code"
                 className="w-48 h-48 mx-auto border rounded-lg mb-3"
               />
-              <p className="text-xs text-gray-500 text-center mb-3">
+              <p className="text-xs text-[var(--text-muted)] text-center mb-3">
                 {t('sec.orEnterSecret')}{' '}
-                <code className="bg-white px-2 py-0.5 rounded">{secret}</code>
+                <code className="bg-[var(--surface)] px-2 py-0.5 rounded">{secret}</code>
               </p>
-              <p className="text-sm text-gray-600 mb-2">{t('sec.enterCode')}</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-2">{t('sec.enterCode')}</p>
               <div className="flex gap-2">
                 <Input
                   placeholder="000000"

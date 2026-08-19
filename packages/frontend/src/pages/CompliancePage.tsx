@@ -5,6 +5,7 @@ import { Modal, Input, Button, Badge, EmptyState, PageLoader } from '../componen
 import { Shield, ScrollText, AlertTriangle, UserCheck, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 type TabType = 'policies' | 'audits' | 'consents' | 'breaches';
 
@@ -94,32 +95,32 @@ export default function CompliancePage() {
       {/* Policies Tab */}
       {tab === 'policies' && (
         filteredPolicies.length === 0 ? (
-          <EmptyState icon={<Shield className="w-8 h-8 text-gray-400" />} title={t('compliance.noPolicies')} message={t('common.noData')} />
+          <EmptyState icon={<Shield className="w-8 h-8 text-[var(--text-disabled)]" />} title={t('compliance.noPolicies')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.code')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.titleField')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.category')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.status')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.effectiveDate')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.reviewDate')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.code')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.titleField')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.category')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.effectiveDate')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.reviewDate')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {filteredPolicies.map((pol) => (
-                    <tr key={pol.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setSelectedPolicy(pol)}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{pol.code}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{pol.title}</td>
+                    <tr key={pol.id} className="hover:bg-[var(--surface-secondary)] cursor-pointer transition-colors" onClick={() => setSelectedPolicy(pol)}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">{pol.code}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{pol.title}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{pol.category}</Badge></td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={pol.status === 'active' ? 'success' : pol.status === 'draft' ? 'warning' : 'gray'}>{pol.status}</Badge>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{pol.effectiveDate || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{pol.reviewDate || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{pol.effectiveDate || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{pol.reviewDate || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -134,25 +135,25 @@ export default function CompliancePage() {
         audits.length === 0 ? (
           <EmptyState title={t('compliance.noAudits')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.titleField')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.type')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.auditor')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.scheduledDate')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.titleField')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.type')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.auditor')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.scheduledDate')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.status')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {audits.map((audit) => (
-                    <tr key={audit.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{audit.title}</td>
+                    <tr key={audit.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{audit.title}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{audit.type}</Badge></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{audit.auditor || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{audit.scheduledDate || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{audit.auditor || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{audit.scheduledDate || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={audit.status === 'completed' ? 'success' : audit.status === 'in_progress' ? 'warning' : 'gray'}>{audit.status}</Badge>
                       </td>
@@ -170,26 +171,26 @@ export default function CompliancePage() {
         consents.length === 0 ? (
           <EmptyState title={t('compliance.noConsents')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.patient')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.consentType')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.granted')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.effectiveDate')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.patient')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.consentType')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.granted')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.effectiveDate')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {consents.map((consent) => (
-                    <tr key={consent.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{consent.patientName}</td>
+                    <tr key={consent.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{consent.patientName}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{consent.consentType}</Badge></td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={consent.granted ? 'success' : 'danger'}>{consent.granted ? t('compliance.granted') : t('compliance.denied')}</Badge>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(consent.consentedAt)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{formatDateTime(consent.consentedAt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -204,27 +205,27 @@ export default function CompliancePage() {
         breaches.length === 0 ? (
           <EmptyState title={t('compliance.noBreaches')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.type')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.severity')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.detectedDate')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.affectedRecords')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('compliance.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.type')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.severity')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.detectedDate')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.affectedRecords')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('compliance.status')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {breaches.map((breach) => (
-                    <tr key={breach.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{breach.type}</td>
+                    <tr key={breach.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{breach.type}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={breach.severity === 'high' || breach.severity === 'critical' ? 'danger' : breach.severity === 'medium' ? 'warning' : 'info'}>{breach.severity}</Badge>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{breach.detectedDate}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{breach.affectedRecords}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{breach.detectedDate}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{breach.affectedRecords}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={breach.status === 'resolved' || breach.status === 'closed' ? 'success' : breach.status === 'investigating' ? 'warning' : 'danger'}>{breach.status}</Badge>
                       </td>
@@ -255,7 +256,7 @@ export default function CompliancePage() {
             {selectedPolicy.content && (
               <div>
                 <strong>{t('compliance.content')}:</strong>
-                <p className="mt-1 p-3 bg-gray-50 rounded text-xs max-h-60 overflow-y-auto whitespace-pre-wrap">{selectedPolicy.content}</p>
+                <p className="mt-1 p-3 bg-[var(--surface-secondary)] rounded text-xs max-h-60 overflow-y-auto whitespace-pre-wrap">{selectedPolicy.content}</p>
               </div>
             )}
             <p>

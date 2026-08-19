@@ -1,7 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { getCtx } from '../../utils/route-helper.js';
 import { sendSuccess } from '../../utils/response.js';
-import { UnauthorizedError, ConflictError } from '@healthcare/shared/errors';
+import { UnauthorizedError, ConflictError, ForbiddenError } from '@healthcare/shared/errors';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { logAudit } from '../../services/audit.js';
@@ -11,6 +11,8 @@ import { createAndSendOtp, verifyOtp, incrementOtpAttempt } from '../../services
 import { sendEmail } from '../../services/email.js';
 import { getEnv } from '@healthcare/shared/config';
 import { loadUserPrincipal, uniquePermissionKeys, type Principal } from '../../services/authorization.js';
+import { invalidatePrincipal, invalidateUserAuthz } from '../../services/authz-cache.js';
+import { db } from '../../core/database.js';
 import * as svc from './auth.service.js';
 import * as repo from './auth.repository.js';
 import {
@@ -18,6 +20,7 @@ import {
   logoutSchema, sessionIdSchema, forgotPasswordSchema, resetPasswordSchema,
   changePasswordSchema, verifyEmailSchema, resendVerificationSchema,
   mfaEnableSchema, mfaDisableSchema, otpSendSchema, otpVerifySchema,
+  switchMembershipSchema,
 } from './auth.schema.js';
 const env = getEnv();
 
@@ -49,7 +52,7 @@ function buildUserResponse(user: Record<string, unknown>, principal: Principal |
     permissions: principal ? uniquePermissionKeys(principal.grants) : [],
     branches: principal?.branches || [],
     employeeType: user.employee_type || 'staff',
-    departmentId: user.department_id || null,
+    departmentId: principal?.departmentId || user.department_id || null,
     position: user.position || null,
     locale: user.locale || 'en',
     status: user.status,
@@ -57,6 +60,41 @@ function buildUserResponse(user: Record<string, unknown>, principal: Principal |
     passwordChangedAt: user.password_changed_at || null,
   };
 }
+
+/**
+ * Load all active memberships for a user, enriched with tenant/branch/dept names.
+ */
+async function loadMemberships(userId: string) {
+  return db('memberships')
+    .where({ user_id: userId, status: 'active' })
+    .join('tenants', 'memberships.tenant_id', 'tenants.id')
+    .leftJoin('branches', 'memberships.branch_id', 'branches.id')
+    .leftJoin('departments', 'memberships.department_id', 'departments.id')
+    .select(
+      'memberships.id', 'memberships.tenant_id', 'memberships.branch_id',
+      'memberships.department_id', 'memberships.authz_version',
+      'tenants.name as tenant_name', 'tenants.slug as tenant_slug',
+      'branches.name as branch_name',
+      'departments.name as department_name',
+    );
+}
+
+/**
+ * Format memberships for API response.
+ */
+function formatMemberships(memberships: Record<string, unknown>[]) {
+  return memberships.map((m) => ({
+    id: m.id,
+    tenant: { id: m.tenant_id, name: m.tenant_name, slug: m.tenant_slug },
+    branch: m.branch_id ? { id: m.branch_id, name: m.branch_name } : null,
+    department: m.department_id ? { id: m.department_id, name: m.department_name } : null,
+    authzVersion: m.authz_version,
+  }));
+}
+
+// ════════════════════════════════════════════════════════════════════
+// REGISTRATION
+// ════════════════════════════════════════════════════════════════════
 
 export async function registerTenant(request: FastifyRequest, reply: FastifyReply) {
   const body = registerTenantSchema.parse(request.body);
@@ -88,7 +126,22 @@ export async function registerTenant(request: FastifyRequest, reply: FastifyRepl
     verificationToken,
   });
 
-  await logAudit({ tenantId: String(result.tenant.id), userId: String(result.user.id), action: 'tenant.created' });
+  // Create membership for the admin user
+  const tenantId = String(result.tenant.id);
+  const userId = String(result.user.id);
+  const [membership] = await db('memberships').insert({
+    user_id: userId,
+    tenant_id: tenantId,
+    branch_id: null,
+    department_id: null,
+    status: 'active',
+    authz_version: 1,
+  }).returning('*');
+
+  // Set as active membership
+  await db('users').where({ id: userId }).update({ active_membership_id: membership.id });
+
+  await logAudit({ tenantId, userId, action: 'tenant.created' });
 
   try {
     const verifyUrl = `${env.APP_URL}/verify-email?token=${result.verificationToken}`;
@@ -103,6 +156,10 @@ export async function registerTenant(request: FastifyRequest, reply: FastifyRepl
     message: 'Registration successful. Please verify your email.',
   }, 'Tenant created', 201);
 }
+
+// ════════════════════════════════════════════════════════════════════
+// LOGIN
+// ════════════════════════════════════════════════════════════════════
 
 export async function login(request: FastifyRequest, reply: FastifyReply) {
   const body = loginSchema.parse(request.body);
@@ -125,19 +182,52 @@ export async function login(request: FastifyRequest, reply: FastifyReply) {
   await svc.recordSuccessfulLogin(body.email, tenant.id, ip, userAgent);
   await svc.resetFailedLogin(user.id);
 
+  // ── MFA gate ──
   if (user.mfa_enabled) {
     const jwt = svc.getJwtHelper(request.server);
-    const partialToken = jwt.sign({ tenantId: tenant.id, userId: user.id, mfaPending: true }, { expiresIn: '5m' });
+    const partialToken = jwt.sign({ userId: user.id, mfaPending: true }, { expiresIn: '5m' });
     return sendSuccess(reply, { mfaRequired: true, partialToken, userId: user.id });
   }
 
-  const jwt = svc.getJwtHelper(request.server);
-  const accessToken = svc.generateAccessToken(jwt, tenant.id, user.id);
-  const { refreshToken } = await generateTokenPair(user.id, tenant.id, ip, userAgent);
-  await svc.enforceSessionLimit(user.id, tenant.id);
-  await svc.createSessionRecord(tenant.id, user.id, refreshToken, ip, userAgent);
-  await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.login', ipAddress: ip, userAgent });
+  // ── Load memberships ──
+  const memberships = await loadMemberships(user.id);
+  if (memberships.length === 0) {
+    throw new UnauthorizedError('No active memberships found');
+  }
 
+  // Select active membership (user's stored preference, or first available)
+  const activeMembership = memberships.find(
+    (m: Record<string, unknown>) => m.id === user.active_membership_id,
+  ) || memberships[0];
+
+  const membershipId = String(activeMembership.id);
+  const authzVersion = Number(activeMembership.authz_version);
+
+  // ── Create session ──
+  const sessionId = crypto.randomUUID();
+  const { refreshToken } = await generateTokenPair(user.id, String(activeMembership.tenant_id), ip, userAgent);
+  await svc.createSessionRecord(String(activeMembership.tenant_id), user.id, refreshToken, ip, userAgent);
+  await svc.enforceSessionLimit(user.id, String(activeMembership.tenant_id));
+
+  // ── Generate JWT with membership reference (NOT tenant data) ──
+  const jwt = svc.getJwtHelper(request.server);
+  const accessToken = svc.generateAccessToken(jwt, user.id, membershipId, sessionId, authzVersion);
+
+  // ── Load principal from membership ──
+  const principal = await loadUserPrincipal(user.id, membershipId);
+
+  // ── Update active membership pointer ──
+  await db('users').where({ id: user.id }).update({
+    active_membership_id: membershipId,
+    last_login_at: new Date(),
+  });
+
+  // Invalidate stale cache entries for this user (fresh login)
+  await invalidateUserAuthz(user.id);
+
+  await logAudit({ tenantId: String(activeMembership.tenant_id), userId: user.id, action: 'user.login', ipAddress: ip, userAgent });
+
+  // ── CSRF tokens ──
   const csrfToken = svc.generateCsrfToken();
   reply.setCookie('refresh_token', refreshToken, {
     httpOnly: true, secure: env.COOKIE_SECURE, sameSite: 'strict',
@@ -148,25 +238,35 @@ export async function login(request: FastifyRequest, reply: FastifyReply) {
     path: '/', maxAge: env.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
   });
 
-  const principal = await loadUserPrincipal(user.id, tenant.id);
+  // ── Load tenant for response ──
+  const tenantData = await repo.findTenantById(String(activeMembership.tenant_id));
+
   return sendSuccess(reply, {
-    accessToken, csrfToken, expiresIn: 3600,
+    accessToken,
+    csrfToken,
+    expiresIn: 3600,
+    activeMembershipId: membershipId,
+    memberships: formatMemberships(memberships),
     user: buildUserResponse(user, principal),
-    tenant: {
-      id: tenant.id, name: tenant.name, slug: tenant.slug,
-      locale: tenant.locale, direction: tenant.settings?.direction || (tenant.locale === 'ar' ? 'rtl' : 'ltr'),
-      settings: tenant.settings ?? {},
-    },
+    tenant: tenantData ? {
+      id: tenantData.id, name: tenantData.name, slug: tenantData.slug,
+      locale: tenantData.locale, direction: tenantData.settings?.direction || (tenantData.locale === 'ar' ? 'rtl' : 'ltr'),
+      settings: tenantData.settings ?? {},
+    } : null,
   });
 }
+
+// ════════════════════════════════════════════════════════════════════
+// MFA VERIFY
+// ════════════════════════════════════════════════════════════════════
 
 export async function mfaVerify(request: FastifyRequest, reply: FastifyReply) {
   const { code, partialToken } = mfaVerifySchema.parse(request.body);
   const ip = request.ip ?? '127.0.0.1';
   const userAgent = (request.headers['user-agent'] as string) || null;
 
-  let decoded: { tenantId: string; userId: string; mfaPending: boolean };
-  try { decoded = svc.getJwtHelper(request.server).verify(partialToken) as { tenantId: string; userId: string; mfaPending: boolean }; }
+  let decoded: { userId: string; mfaPending: boolean };
+  try { decoded = svc.getJwtHelper(request.server).verify(partialToken) as { userId: string; mfaPending: boolean }; }
   catch { throw new UnauthorizedError('Invalid or expired token'); }
 
   if (!decoded.mfaPending) throw new UnauthorizedError('Invalid token');
@@ -177,15 +277,32 @@ export async function mfaVerify(request: FastifyRequest, reply: FastifyReply) {
   const valid = verifyToken(code, user.mfa_secret);
   if (!valid) throw new UnauthorizedError('Invalid MFA code');
 
-  const tenant = await repo.findTenantById(decoded.tenantId);
-  if (!tenant) throw new UnauthorizedError('Invalid organization');
+  // ── Load memberships ──
+  const memberships = await loadMemberships(user.id);
+  if (memberships.length === 0) {
+    throw new UnauthorizedError('No active memberships found');
+  }
+
+  const activeMembership = memberships.find(
+    (m: Record<string, unknown>) => m.id === user.active_membership_id,
+  ) || memberships[0];
+
+  const membershipId = String(activeMembership.id);
+  const authzVersion = Number(activeMembership.authz_version);
+
+  // ── Create session + JWT ──
+  const sessionId = crypto.randomUUID();
+  const { refreshToken } = await generateTokenPair(user.id, String(activeMembership.tenant_id), ip, userAgent);
+  await svc.createSessionRecord(String(activeMembership.tenant_id), user.id, refreshToken, ip, userAgent);
+  await svc.enforceSessionLimit(user.id, String(activeMembership.tenant_id));
 
   const jwt = svc.getJwtHelper(request.server);
-  const accessToken = svc.generateAccessToken(jwt, tenant.id, user.id);
-  const { refreshToken } = await generateTokenPair(user.id, tenant.id, ip, userAgent);
-  await svc.enforceSessionLimit(user.id, tenant.id);
-  await svc.createSessionRecord(tenant.id, user.id, refreshToken, ip, userAgent);
-  await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.login.mfa', ipAddress: ip });
+  const accessToken = svc.generateAccessToken(jwt, user.id, membershipId, sessionId, authzVersion);
+
+  const principal = await loadUserPrincipal(user.id, membershipId);
+
+  await db('users').where({ id: user.id }).update({ active_membership_id: membershipId });
+  await logAudit({ tenantId: String(activeMembership.tenant_id), userId: user.id, action: 'user.login.mfa', ipAddress: ip });
 
   const csrfToken = svc.generateCsrfToken();
   reply.setCookie('refresh_token', refreshToken, {
@@ -197,16 +314,106 @@ export async function mfaVerify(request: FastifyRequest, reply: FastifyReply) {
     path: '/', maxAge: env.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
   });
 
-  const principal = await loadUserPrincipal(user.id, tenant.id);
+  const tenantData = await repo.findTenantById(String(activeMembership.tenant_id));
+
   return sendSuccess(reply, {
-    accessToken, csrfToken, expiresIn: 3600,
+    accessToken,
+    csrfToken,
+    expiresIn: 3600,
+    activeMembershipId: membershipId,
+    memberships: formatMemberships(memberships),
     user: buildUserResponse(user, principal),
+    tenant: tenantData ? {
+      id: tenantData.id, name: tenantData.name, slug: tenantData.slug,
+      locale: tenantData.locale, direction: tenantData.settings?.direction || (tenantData.locale === 'ar' ? 'rtl' : 'ltr'),
+      settings: tenantData.settings ?? {},
+    } : null,
   });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// SWITCH MEMBERSHIP (multi-tenant / multi-branch)
+// ════════════════════════════════════════════════════════════════════
+
+export async function switchMembership(request: FastifyRequest, reply: FastifyReply) {
+  const { membershipId } = switchMembershipSchema.parse(request.body);
+  const { userId } = getCtx(request);
+
+  // 1. Verify user owns this membership and it's active
+  const membership = await db('memberships')
+    .where({ id: membershipId, user_id: userId, status: 'active' })
+    .first();
+  if (!membership) throw new ForbiddenError('Membership not found or inactive');
+
+  // 2. Update active membership pointer
+  await db('users').where({ id: userId }).update({ active_membership_id: membershipId });
+
+  // 3. Load new principal from the new membership
+  const principal = await loadUserPrincipal(userId, membershipId);
+  if (!principal) throw new ForbiddenError('Failed to load authorization context');
+
+  // 4. Issue new JWT with new membership
+  const sessionId = crypto.randomUUID();
+  const jwt = svc.getJwtHelper(request.server);
+  const accessToken = svc.generateAccessToken(
+    jwt, userId, membershipId, sessionId, principal.authzVersion,
+  );
+
+  // 5. Load updated memberships list
+  const memberships = await loadMemberships(userId);
+
+  const tenantData = await repo.findTenantById(principal.tenantId);
+
+  // Invalidate old cached principal for this user
+  await invalidateUserAuthz(userId);
+
+  await logAudit({
+    tenantId: principal.tenantId, userId,
+    action: 'user.membership_switched',
+    metadata: JSON.stringify({ newMembershipId: membershipId }),
+  });
+
+  return sendSuccess(reply, {
+    accessToken,
+    expiresIn: 3600,
+    activeMembershipId: membershipId,
+    memberships: formatMemberships(memberships),
+    user: buildUserResponse(
+      { id: userId, email: principal.userId, first_name: '', last_name: '', roles: principal.roles,
+        employee_type: 'staff', department_id: principal.departmentId, position: null,
+        locale: principal.locale, status: principal.status, mfa_enabled: false, password_changed_at: null },
+      principal,
+    ),
+    tenant: tenantData ? {
+      id: tenantData.id, name: tenantData.name, slug: tenantData.slug,
+      locale: tenantData.locale, direction: tenantData.settings?.direction || (tenantData.locale === 'ar' ? 'rtl' : 'ltr'),
+      settings: tenantData.settings ?? {},
+    } : null,
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// GET MEMBERSHIPS
+// ════════════════════════════════════════════════════════════════════
+
+export async function getMemberships(request: FastifyRequest, reply: FastifyReply) {
+  const { userId } = getCtx(request);
+  const memberships = await loadMemberships(userId);
+
+  const user = await repo.findUserById(userId);
+  const activeMembershipId = user?.active_membership_id || null;
+
+  return sendSuccess(reply, {
+    memberships: formatMemberships(memberships),
+    activeMembershipId,
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// REFRESH TOKEN
+// ════════════════════════════════════════════════════════════════════
+
 export async function refreshToken(request: FastifyRequest, reply: FastifyReply) {
-  // Accept the token from the body (API clients) or the HttpOnly refresh_token cookie
-  // (browser session restore — the frontend cannot read the cookie to send it in the body).
   const body = (request.body ?? {}) as Record<string, unknown>;
   const bodyToken = typeof body.refreshToken === 'string' ? body.refreshToken : undefined;
   const oldToken = bodyToken || request.cookies?.refresh_token;
@@ -236,8 +443,26 @@ export async function refreshToken(request: FastifyRequest, reply: FastifyReply)
   const user = await repo.findUserById(oldRecord.user_id);
   if (!user || user.status !== 'active') throw new UnauthorizedError('Account is not active');
 
+  // ── Load user's active membership to get authz_version ──
+  const membership = await db('memberships')
+    .where({ id: user.active_membership_id, user_id: user.id, status: 'active' })
+    .first();
+
+  if (!membership) {
+    // Fallback: use first available membership
+    const fallbackMembership = await db('memberships')
+      .where({ user_id: user.id, status: 'active' })
+      .first();
+    if (!fallbackMembership) throw new UnauthorizedError('No active membership');
+    membership.id = fallbackMembership.id;
+    membership.authz_version = fallbackMembership.authz_version;
+    membership.tenant_id = fallbackMembership.tenant_id;
+  }
+
   const jwt = svc.getJwtHelper(request.server);
-  const accessToken = svc.generateAccessToken(jwt, oldRecord.tenant_id, user.id);
+  const accessToken = svc.generateAccessTokenCompat(
+    jwt, user.id, String(membership.id), Number(membership.authz_version),
+  );
 
   await repo.updateSessionActivity(user.id, oldRecord.tenant_id, oldTokenHash);
   await logAudit({ tenantId: oldRecord.tenant_id, userId: user.id, action: 'user.token_refresh' });
@@ -255,9 +480,11 @@ export async function refreshToken(request: FastifyRequest, reply: FastifyReply)
   return sendSuccess(reply, { accessToken, csrfToken, expiresIn: 3600 });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// LOGOUT
+// ════════════════════════════════════════════════════════════════════
+
 export async function logout(request: FastifyRequest, reply: FastifyReply) {
-  // Never fail logout just because the access token expired: resolve the session
-  // from the refresh token itself, and always clear the cookies.
   const body = (request.body ?? {}) as Record<string, unknown>;
   const bodyToken = typeof body.refreshToken === 'string' ? body.refreshToken : undefined;
   const token = bodyToken || request.cookies?.refresh_token;
@@ -278,12 +505,15 @@ export async function logout(request: FastifyRequest, reply: FastifyReply) {
   return sendSuccess(reply, { message: 'Logged out successfully' });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ME (current user)
+// ════════════════════════════════════════════════════════════════════
+
 export async function me(request: FastifyRequest, reply: FastifyReply) {
-  const { userId, tenantId } = getCtx(request);
-  const user = await repo.findUserByIdAndTenant(userId, tenantId);
+  const { userId, principal } = getCtx(request);
+  const user = await repo.findUserByIdAndTenant(userId, principal.tenantId);
   if (!user) throw new UnauthorizedError('User not found');
-  const tenant = await repo.findTenantById(tenantId);
-  const principal = await loadUserPrincipal(userId, tenantId);
+  const tenant = await repo.findTenantById(principal.tenantId);
   return sendSuccess(reply, {
     user: buildUserResponse(user, principal),
     tenant: tenant ? {
@@ -293,6 +523,10 @@ export async function me(request: FastifyRequest, reply: FastifyReply) {
     } : null,
   });
 }
+
+// ════════════════════════════════════════════════════════════════════
+// SESSIONS
+// ════════════════════════════════════════════════════════════════════
 
 export async function listSessions(request: FastifyRequest, reply: FastifyReply) {
   const { userId, tenantId } = getCtx(request);
@@ -311,62 +545,67 @@ export async function revokeSession(request: FastifyRequest, reply: FastifyReply
   return sendSuccess(reply, { message: 'Session revoked' });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// PASSWORD MANAGEMENT
+// ════════════════════════════════════════════════════════════════════
+
 export async function forgotPassword(request: FastifyRequest, reply: FastifyReply) {
   const { email, tenantSlug } = forgotPasswordSchema.parse(request.body);
   const tenant = await repo.findTenantBySlug(tenantSlug);
   if (!tenant) throw new UnauthorizedError('Invalid organization');
   const user = await repo.findUserByEmailAndTenant(email, tenant.id);
-  if (!user) return sendSuccess(reply, { message: 'If an account exists, a reset link has been sent.' });
-
+  if (!user) return sendSuccess(reply, { message: 'If an account exists, a reset email has been sent.' });
   const resetToken = crypto.randomBytes(32).toString('hex');
-  const resetHash = crypto.createHash('sha256').update(resetToken).digest('hex');
-  await repo.createPasswordReset({ user_id: user.id, tenant_id: tenant.id, token_hash: resetHash, expires_at: new Date(Date.now() + 60 * 60 * 1000) });
-
+  const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+  await repo.createPasswordReset({
+    tenant_id: tenant.id, user_id: user.id, token_hash: tokenHash,
+    expires_at: new Date(Date.now() + 60 * 60 * 1000),
+  });
   try {
-    await sendEmail({ to: user.email, subject: 'Password Reset — Vision Healthcare',
-      html: `<p>You requested a password reset.</p><p>Click: <a href="${env.APP_URL}/reset-password?token=${resetToken}">Reset Password</a></p><p>This link expires in 1 hour.</p>` });
+    await sendEmail({
+      to: user.email, subject: 'Reset your password — Vision Healthcare',
+      html: `<p>Reset your password: <a href="${env.APP_URL}/reset-password?token=${resetToken}">Reset Password</a></p><p>This link expires in 1 hour.</p>`,
+    });
   } catch { /* best-effort */ }
-
-  await logAudit({ tenantId: tenant.id, userId: user.id, action: 'user.forgot_password' });
-  return sendSuccess(reply, { message: 'If an account exists, a reset link has been sent.' });
+  return sendSuccess(reply, { message: 'If an account exists, a reset email has been sent.' });
 }
 
 export async function resetPassword(request: FastifyRequest, reply: FastifyReply) {
   const { token, password } = resetPasswordSchema.parse(request.body);
-  const resetHash = crypto.createHash('sha256').update(token).digest('hex');
-  const reset = await repo.findPasswordReset(resetHash);
-  if (!reset) throw new UnauthorizedError('Invalid or expired reset token');
-
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const record = await repo.findPasswordReset(tokenHash);
+  if (!record) throw new UnauthorizedError('Invalid or expired reset token');
   const passwordHash = await bcrypt.hash(password, env.BCRYPT_ROUNDS);
-  await repo.updateUser(reset.user_id, { password_hash: passwordHash, password_changed_at: new Date() });
-  await repo.deletePasswordReset(reset.id);
-  await revokeAllUserTokens(reset.user_id, reset.tenant_id);
-  await logAudit({ tenantId: reset.tenant_id, userId: reset.user_id, action: 'user.reset_password' });
-  return sendSuccess(reply, { message: 'Password reset successfully. Please log in again.' });
+  await repo.updateUser(record.user_id, { password_hash: passwordHash, password_changed_at: new Date() });
+  await repo.deletePasswordReset(record.id);
+  await logAudit({ tenantId: record.tenant_id, userId: record.user_id, action: 'user.password_reset' });
+  return sendSuccess(reply, { message: 'Password reset successfully' });
 }
 
 export async function changePassword(request: FastifyRequest, reply: FastifyReply) {
   const { currentPassword, newPassword } = changePasswordSchema.parse(request.body);
   const { userId, tenantId } = getCtx(request);
-  const user = await repo.findUserById(userId);
+  const user = await repo.findUserByIdAndTenant(userId, tenantId);
   if (!user) throw new UnauthorizedError('User not found');
   const valid = await bcrypt.compare(currentPassword, user.password_hash);
   if (!valid) throw new UnauthorizedError('Current password is incorrect');
-  if (await bcrypt.compare(newPassword, user.password_hash)) throw new UnauthorizedError('New password must be different from current password');
   const passwordHash = await bcrypt.hash(newPassword, env.BCRYPT_ROUNDS);
   await repo.updateUser(userId, { password_hash: passwordHash, password_changed_at: new Date() });
-  await revokeAllUserTokens(userId, tenantId);
-  await logAudit({ tenantId, userId, action: 'user.change_password' });
-  return sendSuccess(reply, { message: 'Password changed successfully. Please log in again.' });
+  await logAudit({ tenantId, userId, action: 'user.password_changed' });
+  return sendSuccess(reply, { message: 'Password changed successfully' });
 }
+
+// ════════════════════════════════════════════════════════════════════
+// EMAIL VERIFICATION
+// ════════════════════════════════════════════════════════════════════
 
 export async function verifyEmail(request: FastifyRequest, reply: FastifyReply) {
   const { token } = verifyEmailSchema.parse(request.body);
   const user = await repo.findUserByVerificationToken(token);
-  if (!user) throw new UnauthorizedError('Invalid verification token');
-  await repo.updateUser(user.id, { email_verified: true, email_verified_at: new Date(), email_verification_token: null });
+  if (!user) throw new UnauthorizedError('Invalid or expired verification token');
+  await repo.updateUser(user.id, { email_verified: true, email_verification_token: null });
   await logAudit({ tenantId: user.tenant_id, userId: user.id, action: 'user.email_verified' });
-  return sendSuccess(reply, { message: 'Email verified successfully.' });
+  return sendSuccess(reply, { message: 'Email verified successfully' });
 }
 
 export async function resendVerification(request: FastifyRequest, reply: FastifyReply) {
@@ -383,6 +622,10 @@ export async function resendVerification(request: FastifyRequest, reply: Fastify
   } catch { /* best-effort */ }
   return sendSuccess(reply, { message: 'If an account exists, a verification email has been sent.' });
 }
+
+// ════════════════════════════════════════════════════════════════════
+// MFA MANAGEMENT
+// ════════════════════════════════════════════════════════════════════
 
 export async function mfaSetup(request: FastifyRequest, reply: FastifyReply) {
   const { userId } = getCtx(request);
@@ -418,6 +661,10 @@ export async function mfaDisable(request: FastifyRequest, reply: FastifyReply) {
   return sendSuccess(reply, { message: 'Two-factor authentication disabled.' });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// OTP
+// ════════════════════════════════════════════════════════════════════
+
 export async function sendOtp(request: FastifyRequest, reply: FastifyReply) {
   const { identifier, tenantSlug } = otpSendSchema.parse(request.body);
   const tenant = await repo.findTenantBySlug(tenantSlug);
@@ -434,7 +681,10 @@ export async function verifyOtpHandler(request: FastifyRequest, reply: FastifyRe
   return sendSuccess(reply, { message: 'OTP verified successfully.' });
 }
 
-// ── CSRF validation middleware ──
+// ════════════════════════════════════════════════════════════════════
+// CSRF VALIDATION MIDDLEWARE
+// ════════════════════════════════════════════════════════════════════
+
 export async function csrfValidation(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const method = request.method.toUpperCase();
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return;

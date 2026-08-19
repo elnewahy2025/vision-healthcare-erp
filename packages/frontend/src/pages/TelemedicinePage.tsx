@@ -6,6 +6,7 @@ import { confirmDialog } from '../components/ui';
 import { Plus, ExternalLink, Video, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { AppointmentStatus } from '@healthcare/shared/types';
+import { Can } from '../components/Can';
 
 interface TelemedicineSession {
   id: string;
@@ -128,12 +129,14 @@ export default function TelemedicinePage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('tele.title')}</h1>
-          <p className="text-gray-500 mt-1">{sessions.length} sessions</p>
+          <p className="text-[var(--text-muted)] mt-1">{sessions.length} sessions</p>
         </div>
-        <button onClick={() => setShowNewModal(true)} className="btn-primary">
-          <Plus className="w-4 h-4" />
+        <Can permission="telemedicine.create">
+          <button onClick={() => setShowNewModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />
           {t('tele.newSession')}
         </button>
+        </Can>
       </div>
 
       <div className="card mb-6">
@@ -162,9 +165,9 @@ export default function TelemedicinePage() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-12 text-gray-500">{t('tele.noSessions')}</td></tr>
+              <tr><td colSpan={7} className="text-center py-12 text-[var(--text-muted)]">{t('tele.noSessions')}</td></tr>
             ) : filtered.map(s => (
-              <tr key={s.id} className="hover:bg-gray-50">
+              <tr key={s.id} className="hover:bg-[var(--surface-secondary)]">
                 <td className="font-mono text-xs text-primary-600">{s.roomName}</td>
                 <td className="font-medium">{s.patientName}</td>
                 <td>{s.doctorName || '-'}</td>
@@ -242,12 +245,12 @@ export default function TelemedicinePage() {
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={newSession.recordingEnabled}
               onChange={e => setNewSession(prev => ({ ...prev, recordingEnabled: e.target.checked }))}
-              className="rounded border-gray-300 text-primary-600" />
+              className="rounded border-[var(--border-strong)] text-primary-600" />
             <span className="text-sm">{t('tele.recording')}</span>
           </label>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('tele.notes')}</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('tele.notes')}</label>
             <textarea className="input" rows={2} value={newSession.notes}
               onChange={e => setNewSession(prev => ({ ...prev, notes: e.target.value }))} />
           </div>

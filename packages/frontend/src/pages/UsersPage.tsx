@@ -11,6 +11,7 @@ import { Spinner } from '../components/ui/Spinner';
 import { EmptyState } from '../components/ui/EmptyState';
 import { usersApi, branchesApi, departmentsApi, rolesApi, type UserListItem, type UserDetail, type RoleItem } from '../lib/api/users';
 import { useAuth } from '../stores/authStore';
+import { Can } from '../components/Can';
 
 const EMPLOYEE_TYPES = ['staff', 'doctor', 'nurse', 'pharmacist', 'technician', 'receptionist', 'accountant', 'manager', 'administrator'];
 
@@ -153,13 +154,15 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('admin.userManagement', 'User Management')}</h1>
-          <p className="text-sm text-gray-500 mt-1">Staff accounts, roles, branches, departments, and access status.</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('admin.userManagement', 'User Management')}</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Staff accounts, roles, branches, departments, and access status.</p>
         </div>
         {can('users.create') && (
+          <Can permission="users.create">
           <Button onClick={() => setShowCreate(true)} icon={<Plus className="w-4 h-4" />}>
             New User
           </Button>
+        </Can>
         )}
       </div>
 
@@ -170,7 +173,7 @@ export default function UsersPage() {
         <CardBody className="p-4 space-y-3">
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[220px]">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-[var(--text-disabled)]" />
               <Input
                 placeholder="Search by name, email, or phone"
                 value={search}
@@ -209,34 +212,34 @@ export default function UsersPage() {
             <EmptyState title="No users found" message="Try adjusting your search or filters." />
           ) : (
             <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
+              <thead className="bg-[var(--surface-secondary)]">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Name</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Email</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Type</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Roles</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Branches</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Status</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Last login</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Name</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Email</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Type</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Roles</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Branches</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Status</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Last login</th>
+                  <th className="px-4 py-3 text-right font-medium text-[var(--text-muted)]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{u.firstName} {u.lastName}</td>
-                    <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                    <td className="px-4 py-3 text-gray-600 capitalize">{u.employeeType}</td>
+                  <tr key={u.id} className="hover:bg-[var(--surface-secondary)]">
+                    <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{u.firstName} {u.lastName}</td>
+                    <td className="px-4 py-3 text-[var(--text-secondary)]">{u.email}</td>
+                    <td className="px-4 py-3 text-[var(--text-secondary)] capitalize">{u.employeeType}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {(u.roles ?? []).map((r) => <Badge key={r} variant="info">{r}</Badge>)}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{u.branches?.length || 0}</td>
+                    <td className="px-4 py-3 text-[var(--text-secondary)]">{u.branches?.length || 0}</td>
                     <td className="px-4 py-3">
                       <Badge variant={statusColor[u.status] || 'gray'}>{u.status}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : '—'}</td>
+                    <td className="px-4 py-3 text-[var(--text-muted)]">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : '—'}</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" icon={<UserCog className="w-4 h-4" />} onClick={() => openDetail(u.id)}>View</Button>
                       {can('users.manage') && u.status !== 'suspended' && (
@@ -258,8 +261,8 @@ export default function UsersPage() {
             </table>
           )}
           {!loading && totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-              <span className="text-sm text-gray-500">Page {page} of {totalPages} ({total} users)</span>
+            <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)]">
+              <span className="text-sm text-[var(--text-muted)]">Page {page} of {totalPages} ({total} users)</span>
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
                 <Button variant="secondary" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
@@ -284,58 +287,58 @@ export default function UsersPage() {
           <div className="space-y-5">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">{selectedUser.firstName} {selectedUser.lastName}</h3>
-                <p className="text-sm text-gray-500">{selectedUser.email} · {selectedUser.phone || 'no phone'}</p>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">{selectedUser.firstName} {selectedUser.lastName}</h3>
+                <p className="text-sm text-[var(--text-muted)]">{selectedUser.email} · {selectedUser.phone || 'no phone'}</p>
               </div>
               <Badge variant={statusColor[selectedUser.status] || 'gray'}>{selectedUser.status}</Badge>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-              <div><div className="text-gray-500">Employee type</div><div className="font-medium capitalize">{selectedUser.employeeType}</div></div>
-              <div><div className="text-gray-500">Department</div><div className="font-medium">{selectedUser.department?.name || '—'}</div></div>
-              <div><div className="text-gray-500">Position</div><div className="font-medium">{selectedUser.position || '—'}</div></div>
-              <div><div className="text-gray-500">MFA</div><div className="font-medium">{selectedUser.mfaEnabled ? 'Enabled' : 'Disabled'}</div></div>
-              <div><div className="text-gray-500">Last login</div><div className="font-medium">{selectedUser.lastLoginAt ? new Date(selectedUser.lastLoginAt).toLocaleString() : '—'}</div></div>
-              <div><div className="text-gray-500">Password changed</div><div className="font-medium">{selectedUser.passwordChangedAt ? new Date(selectedUser.passwordChangedAt).toLocaleString() : '—'}</div></div>
+              <div><div className="text-[var(--text-muted)]">Employee type</div><div className="font-medium capitalize">{selectedUser.employeeType}</div></div>
+              <div><div className="text-[var(--text-muted)]">Department</div><div className="font-medium">{selectedUser.department?.name || '—'}</div></div>
+              <div><div className="text-[var(--text-muted)]">Position</div><div className="font-medium">{selectedUser.position || '—'}</div></div>
+              <div><div className="text-[var(--text-muted)]">MFA</div><div className="font-medium">{selectedUser.mfaEnabled ? 'Enabled' : 'Disabled'}</div></div>
+              <div><div className="text-[var(--text-muted)]">Last login</div><div className="font-medium">{selectedUser.lastLoginAt ? new Date(selectedUser.lastLoginAt).toLocaleString() : '—'}</div></div>
+              <div><div className="text-[var(--text-muted)]">Password changed</div><div className="font-medium">{selectedUser.passwordChangedAt ? new Date(selectedUser.passwordChangedAt).toLocaleString() : '—'}</div></div>
             </div>
             <div>
-              <div className="text-sm font-medium text-gray-700 mb-1">Roles</div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Roles</div>
               <div className="flex flex-wrap gap-1.5">
                 {selectedUser.roles?.map((r: { slug: string; name: string; level: string }) => (
                   <Badge key={r.slug} variant="info">{r.name} ({r.level})</Badge>
-                )) || <span className="text-gray-400 text-sm">No roles assigned</span>}
+                )) || <span className="text-[var(--text-disabled)] text-sm">No roles assigned</span>}
               </div>
             </div>
             <div>
-              <div className="text-sm font-medium text-gray-700 mb-1">Branches</div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Branches</div>
               <div className="flex flex-wrap gap-1.5">
                 {selectedUser.branches?.map((b: { id: string; name: string; code: string }) => (
                   <Badge key={b.id} variant="success">{b.name}</Badge>
-                )) || <span className="text-gray-400 text-sm">No branches assigned</span>}
+                )) || <span className="text-[var(--text-disabled)] text-sm">No branches assigned</span>}
               </div>
             </div>
             <div>
-              <div className="text-sm font-medium text-gray-700 mb-1">Active sessions ({selectedUser.sessions?.length || 0})</div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Active sessions ({selectedUser.sessions?.length || 0})</div>
               <div className="space-y-1.5 max-h-40 overflow-y-auto">
                 {(selectedUser.sessions || []).map((s) => (
-                  <div key={s.id} className="flex justify-between text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
+                  <div key={s.id} className="flex justify-between text-xs text-[var(--text-secondary)] bg-[var(--surface-secondary)] rounded-lg px-3 py-2">
                     <span className="truncate">{s.device || s.user_agent || 'Unknown device'} · {s.location || '—'}</span>
                     <span>{s.last_activity_at ? new Date(s.last_activity_at).toLocaleString() : '—'}</span>
                   </div>
                 ))}
-                {selectedUser.sessions?.length === 0 && <p className="text-xs text-gray-400">No active sessions</p>}
+                {selectedUser.sessions?.length === 0 && <p className="text-xs text-[var(--text-disabled)]">No active sessions</p>}
               </div>
             </div>
             <div>
-              <div className="text-sm font-medium text-gray-700 mb-1">Recent audit history</div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Recent audit history</div>
               {auditLoading ? <Spinner /> : (
                 <div className="max-h-48 overflow-y-auto space-y-1">
                   {(selectedAudit || []).map((a: Record<string, unknown>) => (
-                    <div key={String(a.id)} className="flex justify-between text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
+                    <div key={String(a.id)} className="flex justify-between text-xs text-[var(--text-secondary)] bg-[var(--surface-secondary)] rounded-lg px-3 py-2">
                       <span className="font-medium">{String(a.action)}</span>
                       <span>{a.timestamp ? new Date(String(a.timestamp)).toLocaleString() : '—'}</span>
                     </div>
                   ))}
-                  {selectedAudit.length === 0 && <p className="text-xs text-gray-400">No audit events found</p>}
+                  {selectedAudit.length === 0 && <p className="text-xs text-[var(--text-disabled)]">No audit events found</p>}
                 </div>
               )}
             </div>
@@ -404,7 +407,7 @@ function CreateUserModal({
         <Input label="Temporary password (optional, min 8 chars)" value={form.temporaryPassword} onChange={(e) => set('temporaryPassword', e.target.value)} />
       </div>
       <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Roles</label>
+        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Roles</label>
         <div className="flex flex-wrap gap-2">
           {roles.map((r) => (
             <button
@@ -412,17 +415,17 @@ function CreateUserModal({
               type="button"
               onClick={() => setRoleSlugs((prev) => prev.includes(r.slug) ? prev.filter((x) => x !== r.slug) : [...prev, r.slug])}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                roleSlugs.includes(r.slug) ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                roleSlugs.includes(r.slug) ? 'bg-primary-600 text-white border-primary-600' : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border-strong)] hover:bg-[var(--surface-secondary)]'
               }`}
             >
               {r.name}
             </button>
           ))}
-          {roles.length === 0 && <span className="text-xs text-gray-400">Loading roles…</span>}
+          {roles.length === 0 && <span className="text-xs text-[var(--text-disabled)]">Loading roles…</span>}
         </div>
       </div>
       <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Branches</label>
+        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Branches</label>
         <div className="flex flex-wrap gap-2">
           {branches.map((b) => (
             <button
@@ -430,13 +433,13 @@ function CreateUserModal({
               type="button"
               onClick={() => setBranchIds((prev) => prev.includes(b.id) ? prev.filter((x) => x !== b.id) : [...prev, b.id])}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                branchIds.includes(b.id) ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                branchIds.includes(b.id) ? 'bg-green-600 text-white border-green-600' : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border-strong)] hover:bg-[var(--surface-secondary)]'
               }`}
             >
               {b.name}
             </button>
           ))}
-          {branches.length === 0 && <span className="text-xs text-gray-400">No branches available</span>}
+          {branches.length === 0 && <span className="text-xs text-[var(--text-disabled)]">No branches available</span>}
         </div>
       </div>
     </Modal>

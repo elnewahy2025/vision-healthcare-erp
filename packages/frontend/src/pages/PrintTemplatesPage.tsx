@@ -7,6 +7,7 @@ import {
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 interface PrintTemplate {
   id: string;
@@ -112,13 +113,15 @@ export default function PrintTemplatesPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('printTemplates.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('printTemplates.templateCount', { count: templates.length })}
           </p>
         </div>
-        <Button onClick={openCreate}>
+        <Can permission="settings.create">
+          <Button onClick={openCreate}>
           <FileText className="w-4 h-4" /> {t('printTemplates.newTemplate')}
         </Button>
+        </Can>
       </div>
 
       <Card className="mb-6">
@@ -135,7 +138,7 @@ export default function PrintTemplatesPage() {
       <div className="flex gap-2 mb-4 flex-wrap">
         <button
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer ${
-            !search ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+            !search ? 'bg-blue-100 text-blue-800' : 'bg-[var(--surface-hover)] text-[var(--text-primary)]'
           }`}
           onClick={clearFilter}
         >
@@ -147,7 +150,7 @@ export default function PrintTemplatesPage() {
             <button
               key={dt}
               className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer capitalize ${
-                search === dt ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                search === dt ? 'bg-blue-100 text-blue-800' : 'bg-[var(--surface-hover)] text-[var(--text-primary)]'
               }`}
               onClick={() => handleFilterByType(dt)}
             >
@@ -166,13 +169,13 @@ export default function PrintTemplatesPage() {
               <CardBody>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-gray-400" />
+                    <FileText className="w-4 h-4 text-[var(--text-disabled)]" />
                     <h3 className="font-semibold">{sanitizeString(tpl.name)}</h3>
                   </div>
                   <Badge>{sanitizeString(tpl.category)}</Badge>
                 </div>
-                <p className="text-xs font-mono text-gray-500 mb-1">{sanitizeString(tpl.code)}</p>
-                <p className="text-xs text-gray-500 mb-3 capitalize">
+                <p className="text-xs font-mono text-[var(--text-muted)] mb-1">{sanitizeString(tpl.code)}</p>
+                <p className="text-xs text-[var(--text-muted)] mb-3 capitalize">
                   {t('printTemplates.documentType')}: {sanitizeString(tpl.documentType.replace(/_/g, ' '))}
                   {' · '}{t('printTemplates.paper')}: {sanitizeString(tpl.paperSize)}
                 </p>
@@ -245,7 +248,7 @@ export default function PrintTemplatesPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
               {t('printTemplates.preview')} (HTML)
             </label>
             <textarea

@@ -8,6 +8,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 type CommsTab = 'send' | 'history' | 'stats';
 
@@ -178,7 +179,7 @@ export default function CommunicationsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('comms.title')}</h1>
-          <p className="text-gray-500 mt-1">{t('comms.totalMessages', { count: logsTotal })}</p>
+          <p className="text-[var(--text-muted)] mt-1">{t('comms.totalMessages', { count: logsTotal })}</p>
         </div>
       </div>
 
@@ -217,14 +218,16 @@ export default function CommunicationsPage() {
                 {sentMessage ? (
                   <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm">{sentMessage}</div>
                 ) : (
-                  <Button
-                    className="w-full"
-                    onClick={handleSendTest}
-                    loading={sending}
-                    disabled={!selectedTemplateId || !recipient.trim()}
-                  >
-                    <Send className="w-4 h-4" /> {t('comms.testSend')}
-                  </Button>
+                  <Can permission="communications.manage">
+                    <Button
+                      className="w-full"
+                      onClick={handleSendTest}
+                      loading={sending}
+                      disabled={!selectedTemplateId || !recipient.trim()}
+                    >
+                      <Send className="w-4 h-4" /> {t('comms.testSend')}
+                    </Button>
+                  </Can>
                 )}
               </div>
             </CardBody>
@@ -254,7 +257,7 @@ export default function CommunicationsPage() {
                   </tr>
                 ) : (
                   logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50">
+                    <tr key={log.id} className="hover:bg-[var(--surface-secondary)]">
                       <td className="font-medium text-sm max-w-xs truncate">
                         {sanitizeString(log.subject ?? log.template_key)}
                       </td>
@@ -290,7 +293,7 @@ export default function CommunicationsPage() {
               >
                 {t('comms.prev')}
               </Button>
-              <span className="text-sm text-gray-500">{t('comms.page', { page: logsPage })}</span>
+              <span className="text-sm text-[var(--text-muted)]">{t('comms.page', { page: logsPage })}</span>
               <Button
                 variant="secondary"
                 size="sm"
@@ -309,13 +312,13 @@ export default function CommunicationsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <Card>
               <CardBody>
-                <p className="text-sm text-gray-500">{t('comms.totalCount')}</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('comms.totalCount')}</p>
                 <p className="text-2xl font-bold">{logsTotal}</p>
               </CardBody>
             </Card>
             <Card>
               <CardBody>
-                <p className="text-sm text-gray-500">{t('comms.templates')}</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('comms.templates')}</p>
                 <p className="text-2xl font-bold">{templates.length}</p>
               </CardBody>
             </Card>

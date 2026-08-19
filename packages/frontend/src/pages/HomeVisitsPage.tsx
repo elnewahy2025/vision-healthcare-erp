@@ -5,6 +5,7 @@ import { Modal, Input, Select, PatientSearchField } from '../components/ui';
 import { confirmDialog } from '../components/ui';
 import { Plus, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 interface HomeVisitForm {
   patientId: string;
@@ -98,8 +99,11 @@ export default function HomeVisitsPage() {
   return (
     <div>
       <div className="page-header">
-        <div><h1 className="page-title">{t('homeVisit.title')}</h1><p className="text-gray-500 mt-1">{visits.length} visits</p></div>
-        <button onClick={() => setShowNewModal(true)} className="btn-primary"><Plus className="w-4 h-4" />{t('homeVisit.schedule')}</button>
+        <div><h1 className="page-title">{t('homeVisit.title')}</h1><p className="text-[var(--text-muted)] mt-1">{visits.length} visits</p></div>
+        <Can permission="home_visits.create">
+          <button onClick={() => setShowNewModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />{t('homeVisit.schedule')}</button>
+        </Can>
       </div>
 
       <div className="card mb-6"><div className="card-body">
@@ -110,9 +114,9 @@ export default function HomeVisitsPage() {
         <table>
           <thead><tr><th>{t('homeVisit.visitNumber')}</th><th>{t('homeVisit.patient')}</th><th>{t('homeVisit.type')}</th><th>{t('homeVisit.date')}</th><th>{t('homeVisit.assignedTo')}</th><th>{t('homeVisit.status')}</th><th>{t('common.actions')}</th></tr></thead>
           <tbody>
-            {filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-12 text-gray-500">{t('homeVisit.noVisits')}</td></tr> :
+            {filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-12 text-[var(--text-muted)]">{t('homeVisit.noVisits')}</td></tr> :
               filtered.map(v => (
-                <tr key={v.id} className="hover:bg-gray-50">
+                <tr key={v.id} className="hover:bg-[var(--surface-secondary)]">
                   <td className="font-mono text-xs text-primary-600">{v.visitNumber}</td>
                   <td className="font-medium">{v.patientName}</td>
                   <td><span className="badge-info">{v.visitType}</span></td>
@@ -155,14 +159,14 @@ export default function HomeVisitsPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('homeVisit.address')} *</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('homeVisit.address')} *</label>
             <textarea className={`input ${formErrors.address ? 'border-red-500' : ''}`} rows={2} placeholder="Full address for the visit..."
               value={newVisit.address} onChange={e => setNewVisit(prev => ({ ...prev, address: e.target.value }))} />
             {formErrors.address && <p className="text-sm text-red-600">{formErrors.address}</p>}
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('homeVisit.notes')}</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('homeVisit.notes')}</label>
             <textarea className="input" rows={2} placeholder="Special instructions..." value={newVisit.notes}
               onChange={e => setNewVisit(prev => ({ ...prev, notes: e.target.value }))} />
           </div>

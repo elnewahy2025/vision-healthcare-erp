@@ -20,6 +20,7 @@ import {
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 interface NoShowPrediction {
   appointmentId: string;
@@ -168,11 +169,11 @@ export default function PredictiveAnalyticsPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold">{t('pred.title')}</h1>
-          <p className="text-sm text-gray-500">{t('pred.subtitle')}</p>
+          <p className="text-sm text-[var(--text-muted)]">{t('pred.subtitle')}</p>
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
+      <div className="flex gap-2 border-b border-[var(--border)] pb-2 overflow-x-auto">
         {(Object.keys(tabLabels) as TabKey[]).map((k) => (
           <button
             key={k}
@@ -180,7 +181,7 @@ export default function PredictiveAnalyticsPage() {
             className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
               tab === k
                 ? 'bg-purple-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {tabLabels[k]}
@@ -198,7 +199,7 @@ export default function PredictiveAnalyticsPage() {
               <CardBody>
                 <AlertTriangle className="w-8 h-8 text-yellow-500 mb-2" />
                 <h3 className="font-semibold">{t('pred.noShowTitle')}</h3>
-                <p className="text-sm text-gray-500">{t('pred.noShowDesc')}</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('pred.noShowDesc')}</p>
               </CardBody>
             </Card>
             <Card
@@ -208,7 +209,7 @@ export default function PredictiveAnalyticsPage() {
               <CardBody>
                 <DollarSign className="w-8 h-8 text-green-500 mb-2" />
                 <h3 className="font-semibold">{t('pred.revenueTitle')}</h3>
-                <p className="text-sm text-gray-500">{t('pred.revenueDesc')}</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('pred.revenueDesc')}</p>
               </CardBody>
             </Card>
             <Card
@@ -218,7 +219,7 @@ export default function PredictiveAnalyticsPage() {
               <CardBody>
                 <Users className="w-8 h-8 text-blue-500 mb-2" />
                 <h3 className="font-semibold">{t('pred.riskAssessmentTitle')}</h3>
-                <p className="text-sm text-gray-500">{t('pred.riskAssessmentDesc')}</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('pred.riskAssessmentDesc')}</p>
               </CardBody>
             </Card>
           </div>
@@ -234,13 +235,15 @@ export default function PredictiveAnalyticsPage() {
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
-            <Button
+            <Can permission="predictive_analytics.view">
+          <Button
               onClick={handleRefreshNoShows}
               icon={<RefreshCw className="w-4 h-4" />}
               loading={loading}
             >
               {t('pred.overviewTab')}
             </Button>
+        </Can>
           </div>
           {loading ? (
             <PageLoader message={t('pred.loadingPredictions')} />
@@ -253,11 +256,11 @@ export default function PredictiveAnalyticsPage() {
                     {sortedNoShows.map((p) => (
                       <div
                         key={p.appointmentId}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        className="flex items-center justify-between p-3 bg-[var(--surface-secondary)] rounded-lg"
                       >
                         <div>
                           <span className="font-medium text-sm">{sanitizeString(p.patient)}</span>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-[var(--text-muted)]">
                             {new Date(p.time).toLocaleTimeString()} — {p.factors.slice(0, 2).join(', ')}
                           </p>
                         </div>
@@ -274,7 +277,7 @@ export default function PredictiveAnalyticsPage() {
                   <Card key={level}>
                     <CardBody className="text-center">
                       <p className="text-2xl font-bold">{riskCounts[level]}</p>
-                      <p className="text-sm text-gray-500">{t(`pred.${level}`)}</p>
+                      <p className="text-sm text-[var(--text-muted)]">{t(`pred.${level}`)}</p>
                     </CardBody>
                   </Card>
                 ))}
@@ -320,7 +323,7 @@ export default function PredictiveAnalyticsPage() {
                     {forecast.historical.slice(0, 6).map((h) => (
                       <div
                         key={h.month}
-                        className="flex justify-between items-center p-2 bg-gray-50 rounded"
+                        className="flex justify-between items-center p-2 bg-[var(--surface-secondary)] rounded"
                       >
                         <span className="text-sm font-medium">{h.month}</span>
                         <span className="text-sm font-semibold">
@@ -343,7 +346,7 @@ export default function PredictiveAnalyticsPage() {
                             {f.predicted.toLocaleString()} EGP
                           </span>
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <div className="flex justify-between text-xs text-[var(--text-muted)] mt-1">
                           <span>
                             {t('pred.range')}: {f.low.toLocaleString()} – {f.high.toLocaleString()}
                           </span>
@@ -402,7 +405,7 @@ export default function PredictiveAnalyticsPage() {
                         {t(`pred.${r.level}`)} ({(r.score * 100).toFixed(0)}%)
                       </Badge>
                     </div>
-                    <div className="text-sm text-gray-600 mb-2">
+                    <div className="text-sm text-[var(--text-secondary)] mb-2">
                       <strong>{t('pred.factors')}:</strong>{' '}
                       {r.factors?.join(', ') || t('pred.na')}
                     </div>

@@ -33,7 +33,7 @@ export async function up(knex: Knex): Promise<void> {
   // Legacy columns were NOT NULL; new rules only set trigger_event when an
   // event-driven trigger is chosen and rely on automation_rule_actions.
   await knex.schema.alterTable(tableName, (t) => {
-    t.dropNullable('trigger_event');
+    t.setNullable('trigger_event');
     t.dropNullable('action_type');
   });
 

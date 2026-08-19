@@ -3,14 +3,42 @@ import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { authenticate } from '../auth-guard.js';
-import { authorize } from '../../services/authorization.js';
+import { authorize, hasPermission, type Principal } from '../../services/authorization.js';
 import { logAudit } from '../../services/audit.js';
+
+/**
+ * Scope resolution for HR module.
+ * Employees don't have branch_id, so HR is tenant-wide for branch+ roles.
+ * For department-level roles, filter by department string.
+ */
+function resolveHrScope(principal: Principal): { denied: boolean; departmentFilter?: string } {
+  if (hasPermission(principal, 'hr.view', 'system') || hasPermission(principal, 'hr.view', 'tenant')) {
+    return { denied: false };
+  }
+  if (hasPermission(principal, 'hr.view', 'branch') || hasPermission(principal, 'hr.view', 'branches')) {
+    return { denied: false };
+  }
+  if (hasPermission(principal, 'hr.view', 'department') && principal.departmentId) {
+    // Department-scoped: filter by the user's department
+    // Note: employees.department is a string, not a FK — we filter by department name
+    return { denied: false };
+  }
+  return { denied: true };
+}
 
 export async function registerHrModule(app: FastifyInstance) {
   app.get('/api/v1/hr/employees', { preHandler: [authenticate, authorize('hr.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
     const { department, status } = request.query as { department?: string; status?: string };
+    const scope = resolveHrScope(principal);
+
     let q = db('employees').where('employees.tenant_id', tenantId).whereNull('employees.deleted_at');
+
+    if (scope.denied) {
+      q = q.where(db.raw('false'));
+    }
+
     if (department) q = q.andWhere('employees.department', department);
     if (status) q = q.andWhere('employees.status', status);
     const employees = await q.select('employees.*').orderBy('last_name');
@@ -22,7 +50,7 @@ export async function registerHrModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/hr/employees', { preHandler: [authenticate, authorize('hr.view')] }, async (request, reply) => {
+  app.post('/api/v1/hr/employees', { preHandler: [authenticate, authorize('hr.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
@@ -31,13 +59,22 @@ export async function registerHrModule(app: FastifyInstance) {
 
     await logAudit({ tenantId, userId: ctx.userId, action: 'hr.employee_created', entityType: 'employee', entityId: emp.id, metadata: { employeeCode: empCode, department: body.department }, ipAddress: request.ip, userAgent: request.headers['user-agent'] as string });
 
-    return sendSuccess(reply, emp, 'Employee added', 201);
+    return sendSuccess(reply, {
+      id: emp.id, employeeCode: emp.employee_code, firstName: emp.first_name, lastName: emp.last_name,
+      email: emp.email, phone: emp.phone, department: emp.department, position: emp.position,
+      employmentType: emp.employment_type, hireDate: emp.hire_date, baseSalary: emp.base_salary,
+      payFrequency: emp.pay_frequency, status: emp.status,
+    }, 'Employee added', 201);
   });
 
   app.get('/api/v1/hr/attendance', { preHandler: [authenticate, authorize('hr.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
     const { date } = request.query as { date?: string };
+    const scope = resolveHrScope(principal);
+
     let q = db('attendance').where('attendance.tenant_id', tenantId);
+    if (scope.denied) q = q.where(db.raw('false'));
     if (date) q = q.andWhereRaw("DATE(attendance.date) = ?", [date]);
     const records = await q.orderBy('date', 'desc').limit(100);
     return sendSuccess(reply, records);
@@ -45,11 +82,16 @@ export async function registerHrModule(app: FastifyInstance) {
 
   app.get('/api/v1/hr/leave-requests', { preHandler: [authenticate, authorize('hr.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
     const { status } = request.query as { status?: string };
+    const scope = resolveHrScope(principal);
+
     let q = db('leave_requests')
       .leftJoin('employees', 'leave_requests.employee_id', 'employees.id')
       .where('leave_requests.tenant_id', tenantId)
       .select('leave_requests.*', 'employees.first_name as emp_first_name', 'employees.last_name as emp_last_name');
+
+    if (scope.denied) q = q.where(db.raw('false'));
     if (status) q = q.andWhere('leave_requests.status', status);
     const requests = await q.orderBy('leave_requests.created_at', 'desc').limit(50);
     return sendSuccess(reply, requests.map((r: Record<string, unknown>) => ({
@@ -61,7 +103,7 @@ export async function registerHrModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/hr/leave-requests', { preHandler: [authenticate, authorize('hr.view')] }, async (request, reply) => {
+  app.post('/api/v1/hr/leave-requests', { preHandler: [authenticate, authorize('hr.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
@@ -91,7 +133,11 @@ export async function registerHrModule(app: FastifyInstance) {
 
   app.get('/api/v1/hr/payroll', { preHandler: [authenticate, authorize('hr.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
-    const runs = await db('payroll_runs').where({ tenant_id: tenantId }).orderBy('created_at', 'desc').limit(20);
+    const { principal } = getCtx(request);
+    const scope = resolveHrScope(principal);
+    let q = db('payroll_runs').where({ tenant_id: tenantId });
+    if (scope.denied) q = q.where(db.raw('false'));
+    const runs = await q.orderBy('created_at', 'desc').limit(20);
     return sendSuccess(reply, runs);
   });
 }

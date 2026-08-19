@@ -5,6 +5,7 @@ import { apiClient as api } from '../lib/api';
 import { Bell, CheckCheck, Loader2, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 interface Notification {
   id: string;
@@ -61,7 +62,7 @@ export default function NotificationsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('notif.title')}</h1>
-          <p className="text-gray-500 mt-1">{unread} {t('notif.unread')} {t('notif.of')} {notifs.length} {t('notif.total')}</p>
+          <p className="text-[var(--text-muted)] mt-1">{unread} {t('notif.unread')} {t('notif.of')} {notifs.length} {t('notif.total')}</p>
         </div>
         {unread > 0 && (
           <button onClick={async () => {
@@ -79,20 +80,20 @@ export default function NotificationsPage() {
       <div className="card">
         <div className="card-body">
           {notifs.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">{t('notif.noNotifs')}</p>
+            <p className="text-[var(--text-muted)] text-center py-8">{t('notif.noNotifs')}</p>
           ) : (
             <div className="space-y-2">
               {notifs.map(n => (
                 <div key={n.id} onClick={() => openNotif(n)}
                   className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                    n.status === 'pending' ? 'bg-blue-50 hover:bg-blue-100' : 'bg-gray-50 hover:bg-gray-100'
+                    n.status === 'pending' ? 'bg-blue-50 hover:bg-blue-100' : 'bg-[var(--surface-secondary)] hover:bg-[var(--surface-hover)]'
                   }`}>
-                  <Bell className={`w-5 h-5 shrink-0 ${n.status === 'pending' ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <Bell className={`w-5 h-5 shrink-0 ${n.status === 'pending' ? 'text-blue-600' : 'text-[var(--text-disabled)]'}`} />
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${n.status === 'pending' ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                    <p className={`text-sm ${n.status === 'pending' ? 'font-semibold text-[var(--text-primary)]' : 'font-medium text-[var(--text-primary)]'}`}>
                       {n.subject || t('notif.notification')}
                     </p>
-                    <p className="text-xs text-gray-500 truncate">
+                    <p className="text-xs text-[var(--text-muted)] truncate">
                       {n.channel} — {formatDateTime(n.createdAt)}
                     </p>
                   </div>
@@ -115,14 +116,14 @@ export default function NotificationsPage() {
         footer={<button onClick={() => setShowReadModal(false)} className="btn-secondary">{t('common.close')}</button>}>
         {selectedNotif && (
           <div className="space-y-4">
-            <div className="flex gap-2 text-sm text-gray-500">
+            <div className="flex gap-2 text-sm text-[var(--text-muted)]">
               <span className="badge-info">{selectedNotif.channel}</span>
               <span className={`badge ${selectedNotif.status === 'pending' ? 'badge-warning' : 'badge-success'}`}>{selectedNotif.status}</span>
             </div>
             {selectedNotif.body && (
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedNotif.body}</p>
+              <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap">{selectedNotif.body}</p>
             )}
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-[var(--text-disabled)]">
               {formatDateTime(selectedNotif.createdAt)}
             </p>
           </div>

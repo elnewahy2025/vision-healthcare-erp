@@ -16,12 +16,12 @@ export default function Breadcrumbs() {
 
   const hasDetail = segments.length > 1;
   const chevron = (
-    <ChevronRight className={`w-3.5 h-3.5 text-gray-400 shrink-0 ${isRtl ? 'rotate-180' : ''}`} />
+    <ChevronRight className={`w-3.5 h-3.5 text-[var(--text-disabled)] shrink-0 ${isRtl ? 'rotate-180' : ''}`} />
   );
 
   return (
     <nav aria-label="Breadcrumb" className="mb-4">
-      <ol className="flex items-center gap-1.5 text-sm text-gray-500 flex-wrap dark:text-gray-400">
+      <ol className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] flex-wrap dark:text-[var(--text-disabled)]">
         <li>
           <Link to="/" className="hover:text-primary-600">
             {t('nav.dashboard')}
@@ -36,12 +36,12 @@ export default function Breadcrumbs() {
               </Link>
             </li>
             {chevron}
-            <li aria-current="page" className="font-medium text-gray-900 dark:text-gray-100">
+            <li aria-current="page" className="font-medium text-[var(--text-primary)] dark:text-gray-100">
               {t('common.view')}
             </li>
           </>
         ) : (
-          <li aria-current="page" className="font-medium text-gray-900">
+          <li aria-current="page" className="font-medium text-[var(--text-primary)]">
             {t(rootKey)}
           </li>
         )}

@@ -7,6 +7,7 @@ import {
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 interface Region {
   id: string;
@@ -146,7 +147,7 @@ export default function RegionsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('regions.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('regions.regionCount', { count: regions.length })}
           </p>
         </div>
@@ -154,7 +155,7 @@ export default function RegionsPage() {
 
       {regions.length === 0 ? (
         <EmptyState
-          icon={<Globe className="w-8 h-8 text-gray-400" />}
+          icon={<Globe className="w-8 h-8 text-[var(--text-disabled)]" />}
           title={t('regions.noRegions')}
           message={t('regions.noRegionsMessage')}
         />
@@ -179,10 +180,10 @@ export default function RegionsPage() {
                       </h3>
                       <Badge variant="gray">{sanitizeString(region.provider)}</Badge>
                     </div>
-                    <p className="text-xs text-gray-500 font-mono">
+                    <p className="text-xs text-[var(--text-muted)] font-mono">
                       {sanitizeString(region.code)}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-[var(--text-disabled)] mt-1">
                       {sanitizeString(region.location)}
                     </p>
                     {region.complianceFlags.length > 0 && (
@@ -222,11 +223,11 @@ export default function RegionsPage() {
                 <h3 className="font-semibold mb-4">{t('regions.dataResidency')}</h3>
                 <div className="space-y-4 text-sm">
                   <div>
-                    <p className="text-gray-500 mb-1">{t('regions.primaryRegion')}</p>
+                    <p className="text-[var(--text-muted)] mb-1">{t('regions.primaryRegion')}</p>
                     <p className="font-medium">{getRegionName(selectedPrimary)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500 mb-1">{t('regions.backupRegion')}</p>
+                    <p className="text-[var(--text-muted)] mb-1">{t('regions.backupRegion')}</p>
                     <p className="font-medium">{getRegionName(selectedBackup)}</p>
                   </div>
                   <div>
@@ -244,7 +245,7 @@ export default function RegionsPage() {
                   >
                     {t('regions.saveResidency')}
                   </Button>
-                  <p className="text-xs text-gray-400 mt-2">
+                  <p className="text-xs text-[var(--text-disabled)] mt-2">
                     {t('regions.selectHint')}
                   </p>
                 </div>
@@ -260,7 +261,7 @@ export default function RegionsPage() {
                       {t('regions.compliance')}: {residency.complianceFramework.toUpperCase()}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-[var(--text-muted)]">
                     {t('regions.complianceDesc')}
                   </p>
                 </CardBody>

@@ -8,6 +8,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 interface ApiKey {
   id: string;
@@ -131,13 +132,15 @@ export default function ApiKeysPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('apiKeys.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('apiKeys.activeKeys', { count: keys.length })}
           </p>
         </div>
-        <Button onClick={() => setShowNew(true)}>
+        <Can permission="api_keys.create">
+          <Button onClick={() => setShowNew(true)}>
           <Plus className="w-4 h-4" /> {t('apiKeys.newKey')}
         </Button>
+        </Can>
       </div>
 
       <div className="table-container mb-6">
@@ -163,7 +166,7 @@ export default function ApiKeysPage() {
               </tr>
             ) : (
               keys.map((k) => (
-                <tr key={k.id} className="hover:bg-gray-50">
+                <tr key={k.id} className="hover:bg-[var(--surface-secondary)]">
                   <td className="font-medium">{sanitizeString(k.name)}</td>
                   <td className="font-mono text-xs">{sanitizeString(k.keyPrefix)}...</td>
                   <td><Badge>{sanitizeString(k.permissions)}</Badge></td>
@@ -219,7 +222,7 @@ export default function ApiKeysPage() {
                       </tr>
                     ) : (
                       logs.map((l) => (
-                        <tr key={l.id} className="hover:bg-gray-50">
+                        <tr key={l.id} className="hover:bg-[var(--surface-secondary)]">
                           <td><Badge>{sanitizeString(l.method)}</Badge></td>
                           <td className="text-xs max-w-md truncate">{sanitizeString(l.endpoint)}</td>
                           <td>
@@ -258,7 +261,7 @@ export default function ApiKeysPage() {
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm font-medium text-yellow-800 mb-2">{t('apiKeys.saveWarning')}</p>
               <div className="flex gap-2">
-                <code className="flex-1 p-2 bg-white rounded border text-xs font-mono break-all">
+                <code className="flex-1 p-2 bg-[var(--surface)] rounded border text-xs font-mono break-all">
                   {generatedKey.apiKey}
                 </code>
                 <Button variant="ghost" size="sm" onClick={() => copyToClipboard(generatedKey.apiKey)}>

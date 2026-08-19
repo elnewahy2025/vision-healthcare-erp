@@ -27,6 +27,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 type TabType = 'assistants' | 'providers' | 'requests' | 'costs';
 
@@ -236,19 +237,19 @@ export default function AiHubPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">{t('aiHub.title')}</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[var(--text-muted)] mt-1">
             {t('aiHub.assistantCount', { count: assistants.length })} ·{' '}
             {t('aiHub.providerCount', { count: providers.length })}
           </p>
         </div>
         {tab === 'assistants' && (
           <Button onClick={() => { setShowAssistantModal(true); setFormErrors({}); }}>
-            <Plus className="w-4 h-4 mr-1" /> {t('aiHub.newAssistant')}
+            <Can permission="ai_hub.create"><Plus className="w-4 h-4 mr-1" /> {t('aiHub.newAssistant')}</Can>
           </Button>
         )}
         {tab === 'providers' && (
           <Button onClick={() => { setShowProviderModal(true); setFormErrors({}); }}>
-            <Plus className="w-4 h-4 mr-1" /> {t('aiHub.newProvider')}
+            <Can permission="ai_hub.create"><Plus className="w-4 h-4 mr-1" /> {t('aiHub.newProvider')}</Can>
           </Button>
         )}
       </div>
@@ -288,15 +289,15 @@ export default function AiHubPage() {
 
       {/* Assistants Tab */}
       {tab === 'assistants' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.name')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.slug')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.category')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.model')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.isActive')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.name')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.slug')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.category')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.model')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.isActive')}</th>
               </tr>
             </thead>
             <tbody>
@@ -312,11 +313,11 @@ export default function AiHubPage() {
                 </tr>
               ) : (
                 filteredAssistants.map((a) => (
-                  <tr key={a.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={a.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3 text-sm font-medium">{escapeHtml(a.name)}</td>
-                    <td className="p-3 text-sm font-mono text-gray-500">{escapeHtml(a.slug)}</td>
+                    <td className="p-3 text-sm font-mono text-[var(--text-muted)]">{escapeHtml(a.slug)}</td>
                     <td className="p-3"><Badge>{a.category}</Badge></td>
-                    <td className="p-3 text-sm text-gray-500">{a.modelName ?? '-'}</td>
+                    <td className="p-3 text-sm text-[var(--text-muted)]">{a.modelName ?? '-'}</td>
                     <td className="p-3">
                       <Badge variant={a.isActive ? 'success' : 'gray'}>
                         {a.isActive ? t('aiHub.active') : t('aiHub.inactive')}
@@ -332,14 +333,14 @@ export default function AiHubPage() {
 
       {/* Providers Tab */}
       {tab === 'providers' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.name')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.provider')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.endpoint')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.isActive')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.name')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.provider')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.endpoint')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.isActive')}</th>
               </tr>
             </thead>
             <tbody>
@@ -355,10 +356,10 @@ export default function AiHubPage() {
                 </tr>
               ) : (
                 filteredProviders.map((p) => (
-                  <tr key={p.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={p.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3 text-sm font-medium">{escapeHtml(p.name)}</td>
                     <td className="p-3"><Badge>{escapeHtml(p.provider)}</Badge></td>
-                    <td className="p-3 text-sm text-gray-500 max-w-xs truncate">
+                    <td className="p-3 text-sm text-[var(--text-muted)] max-w-xs truncate">
                       {p.apiEndpoint ?? '-'}
                     </td>
                     <td className="p-3">
@@ -376,16 +377,16 @@ export default function AiHubPage() {
 
       {/* Requests Tab */}
       {tab === 'requests' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.source')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.tokens')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.cost')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.latency')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.status')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.date')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.source')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.tokens')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.cost')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.latency')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.date')}</th>
               </tr>
             </thead>
             <tbody>
@@ -401,7 +402,7 @@ export default function AiHubPage() {
                 </tr>
               ) : (
                 requests.map((r) => (
-                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3"><Badge>{escapeHtml(r.source || 'chat')}</Badge></td>
                     <td className="p-3 text-sm">{(r.promptTokens + r.completionTokens).toLocaleString()}</td>
                     <td className="p-3 text-sm">{Number(r.cost).toFixed(6)}</td>
@@ -411,7 +412,7 @@ export default function AiHubPage() {
                         {escapeHtml(r.status)}
                       </Badge>
                     </td>
-                    <td className="p-3 text-sm text-gray-500">
+                    <td className="p-3 text-sm text-[var(--text-muted)]">
                       {formatDateTime(r.createdAt) || '-'}
                     </td>
                   </tr>
@@ -427,20 +428,20 @@ export default function AiHubPage() {
         <div>
           {costData?.summary ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-                <p className="text-sm text-gray-500">{t('aiHub.totalCost')}</p>
+              <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+                <p className="text-sm text-[var(--text-muted)]">{t('aiHub.totalCost')}</p>
                 <p className="text-2xl font-bold mt-1">
                   {Number(costData.summary.totalCost).toFixed(4)}
                 </p>
               </div>
-              <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-                <p className="text-sm text-gray-500">{t('aiHub.totalTokens')}</p>
+              <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+                <p className="text-sm text-[var(--text-muted)]">{t('aiHub.totalTokens')}</p>
                 <p className="text-2xl font-bold mt-1">
                   {costData.summary.totalTokens.toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
-                <p className="text-sm text-gray-500">{t('aiHub.totalRequests')}</p>
+              <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
+                <p className="text-sm text-[var(--text-muted)]">{t('aiHub.totalRequests')}</p>
                 <p className="text-2xl font-bold mt-1">
                   {costData.summary.totalRequests.toLocaleString()}
                 </p>
@@ -456,15 +457,15 @@ export default function AiHubPage() {
             </div>
           )}
 
-          <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+          <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.date')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.source')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.cost')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.totalRequests')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('aiHub.totalTokens')}</th>
+                <tr className="border-b bg-[var(--surface-secondary)]">
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.date')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.source')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.cost')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.totalRequests')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('aiHub.totalTokens')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -480,8 +481,8 @@ export default function AiHubPage() {
                   </tr>
                 ) : (
                   costData!.daily.map((c, i) => (
-                    <tr key={i} className="border-b last:border-b-0 hover:bg-gray-50">
-                      <td className="p-3 text-sm text-gray-500">{escapeHtml(c.date)}</td>
+                    <tr key={i} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
+                      <td className="p-3 text-sm text-[var(--text-muted)]">{escapeHtml(c.date)}</td>
                       <td className="p-3"><Badge>{escapeHtml(c.source)}</Badge></td>
                       <td className="p-3 text-sm">{Number(c.totalCost).toFixed(4)}</td>
                       <td className="p-3 text-sm">{c.totalRequests.toLocaleString()}</td>
@@ -541,7 +542,7 @@ export default function AiHubPage() {
             options={CATEGORY_OPTIONS}
           />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
               {t('aiHub.systemPrompt')}
             </label>
             <textarea

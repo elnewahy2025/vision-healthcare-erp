@@ -68,9 +68,9 @@ export default function QuickSearch({ open, onClose }: { open: boolean; onClose:
     <>
       <div className="fixed inset-0 z-50 bg-black/40" onClick={onClose} />
       <div className="fixed top-[15%] left-1/2 -translate-x-1/2 z-50 w-full max-w-lg">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <Search className="w-5 h-5 text-gray-400" />
+        <div className="bg-[var(--surface)] dark:bg-gray-800 rounded-xl shadow-2xl border border-[var(--border)] dark:border-gray-700 overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] dark:border-gray-700">
+            <Search className="w-5 h-5 text-[var(--text-disabled)]" />
             <input
               ref={inputRef}
               type="text"
@@ -80,14 +80,14 @@ export default function QuickSearch({ open, onClose }: { open: boolean; onClose:
               placeholder="Search patients, doctors, invoices, inventory..."
               className="flex-1 bg-transparent border-none outline-none text-sm placeholder-gray-400 dark:text-gray-200"
             />
-            <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">ESC</span>
+            <span className="text-xs text-[var(--text-disabled)] bg-[var(--surface-hover)] dark:bg-gray-700 px-2 py-1 rounded">ESC</span>
           </div>
 
           <div className="max-h-80 overflow-y-auto">
-            {loading && <p className="text-center text-sm text-gray-400 py-4">Searching...</p>}
+            {loading && <p className="text-center text-sm text-[var(--text-disabled)] py-4">Searching...</p>}
 
             {!loading && query.length >= 2 && flatResults.length === 0 && (
-              <p className="text-center text-sm text-gray-400 py-8">No results for "{query}"</p>
+              <p className="text-center text-sm text-[var(--text-disabled)] py-8">No results for "{query}"</p>
             )}
 
             {results?.patients.map((item, i) => (
@@ -110,7 +110,7 @@ export default function QuickSearch({ open, onClose }: { open: boolean; onClose:
             ))}
           </div>
 
-          <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 flex gap-4 text-xs text-gray-400">
+          <div className="px-4 py-2 border-t border-[var(--border)] dark:border-gray-700 flex gap-4 text-xs text-[var(--text-disabled)]">
             <span>↑↓ Navigate</span>
             <span>↵ Open</span>
             <span>ESC Close</span>
@@ -124,15 +124,15 @@ export default function QuickSearch({ open, onClose }: { open: boolean; onClose:
 function SearchItem({ item, icon: Icon, selected, onSelect }: { item: SearchResultItem; icon: typeof Search; selected: boolean; onSelect: () => void }) {
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer ${selected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
+      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer ${selected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-[var(--surface-secondary)] dark:hover:bg-gray-700/50'}`}
       onClick={onSelect}
     >
-      <Icon className="w-4 h-4 text-gray-400 shrink-0" />
+      <Icon className="w-4 h-4 text-[var(--text-disabled)] shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate dark:text-gray-200">{item.label}</p>
-        <p className="text-xs text-gray-500 truncate">{item.subtitle}</p>
+        <p className="text-xs text-[var(--text-muted)] truncate">{item.subtitle}</p>
       </div>
-      <ArrowRight className="w-3 h-3 text-gray-400 shrink-0" />
+      <ArrowRight className="w-3 h-3 text-[var(--text-disabled)] shrink-0" />
     </div>
   );
 }

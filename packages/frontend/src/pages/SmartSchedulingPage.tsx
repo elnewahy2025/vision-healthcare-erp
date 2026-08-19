@@ -20,6 +20,7 @@ import {
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 interface Slot {
   start: string;
@@ -89,7 +90,7 @@ export default function SmartSchedulingPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold">{t('smart.title')}</h1>
-          <p className="text-sm text-gray-500">{t('smart.subtitle')}</p>
+          <p className="text-sm text-[var(--text-muted)]">{t('smart.subtitle')}</p>
         </div>
       </div>
 
@@ -104,13 +105,15 @@ export default function SmartSchedulingPage() {
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
-            <Button
+            <Can permission="smart_scheduling.create">
+          <Button
               onClick={handleOptimize}
               loading={loading}
               icon={<Zap className="w-4 h-4" />}
             >
               {loading ? t('smart.optimizing') : t('smart.optimizeSchedule')}
             </Button>
+        </Can>
           </div>
         </CardBody>
       </Card>
@@ -135,7 +138,7 @@ export default function SmartSchedulingPage() {
                     <TrendingUp className="w-5 h-5 text-cyan-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">{t('smart.utilization')}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{t('smart.utilization')}</p>
                     <p className="text-xl font-bold">{result.utilization}%</p>
                   </div>
                 </div>
@@ -148,7 +151,7 @@ export default function SmartSchedulingPage() {
                     <Activity className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">{t('smart.expectedRevenue')}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{t('smart.expectedRevenue')}</p>
                     <p className="text-xl font-bold">
                       {result.expectedRevenue.toLocaleString()} EGP
                     </p>
@@ -163,7 +166,7 @@ export default function SmartSchedulingPage() {
                     <Calendar className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">{t('smart.totalSlots')}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{t('smart.totalSlots')}</p>
                     <p className="text-xl font-bold">{result.slots?.length || 0}</p>
                   </div>
                 </div>
@@ -201,7 +204,7 @@ export default function SmartSchedulingPage() {
                             className={`text-xs p-2 rounded-lg ${
                               slot.priority === 'booked'
                                 ? 'bg-green-50 border border-green-200'
-                                : 'bg-gray-50 border border-gray-200'
+                                : 'bg-[var(--surface-secondary)] border border-[var(--border)]'
                             }`}
                           >
                             <div className="flex items-center gap-1">
@@ -215,7 +218,7 @@ export default function SmartSchedulingPage() {
                             </div>
                             <span
                               className={`font-medium ${
-                                slot.priority === 'booked' ? 'text-green-700' : 'text-gray-500'
+                                slot.priority === 'booked' ? 'text-green-700' : 'text-[var(--text-muted)]'
                               }`}
                             >
                               {slot.priority === 'booked'
@@ -243,7 +246,7 @@ export default function SmartSchedulingPage() {
                   {result.utilization}%
                 </div>
               </div>
-              <div className="flex justify-between mt-2 text-xs text-gray-500">
+              <div className="flex justify-between mt-2 text-xs text-[var(--text-muted)]">
                 <span>
                   {t('smart.booked')}: {bookedSlots.length}
                 </span>

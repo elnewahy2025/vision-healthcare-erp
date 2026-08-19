@@ -7,6 +7,7 @@ import {
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 type BookingTab = 'public' | 'manage';
 type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
@@ -218,9 +219,11 @@ export default function OnlineBookingPage() {
                     onChange={(e) => setTenantSlug(e.target.value)}
                     error={errors.tenantSlug}
                   />
-                  <Button onClick={loadDoctors} disabled={!tenantSlug.trim()} loading={loading}>
+                  <Can permission="online_booking.view">
+          <Button onClick={loadDoctors} disabled={!tenantSlug.trim()} loading={loading}>
                     {t('booking.findDoctors')}
                   </Button>
+        </Can>
 
                   {doctors.length > 0 && (
                     <>
@@ -250,7 +253,7 @@ export default function OnlineBookingPage() {
                       <div className="flex items-center justify-between mb-2">
                         <label className="text-sm font-medium">{t('booking.availableSlots')}</label>
                         {slots[0]?.date && (
-                          <span className="text-sm text-gray-500">
+                          <span className="text-sm text-[var(--text-muted)]">
                             {sanitizeString(slots[0].date)}
                           </span>
                         )}
@@ -263,10 +266,10 @@ export default function OnlineBookingPage() {
                             disabled={!s.available}
                             className={`py-3 px-2 rounded-xl border-2 text-center text-sm font-medium transition-all ${
                               !s.available
-                                ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                                ? 'border-[var(--border)] bg-[var(--surface-secondary)] text-gray-300 cursor-not-allowed'
                                 : selectedSlot === s.id
                                   ? 'border-primary-600 bg-primary-50 text-primary-700 shadow-md'
-                                  : 'border-gray-200 hover:border-primary-300 text-gray-700'
+                                  : 'border-[var(--border)] hover:border-primary-300 text-[var(--text-primary)]'
                             }`}
                             onClick={() => setSelectedSlot(s.id)}
                           >
@@ -274,14 +277,14 @@ export default function OnlineBookingPage() {
                           </button>
                         ))}
                       </div>
-                      <p className="text-xs text-gray-400 mt-2">
+                      <p className="text-xs text-[var(--text-disabled)] mt-2">
                         {t('booking.slotDuration')}
                       </p>
                     </div>
                   )}
 
                   {selectedSlot && (
-                    <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                    <div className="p-4 bg-[var(--surface-secondary)] rounded-lg space-y-3">
                       <h4 className="font-medium">{t('booking.yourInformation')}</h4>
                       <Input
                         placeholder={t('booking.fullName')}
@@ -318,7 +321,7 @@ export default function OnlineBookingPage() {
               <CardBody className="text-center py-8">
                 <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
                 <h3 className="text-lg font-semibold mb-2">{t('booking.submitted')}</h3>
-                <p className="text-gray-500 mb-4">{t('booking.submittedMessage')}</p>
+                <p className="text-[var(--text-muted)] mb-4">{t('booking.submittedMessage')}</p>
                 <Button onClick={resetForm}>{t('booking.bookAnother')}</Button>
               </CardBody>
             </Card>
@@ -349,7 +352,7 @@ export default function OnlineBookingPage() {
                 </tr>
               ) : (
                 requests.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
+                  <tr key={r.id} className="hover:bg-[var(--surface-secondary)]">
                     <td className="font-medium">{sanitizeString(r.patientName)}</td>
                     <td className="text-xs">{sanitizeString(r.patientPhone)}</td>
                     <td className="text-xs">{sanitizeString(r.doctorName || '-')}</td>

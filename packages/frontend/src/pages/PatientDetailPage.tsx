@@ -7,6 +7,7 @@ import { isValidEgyptianPhone, isValidEgyptianNationalId, isValidEmail, isValidN
 import { Input, Select } from '../components/ui';
 import { ArrowLeft, Calendar, Eye, FileText, Loader2, Pencil, Receipt } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 interface PatientFormData {
   firstName: string;
@@ -59,12 +60,12 @@ interface InvoiceSummary { id: string; total: number; status: string; createdAt:
   if (loading) return (
     <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary-600" /></div>
   );
-  if (!patient) return <div className="text-center py-12 text-gray-500">Patient not found</div>;
+  if (!patient) return <div className="text-center py-12 text-[var(--text-muted)]">Patient not found</div>;
 
   const InfoRow = ({ label, value }: { label: string; value: string }) => (
-    <div className="flex justify-between py-2 border-b border-gray-100">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className="text-sm font-medium text-gray-900">{value || '-'}</span>
+    <div className="flex justify-between py-2 border-b border-[var(--border)]">
+      <span className="text-sm text-[var(--text-muted)]">{label}</span>
+      <span className="text-sm font-medium text-[var(--text-primary)]">{value || '-'}</span>
     </div>
   );
 
@@ -200,7 +201,7 @@ interface InvoiceSummary { id: string; total: number; status: string; createdAt:
               <h1 className="page-title">{patient.firstName} {patient.lastName}</h1>
               <span className="badge-success">{patient.status}</span>
             </div>
-            <p className="text-sm text-gray-500 font-mono">{patient.medicalRecordNumber}</p>
+            <p className="text-sm text-[var(--text-muted)] font-mono">{patient.medicalRecordNumber}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -298,11 +299,11 @@ interface InvoiceSummary { id: string; total: number; status: string; createdAt:
             {patient.recentAppointments?.length > 0 ? (
               <div className="space-y-3">
                 {patient.recentAppointments.map((a: AppointmentSummary) => (
-                  <div key={a.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div key={a.id} className="flex items-center gap-3 p-3 bg-[var(--surface-secondary)] rounded-lg">
                     <Calendar className="w-8 h-8 text-blue-500 bg-blue-50 p-1.5 rounded-lg" />
                     <div className="flex-1">
                       <p className="text-sm font-medium">{a.type}</p>
-                      <p className="text-xs text-gray-500">{formatDate(a.appointment_date)} {a.start_time}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{formatDate(a.appointment_date)} {a.start_time}</p>
                     </div>
                     <span className={`badge ${
                       a.status === 'completed' ? 'badge-success' :
@@ -311,7 +312,7 @@ interface InvoiceSummary { id: string; total: number; status: string; createdAt:
                   </div>
                 ))}
               </div>
-            ) : <p className="text-sm text-gray-500">{t('common.noData')}</p>}
+            ) : <p className="text-sm text-[var(--text-muted)]">{t('common.noData')}</p>}
           </div>
         </div>
 
@@ -322,17 +323,17 @@ interface InvoiceSummary { id: string; total: number; status: string; createdAt:
             {patient.recentEmrRecords?.length > 0 ? (
               <div className="space-y-3">
                 {patient.recentEmrRecords.map((r: EmrSummary) => (
-                  <div key={r.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div key={r.id} className="flex items-center gap-3 p-3 bg-[var(--surface-secondary)] rounded-lg">
                     <FileText className="w-8 h-8 text-teal-500 bg-teal-50 p-1.5 rounded-lg" />
                     <div className="flex-1">
                       <p className="text-sm font-medium capitalize">{r.encounter_type || 'Encounter'}</p>
-                      <p className="text-xs text-gray-500">{formatDate(r.encounter_date || r.encounterDate || '')}{r.chief_complaint ? ` - ${r.chief_complaint}` : ''}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{formatDate(r.encounter_date || r.encounterDate || '')}{r.chief_complaint ? ` - ${r.chief_complaint}` : ''}</p>
                     </div>
                     <span className="badge">{r.status}</span>
                   </div>
                 ))}
               </div>
-            ) : <p className="text-sm text-gray-500">{t('common.noData')}</p>}
+            ) : <p className="text-sm text-[var(--text-muted)]">{t('common.noData')}</p>}
           </div>
         </div>
 
@@ -343,11 +344,11 @@ interface InvoiceSummary { id: string; total: number; status: string; createdAt:
             {patient.recentInvoices?.length > 0 ? (
               <div className="space-y-3">
                 {patient.recentInvoices.map((inv: InvoiceSummary) => (
-                  <div key={inv.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div key={inv.id} className="flex items-center gap-3 p-3 bg-[var(--surface-secondary)] rounded-lg">
                     <Receipt className="w-8 h-8 text-purple-500 bg-purple-50 p-1.5 rounded-lg" />
                     <div className="flex-1">
                       <p className="text-sm font-medium">{inv.invoice_number}</p>
-                      <p className="text-xs text-gray-500">{inv.total} EGP</p>
+                      <p className="text-xs text-[var(--text-muted)]">{inv.total} EGP</p>
                     </div>
                     <span className={`badge ${
                       inv.status === 'paid' ? 'badge-success' :
@@ -356,7 +357,7 @@ interface InvoiceSummary { id: string; total: number; status: string; createdAt:
                   </div>
                 ))}
               </div>
-            ) : <p className="text-sm text-gray-500">{t('common.noData')}</p>}
+            ) : <p className="text-sm text-[var(--text-muted)]">{t('common.noData')}</p>}
           </div>
         </div>
       </div>

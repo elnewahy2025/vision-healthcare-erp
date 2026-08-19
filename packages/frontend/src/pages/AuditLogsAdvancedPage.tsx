@@ -14,6 +14,7 @@ import {
 } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 interface AuditEntry {
   id: string;
@@ -158,7 +159,7 @@ export default function AuditLogsAdvancedPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">{t('auditAdv.title')}</h1>
-            <p className="text-sm text-gray-500">{t('auditAdv.subtitle')}</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('auditAdv.subtitle')}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -261,18 +262,18 @@ export default function AuditLogsAdvancedPage() {
                         {sanitizeString(log.action)}
                       </span>
                       {log.entity_type && (
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                        <span className="text-xs bg-[var(--surface-hover)] text-[var(--text-secondary)] px-2 py-0.5 rounded">
                           {sanitizeString(log.entity_type)}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">
                       <Clock className="w-3 h-3 inline" />{' '}
                       {new Date(log.created_at).toLocaleString()}
                       {log.ip_address && <> • IP: {sanitizeString(log.ip_address)}</>}
                     </p>
                   </div>
-                  <Eye className="w-4 h-4 text-gray-400" />
+                  <Eye className="w-4 h-4 text-[var(--text-disabled)]" />
                 </div>
               </CardBody>
             </Card>
@@ -280,7 +281,7 @@ export default function AuditLogsAdvancedPage() {
 
           {totalPages > 1 && (
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-[var(--text-muted)]">
                 {t('auditAdv.pageOf', { current: currentPage, total: totalPages })}
               </span>
               <div className="flex gap-2">
@@ -313,42 +314,44 @@ export default function AuditLogsAdvancedPage() {
           title={t('auditAdv.auditLogDetail')}
           size="lg"
           footer={
-            <Button onClick={() => setSelected(null)} variant="secondary">
+            <Can permission="audit.view">
+          <Button onClick={() => setSelected(null)} variant="secondary">
               {t('auditAdv.close')}
             </Button>
+        </Can>
           }
         >
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('auditAdv.actionLabel')}</span>
+              <span className="text-[var(--text-muted)]">{t('auditAdv.actionLabel')}</span>
               <span className="font-medium">{sanitizeString(selected.action)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('auditAdv.entityLabel')}</span>
+              <span className="text-[var(--text-muted)]">{t('auditAdv.entityLabel')}</span>
               <span>{selected.entity_type ? sanitizeString(selected.entity_type) : t('auditAdv.na')}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('auditAdv.entityIdLabel')}</span>
+              <span className="text-[var(--text-muted)]">{t('auditAdv.entityIdLabel')}</span>
               <span className="font-mono text-xs">
                 {selected.entity_id ? sanitizeString(selected.entity_id) : t('auditAdv.na')}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('auditAdv.userLabel')}</span>
+              <span className="text-[var(--text-muted)]">{t('auditAdv.userLabel')}</span>
               <span>{selected.user_id ? sanitizeString(selected.user_id) : t('auditAdv.system')}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('auditAdv.ipLabel')}</span>
+              <span className="text-[var(--text-muted)]">{t('auditAdv.ipLabel')}</span>
               <span>{selected.ip_address ? sanitizeString(selected.ip_address) : t('auditAdv.na')}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('auditAdv.timeLabel')}</span>
+              <span className="text-[var(--text-muted)]">{t('auditAdv.timeLabel')}</span>
               <span>{new Date(selected.created_at).toLocaleString()}</span>
             </div>
             {selected.metadata && (
               <div>
-                <span className="text-gray-500">{t('auditAdv.metadataLabel')}</span>
-                <pre className="mt-1 bg-gray-50 p-3 rounded-lg text-xs overflow-x-auto">
+                <span className="text-[var(--text-muted)]">{t('auditAdv.metadataLabel')}</span>
+                <pre className="mt-1 bg-[var(--surface-secondary)] p-3 rounded-lg text-xs overflow-x-auto">
                   {JSON.stringify(parseMetadata(selected.metadata), null, 2)}
                 </pre>
               </div>

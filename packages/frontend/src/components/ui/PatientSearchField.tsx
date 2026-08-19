@@ -88,7 +88,7 @@ export function PatientSearchField({
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
-        <Search className="absolute top-1/2 -translate-y-1/2 left-3 w-4 h-4 text-gray-400" />
+        <Search className="absolute top-1/2 -translate-y-1/2 left-3 w-4 h-4 text-[var(--text-disabled)]" />
         <input
           type="text"
           className={`input pl-10 ${error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
@@ -103,39 +103,39 @@ export function PatientSearchField({
           aria-describedby={error ? 'patient-search-error' : undefined}
         />
         {isLoading && (
-          <Loader2 className="absolute top-1/2 -translate-y-1/2 right-3 w-4 h-4 text-gray-400 animate-spin" />
+          <Loader2 className="absolute top-1/2 -translate-y-1/2 right-3 w-4 h-4 text-[var(--text-disabled)] animate-spin" />
         )}
         {selectedPatient && !disabled && (
           <button type="button" onClick={handleClear}
-            className="absolute top-1/2 -translate-y-1/2 right-3 p-1 rounded hover:bg-gray-100"
+            className="absolute top-1/2 -translate-y-1/2 right-3 p-1 rounded hover:bg-[var(--surface-hover)]"
             aria-label="Clear selection">
-            <X className="w-4 h-4 text-gray-400" />
+            <X className="w-4 h-4 text-[var(--text-disabled)]" />
           </button>
         )}
         {!selectedPatient && !isLoading && query && (
           <button type="button" onClick={() => { setQuery(''); setResults([]); setIsOpen(false); }}
-            className="absolute top-1/2 -translate-y-1/2 right-3 p-1 rounded hover:bg-gray-100"
+            className="absolute top-1/2 -translate-y-1/2 right-3 p-1 rounded hover:bg-[var(--surface-hover)]"
             aria-label="Clear search">
-            <X className="w-4 h-4 text-gray-400" />
+            <X className="w-4 h-4 text-[var(--text-disabled)]" />
           </button>
         )}
       </div>
 
       {isOpen && results.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+        <div className="absolute z-50 mt-1 w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-lg max-h-48 overflow-y-auto"
           role="listbox">
           {results.map(patient => (
             <button
               key={patient.id}
               type="button"
               onClick={() => handleSelect(patient)}
-              className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-3"
+              className="w-full text-left px-4 py-2 hover:bg-[var(--surface-secondary)] flex items-center gap-3"
               role="option"
               aria-selected={value === patient.id}>
-              <User className="w-4 h-4 text-gray-400" />
+              <User className="w-4 h-4 text-[var(--text-disabled)]" />
               <div>
                 <p className="text-sm font-medium">{patient.name}</p>
-                <p className="text-xs text-gray-500">{patient.mrn} | {patient.phone}</p>
+                <p className="text-xs text-[var(--text-muted)]">{patient.mrn} | {patient.phone}</p>
               </div>
             </button>
           ))}
@@ -143,7 +143,7 @@ export function PatientSearchField({
       )}
 
       {isOpen && results.length === 0 && !isLoading && query.length >= 2 && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500">
+        <div className="absolute z-50 mt-1 w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-lg p-4 text-center text-[var(--text-muted)]">
           {t('common.noData')}
         </div>
       )}

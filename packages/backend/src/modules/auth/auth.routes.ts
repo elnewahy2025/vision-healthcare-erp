@@ -6,27 +6,33 @@ import {
   listSessions, revokeSession, forgotPassword, resetPassword, changePassword,
   verifyEmail, resendVerification, mfaSetup, mfaEnable, mfaDisable,
   sendOtp, verifyOtpHandler,
+  switchMembership, getMemberships,
 } from './auth.controller.js';
 
 export async function registerAuthRoutes(app: FastifyInstance) {
+  // ── Public ──
   app.post('/api/v1/tenants', { preHandler: [registerRateLimit] }, registerTenant);
   app.post('/api/v1/auth/login', { preHandler: [loginRateLimit] }, login);
   app.post('/api/v1/auth/mfa/verify', mfaVerify);
   app.post('/api/v1/auth/refresh', { preHandler: [refreshRateLimit] }, refreshToken);
-  // Logout must work even when the short-lived access token has expired - the
-  // handler resolves the session from the refresh token itself.
   app.post('/api/v1/auth/logout', logout);
+  app.post('/api/v1/auth/forgot-password', { preHandler: [forgotPasswordRateLimit] }, forgotPassword);
+  app.post('/api/v1/auth/reset-password', resetPassword);
+  app.post('/api/v1/auth/verify-email', verifyEmail);
+  app.post('/api/v1/auth/resend-verification', { preHandler: [forgotPasswordRateLimit] }, resendVerification);
+  app.post('/api/v1/auth/otp/send', sendOtp);
+  app.post('/api/v1/auth/otp/verify', verifyOtpHandler);
+
+  // ── Authenticated ──
   app.get('/api/v1/auth/me', { preHandler: [authenticate] }, me);
   app.get('/api/v1/auth/sessions', { preHandler: [authenticate] }, listSessions);
   app.delete('/api/v1/auth/sessions/:sessionId', { preHandler: [authenticate] }, revokeSession);
-  app.post('/api/v1/auth/forgot-password', { preHandler: [forgotPasswordRateLimit] }, forgotPassword);
-  app.post('/api/v1/auth/reset-password', resetPassword);
   app.post('/api/v1/auth/change-password', { preHandler: [authenticate] }, changePassword);
-  app.post('/api/v1/auth/verify-email', verifyEmail);
-  app.post('/api/v1/auth/resend-verification', { preHandler: [forgotPasswordRateLimit] }, resendVerification);
   app.post('/api/v1/auth/mfa/setup', { preHandler: [authenticate] }, mfaSetup);
   app.post('/api/v1/auth/mfa/enable', { preHandler: [authenticate] }, mfaEnable);
   app.post('/api/v1/auth/mfa/disable', { preHandler: [authenticate] }, mfaDisable);
-  app.post('/api/v1/auth/otp/send', sendOtp);
-  app.post('/api/v1/auth/otp/verify', verifyOtpHandler);
+
+  // ── Membership management ──
+  app.post('/api/v1/auth/switch-membership', { preHandler: [authenticate] }, switchMembership);
+  app.get('/api/v1/auth/memberships', { preHandler: [authenticate] }, getMemberships);
 }

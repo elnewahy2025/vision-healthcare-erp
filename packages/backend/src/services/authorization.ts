@@ -3,27 +3,34 @@ import type { Knex } from 'knex';
 import { ForbiddenError } from '@healthcare/shared/errors';
 import type { Grant, PermissionScope } from '@healthcare/shared/authz';
 import { db } from '../core/database.js';
+import { getCachedPrincipal, setCachedPrincipal } from './authz-cache.js';
 
 /**
  * Centralized authorization service — the only place permission/scope decisions
- * are made (see docs/engineering/AUTHORIZATION.md).
+ * are made (see docs/engineering/AUTHORIZATION-SOUND-OF-TRUTH.md).
  *
- * A principal is the authenticated identity (staff user today; patient
- * principals join via the portal in a later phase). Effective grants are the
- * union of role grants (role_permissions) and direct grants (user_permissions).
+ * A principal is the authenticated identity resolved from the membership table.
+ * Effective grants are the union of role grants and direct grants, minus explicit
+ * denials. The membership determines the user's organizational context (tenant,
+ * branch, department). JWT carries only the membership reference.
  */
 
 export interface Principal {
-  kind: 'user';
+  kind: 'user' | 'patient';
+  /** @deprecated Use userId instead. Kept for backward compatibility. */
   id: string;
+  userId: string;
+  membershipId: string;
   tenantId: string;
+  branchId: string | null;
+  departmentId: string | null;
   roles: string[];
   grants: Grant[];
   branches: string[];
-  departmentId: string | null;
   locale: 'ar' | 'en';
-  permVersion: number;
+  authzVersion: number;
   status: string;
+  membershipStatus: string;
 }
 
 export interface RequestCtx {
@@ -58,55 +65,112 @@ export function uniquePermissionKeys(grants: Grant[]): string[] {
 }
 
 /**
- * Load a staff user principal with effective grants from the normalized tables.
- * Returns null when the user does not exist in the tenant.
+ * Load a staff user principal with effective grants from the membership table.
+ *
+ * The membership is the source of truth for organizational context (tenant,
+ * branch, department). Roles and permissions are resolved via the tenant
+ * context provided by the membership.
+ *
+ * Returns null when the membership is invalid, suspended, or the user does
+ * not exist.
+ *
+ * See docs/engineering/AUTHORIZATION-SOUND-OF-TRUTH.md §6.1.
  */
-export async function loadUserPrincipal(userId: string, tenantId: string): Promise<Principal | null> {
-  const user = await db('users').where({ id: userId, tenant_id: tenantId }).first();
-  if (!user) return null;
+export async function loadUserPrincipal(userId: string, membershipId: string): Promise<Principal | null> {
+  // 0. Check cache first (5-minute TTL, invalidated on auth data changes)
+  const cached = await getCachedPrincipal(userId, membershipId);
+  if (cached) return cached;
 
+  // 1. Load membership — this is the authoritative organizational context
+  const membership = await db('memberships')
+    .where({ id: membershipId, user_id: userId, status: 'active' })
+    .first();
+  if (!membership) return null;
+
+  const tenantId = String(membership.tenant_id);
+
+  // 2. Load user within this tenant
+  const user = await db('users')
+    .where({ id: userId, tenant_id: tenantId })
+    .first();
+  if (!user || user.status !== 'active') return null;
+
+  // 3. Load roles via user_roles
   const roleRows = await db('user_roles')
     .join('roles', 'user_roles.role_id', 'roles.id')
     .where('user_roles.user_id', userId)
     .andWhere('user_roles.tenant_id', tenantId)
     .select('roles.slug');
 
+  // 4. Load role grants (permission + scope pairs)
   const roleGrantRows = await db('role_permissions')
     .join('user_roles', 'role_permissions.role_id', 'user_roles.role_id')
     .where('user_roles.user_id', userId)
     .andWhere('user_roles.tenant_id', tenantId)
     .select('role_permissions.permission', 'role_permissions.scope');
 
+  // 5. Load direct grants (type = 'allow')
   const directGrantRows = await db('user_permissions')
-    .where({ user_id: userId, tenant_id: tenantId })
+    .where({ user_id: userId, tenant_id: tenantId, type: 'allow' })
     .select('permission', 'scope');
 
+  // 6. Load explicit denials (type = 'deny') — denials override allows
+  const denialRows = await db('user_permissions')
+    .where({ user_id: userId, tenant_id: tenantId, type: 'deny' })
+    .select('permission');
+
+  // 7. Build effective grants: (role grants ∪ direct grants) − denials
+  const deniedPermissions = new Set(denialRows.map((r: { permission: string }) => String(r.permission)));
+
+  const allowGrants: Grant[] = [
+    ...roleGrantRows.map((r: { permission: string; scope: string }) => ({
+      permission: String(r.permission),
+      scope: String(r.scope) as PermissionScope,
+    })),
+    ...directGrantRows.map((r: { permission: string; scope: string }) => ({
+      permission: String(r.permission),
+      scope: String(r.scope) as PermissionScope,
+    })),
+  ];
+
+  // Filter out denied permissions from the effective grants
+  const grants = allowGrants.filter((g) => !deniedPermissions.has(g.permission));
+
+  // 8. Load branch assignments (for scope resolution)
   const branchRows = await db('user_branches')
     .where({ user_id: userId, tenant_id: tenantId })
     .select('branch_id');
 
-  const grants: Grant[] = [
-    ...roleGrantRows.map((r) => ({ permission: String(r.permission), scope: String(r.scope) as PermissionScope })),
-    ...directGrantRows.map((r) => ({ permission: String(r.permission), scope: String(r.scope) as PermissionScope })),
-  ];
-
-  return {
-    kind: 'user',
+  // Cache the resolved principal for subsequent requests (5-min TTL)
+  const principal: Principal = {
+    kind: 'user' as const,
     id: userId,
+    userId,
+    membershipId: String(membership.id),
     tenantId,
-    roles: roleRows.map((r) => String(r.slug)),
+    branchId: membership.branch_id ? String(membership.branch_id) : null,
+    departmentId: membership.department_id ? String(membership.department_id) : null,
+    roles: roleRows.map((r: { slug: string }) => String(r.slug)),
     grants,
-    branches: branchRows.map((b) => String(b.branch_id)),
-    departmentId: user.department_id ? String(user.department_id) : null,
+    branches: branchRows.map((b: { branch_id: string }) => String(b.branch_id)),
     locale: user.locale === 'ar' ? 'ar' : 'en',
-    permVersion: Number(user.perm_version || 0),
+    authzVersion: Number(membership.authz_version || 0),
     status: String(user.status || 'active'),
+    membershipStatus: String(membership.status || 'active'),
   };
+
+  // Cache for next request
+  await setCachedPrincipal(userId, membershipId, principal);
+
+  return principal;
 }
 
 /**
  * Core permission check. A wildcard '*' grant (super_admin) passes everything.
  * When `requestedScope` is provided, the grant's scope must cover it.
+ *
+ * Denials are already excluded from the grants array in loadUserPrincipal(),
+ * so no additional deny-check is needed here.
  */
 export function hasPermission(
   principal: Principal,
@@ -182,10 +246,10 @@ export function scopeQuery<T extends Knex.QueryBuilder>(
 /** Patient ids assigned to this principal (doctor/nurse via appointments/orders). */
 export async function assignedPatientIds(principal: Principal): Promise<string[]> {
   const rows = await db('appointments')
-    .where({ tenant_id: principal.tenantId, doctor_id: principal.id })
+    .where({ tenant_id: principal.tenantId, doctor_id: principal.userId })
     .whereNotNull('patient_id')
     .distinct('patient_id');
-  return rows.map((r) => String(r.patient_id));
+  return rows.map((r: { patient_id: string }) => String(r.patient_id));
 }
 
 /**
@@ -199,11 +263,6 @@ export function patientAccessByScope(
 ): boolean {
   if (principal.tenantId !== patient.tenant_id) return false;
 
-  // Exact-scope inspection: each grant scope expresses a different access
-  // dimension for patient data (tenant-wide, branch-wide, or assigned
-  // patients). The assigned_patients signal is intentionally narrow — a
-  // broader grant (branch/tenant) must pass its own dedicated check below,
-  // never the assignment check.
   const scopes = new Set(
     principal.grants
       .filter((g) => g.permission === '*' || g.permission === 'patients.view')
@@ -225,14 +284,13 @@ export function patientAccessByScope(
 
 /**
  * True when the principal holds an active, unexpired break-glass
- * emergency-access grant for this patient (docs/engineering/AUTHORIZATION.md §8).
- * Every activation/revocation is audited with the emergency flag.
+ * emergency-access grant for this patient.
  */
 export async function hasEmergencyAccess(principal: Principal, patientId: string): Promise<boolean> {
   const row = await db('emergency_access')
     .where({
       tenant_id: principal.tenantId,
-      user_id: principal.id,
+      user_id: principal.userId,
       patient_id: patientId,
       status: 'active',
     })
@@ -252,10 +310,6 @@ export async function canAccessPatient(
   patient: { id: string; tenant_id: string; branch_id?: string | null; department_id?: string | null },
 ): Promise<boolean> {
   if (principal.tenantId !== patient.tenant_id) return false;
-  // An assigned_patients grant is narrow: it only covers patients assigned to
-  // this principal. patientAccessByScope deliberately returns true for the
-  // assigned_patients scope, so membership must be enforced here — unless a
-  // broader grant (branch/tenant/system) independently covers this patient.
   if (hasPermission(principal, 'patients.view', 'assigned_patients')) {
     const broader =
       hasPermission(principal, 'patients.view', 'branch') ||

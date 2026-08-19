@@ -36,23 +36,23 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-8">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--surface-secondary)] p-8">
         <div className="text-center max-w-sm">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check className="w-8 h-8 text-green-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Created!</h2>
-          <p className="text-gray-500">Redirecting to login...</p>
+          <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Organization Created!</h2>
+          <p className="text-[var(--text-muted)]">Redirecting to login...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
+    <div className="min-h-screen flex bg-[var(--surface-secondary)]">
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-600 to-primary-900 items-center justify-center p-12">
         <div className="max-w-md text-center">
-          <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <div className="w-20 h-20 bg-[var(--surface)]/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Stethoscope className="w-10 h-10 text-white" />
           </div>
           <h1 className="text-4xl font-bold text-white mb-4">{t('app.name')}</h1>
@@ -66,11 +66,11 @@ export default function RegisterPage() {
             <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <Stethoscope className="w-8 h-8 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">{t('auth.signUp')}</h2>
+            <h2 className="text-2xl font-bold text-[var(--text-primary)]">{t('auth.signUp')}</h2>
           </div>
 
-          <h2 className="hidden lg:block text-2xl font-bold text-gray-900 mb-2">{t('auth.signUp')}</h2>
-          <p className="text-gray-500 mb-8">Create your healthcare organization</p>
+          <h2 className="hidden lg:block text-2xl font-bold text-[var(--text-primary)] mb-2">{t('auth.signUp')}</h2>
+          <p className="text-[var(--text-muted)] mb-8">Create your healthcare organization</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -95,7 +95,7 @@ export default function RegisterPage() {
                 dir="ltr"
                 required
               />
-              <p className="text-xs text-gray-400 mt-1">Used for login. 3-30 lowercase letters, numbers, and hyphens.</p>
+              <p className="text-xs text-[var(--text-disabled)] mt-1">Used for login. 3-30 lowercase letters, numbers, and hyphens.</p>
             </div>
             <div>
               <label className="label">Admin Name</label>
@@ -138,7 +138,7 @@ export default function RegisterPage() {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-[var(--text-muted)]">
               Already have an account?{' '}
               <Link to="/login" className="text-primary-600 font-medium">{t('auth.login')}</Link>
             </p>

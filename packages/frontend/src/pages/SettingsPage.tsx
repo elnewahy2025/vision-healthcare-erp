@@ -5,6 +5,7 @@ import { UserCog, Palette, Bell, Globe, Printer, Shield, Building2, Save, Loader
 import { Card, CardBody, Input, Button } from '../components/ui';
 import { apiClient as api } from '../lib/api';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 interface ClinicSettings {
   clinicName: string;
@@ -39,14 +40,16 @@ export default function SettingsPage() {
 
   useEffect(() => {
     api.get('/clinic-settings').then(r => {
-      setClinic(r.data);
+      const d = r.data?.data ?? r.data;
+      setClinic(d);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.put('/clinic-settings', clinic);
+      const payload = { ...clinic };
+      await api.put('/clinic-settings', payload);
       toast.success('Clinic settings saved');
     } catch {
       toast.error('Failed to save settings');
@@ -137,9 +140,11 @@ export default function SettingsPage() {
 
               {/* Save */}
               <div className="flex justify-end pt-4 border-t border-[var(--border)]">
-                <Button onClick={handleSave} loading={saving} icon={<Save className="w-4 h-4" />}>
+                <Can permission="settings.manage">
+          <Button onClick={handleSave} loading={saving} icon={<Save className="w-4 h-4" />}>
                   Save Clinic Settings
                 </Button>
+        </Can>
               </div>
             </div>
           </CardBody>

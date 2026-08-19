@@ -18,6 +18,8 @@ const PatientsPage = lazy(() => import('./pages/PatientsPage'));
 const PatientDetailPage = lazy(() => import('./pages/PatientDetailPage'));
 const AppointmentsPage = lazy(() => import('./pages/AppointmentsPage'));
 const EmrPage = lazy(() => import('./pages/EmrPage'));
+const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage'));
+const EmergencyAccessPage = lazy(() => import('./pages/EmergencyAccessPage'));
 const BillingPage = lazy(() => import('./pages/BillingPage'));
 const LaboratoryPage = lazy(() => import('./pages/LaboratoryPage'));
 const RadiologyPage = lazy(() => import('./pages/RadiologyPage'));
@@ -199,6 +201,8 @@ function AppContent() {
             <Route path="hr" element={<HrPage />} />
             <Route path="crm" element={<CrmPage />} />
             <Route path="dms" element={<DmsPage />} />
+            <Route path="departments" element={<DepartmentsPage />} />
+            <Route path="emergency-access" element={<EmergencyAccessPage />} />
             <Route path="workflow" element={<WorkflowPage />} />
             <Route path="forms" element={<FormsPage />} />
             <Route path="compliance" element={<CompliancePage />} />

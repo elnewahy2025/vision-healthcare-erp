@@ -13,7 +13,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="space-y-1">
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label htmlFor={inputId} className="block text-sm font-medium text-[var(--text-primary)] dark:text-gray-300">
             {label}
           </label>
         )}
@@ -28,7 +28,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           {...props}
         />
         {error && <p className="text-xs text-red-600">{error}</p>}
-        {helpText && !error && <p className="text-xs text-gray-400">{helpText}</p>}
+        {helpText && !error && <p className="text-xs text-[var(--text-disabled)]">{helpText}</p>}
       </div>
     );
   },

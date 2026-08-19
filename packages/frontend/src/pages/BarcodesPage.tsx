@@ -8,6 +8,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 type BarcodeTab = 'templates' | 'labels' | 'scans';
 
@@ -136,7 +137,7 @@ export default function BarcodesPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('barcodes.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('barcodes.templateCount', { count: templates.length })} · {t('barcodes.labelCount', { count: labels.length })} · {t('barcodes.scanCount', { count: scanLogs.length })}
           </p>
         </div>
@@ -144,9 +145,11 @@ export default function BarcodesPage() {
           <Button variant="secondary" onClick={() => setShowScan(true)}>
             <Scan className="w-4 h-4" /> {t('barcodes.logScan')}
           </Button>
+          <Can permission="barcodes.create">
           <Button onClick={() => setShowGenerate(true)}>
             <Plus className="w-4 h-4" /> {t('barcodes.generate')}
           </Button>
+        </Can>
         </div>
       </div>
 
@@ -192,7 +195,7 @@ export default function BarcodesPage() {
                 {filteredTemplates.length === 0 ? (
                   <tr><td colSpan={7}><EmptyState title={t('barcodes.noTemplates')} /></td></tr>
                 ) : filteredTemplates.map((tpl) => (
-                  <tr key={tpl.id} className="hover:bg-gray-50">
+                  <tr key={tpl.id} className="hover:bg-[var(--surface-secondary)]">
                     <td className="font-medium">{sanitizeString(tpl.name)}</td>
                     <td className="font-mono text-xs">{sanitizeString(tpl.code)}</td>
                     <td><Badge>{sanitizeString(tpl.category)}</Badge></td>
@@ -227,7 +230,7 @@ export default function BarcodesPage() {
               {filteredLabels.length === 0 ? (
                 <tr><td colSpan={8}><EmptyState title={t('barcodes.noLabels')} /></td></tr>
               ) : filteredLabels.map((l) => (
-                <tr key={l.id} className="hover:bg-gray-50">
+                <tr key={l.id} className="hover:bg-[var(--surface-secondary)]">
                   <td className="font-mono text-xs">{sanitizeString(l.barcodeData)}</td>
                   <td className="text-sm">{sanitizeString(l.templateName)}</td>
                   <td className="text-xs">{l.referenceType ? `${sanitizeString(l.referenceType)}:${sanitizeString(l.referenceId ?? '')}` : '-'}</td>
@@ -264,7 +267,7 @@ export default function BarcodesPage() {
               {scanLogs.length === 0 ? (
                 <tr><td colSpan={6}><EmptyState title={t('barcodes.noScans')} /></td></tr>
               ) : scanLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50">
+                <tr key={log.id} className="hover:bg-[var(--surface-secondary)]">
                   <td className="font-mono text-xs">{sanitizeString(log.barcodeData)}</td>
                   <td><Badge>{sanitizeString(log.action)}</Badge></td>
                   <td><Badge variant={log.status === 'success' ? 'success' : 'danger'}>{sanitizeString(log.status)}</Badge></td>

@@ -11,6 +11,7 @@ import { Spinner } from '../components/ui/Spinner';
 import { EmptyState } from '../components/ui/EmptyState';
 import { rolesApi, type RoleItem, type RoleGrant } from '../lib/api/users';
 import { useAuth } from '../stores/authStore';
+import { Can } from '../components/Can';
 
 const SCOPES = ['self', 'assigned_patients', 'department', 'branch', 'branches', 'tenant', 'system'];
 
@@ -80,13 +81,15 @@ export default function RolesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('admin.roleManagement', 'Role & Permission Management')}</h1>
-          <p className="text-sm text-gray-500 mt-1">Granular module × action permissions with scope for every role.</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('admin.roleManagement', 'Role & Permission Management')}</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Granular module × action permissions with scope for every role.</p>
         </div>
         {can('roles.create') && (
+          <Can permission="roles.create">
           <Button onClick={() => setEditing({ name: '', slug: '', level: 'custom', scopeDefault: 'tenant', description: null, grants: [] })} icon={<Plus className="w-4 h-4" />}>
             New Role
           </Button>
+        </Can>
         )}
       </div>
 
@@ -100,25 +103,25 @@ export default function RolesPage() {
             <EmptyState title="No roles found" />
           ) : (
             <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
+              <thead className="bg-[var(--surface-secondary)]">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Role</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Level</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Default scope</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Permissions</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Role</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Level</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Default scope</th>
+                  <th className="px-4 py-3 text-left font-medium text-[var(--text-muted)]">Permissions</th>
+                  <th className="px-4 py-3 text-right font-medium text-[var(--text-muted)]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {roles.map((r) => (
-                  <tr key={r.slug} className="hover:bg-gray-50">
+                  <tr key={r.slug} className="hover:bg-[var(--surface-secondary)]">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{r.name}</div>
-                      <div className="text-xs text-gray-400">{r.slug}</div>
+                      <div className="font-medium text-[var(--text-primary)]">{r.name}</div>
+                      <div className="text-xs text-[var(--text-disabled)]">{r.slug}</div>
                     </td>
                     <td className="px-4 py-3"><Badge variant={r.level === 'system' ? 'danger' : r.level === 'tenant' ? 'info' : 'gray'}>{r.level}</Badge></td>
-                    <td className="px-4 py-3 text-gray-600">{r.scopeDefault}</td>
-                    <td className="px-4 py-3 text-gray-600">{r.grants?.length || 0} grants</td>
+                    <td className="px-4 py-3 text-[var(--text-secondary)]">{r.scopeDefault}</td>
+                    <td className="px-4 py-3 text-[var(--text-secondary)]">{r.grants?.length || 0} grants</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {can('roles.edit') && (
                         <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={() => setEditing({ ...r })}>Edit</Button>
@@ -228,8 +231,8 @@ function RoleEditorModal({
         />
       </div>
 
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <div className="bg-gray-50 px-4 py-2 flex items-center gap-2 text-xs font-medium text-gray-500">
+      <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+        <div className="bg-[var(--surface-secondary)] px-4 py-2 flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
           <Shield className="w-4 h-4" />
           Permission matrix — module × action × scope
         </div>
@@ -237,10 +240,10 @@ function RoleEditorModal({
           {catalog.modules.map((module) => (
             <div key={module} className="px-4 py-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-800">{module}</span>
+                <span className="text-sm font-medium text-[var(--text-primary)]">{module}</span>
                 <div className="flex items-center gap-2">
                   {SCOPES.map((scope) => (
-                    <label key={scope} className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                    <label key={scope} className="flex items-center gap-1 text-xs text-[var(--text-muted)] cursor-pointer">
                       <input
                         type="checkbox"
                         className="accent-primary-600"
@@ -255,7 +258,7 @@ function RoleEditorModal({
               <div className="flex flex-wrap gap-2">
                 {catalog.actions.map((action) => (
                   <div key={`${module}.${action}`} className="flex items-center gap-1">
-                    <label className="flex items-center gap-1 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-md px-2 py-1 cursor-pointer">
+                    <label className="flex items-center gap-1 text-xs text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border)] rounded-md px-2 py-1 cursor-pointer">
                       <input
                         type="checkbox"
                         className="accent-primary-600"
@@ -269,10 +272,10 @@ function RoleEditorModal({
               </div>
             </div>
           ))}
-          {catalog.modules.length === 0 && <div className="p-6 text-sm text-gray-400">Loading permission catalog…</div>}
+          {catalog.modules.length === 0 && <div className="p-6 text-sm text-[var(--text-disabled)]">Loading permission catalog…</div>}
         </div>
       </div>
-      <p className="text-xs text-gray-400 mt-2">
+      <p className="text-xs text-[var(--text-disabled)] mt-2">
         {Object.keys(grants).length} grant(s) selected. Scopes: self → own records, assigned_patients → assigned patients,
         department / branch / branches → department or branch data, tenant → entire organization, system → all tenants.
       </p>

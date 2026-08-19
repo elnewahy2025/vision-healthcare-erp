@@ -23,6 +23,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 type TabType = 'connections' | 'webhooks' | 'catalog';
 
@@ -138,7 +139,7 @@ export default function IntegrationsPage() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Puzzle className="w-6 h-6" /> {t('intg.title')}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[var(--text-muted)] mt-1">
             {t('intg.connectionCount', { count: connections.length })} ·{' '}
             {t('intg.webhookCount', { count: webhooks.length })}
           </p>
@@ -181,16 +182,16 @@ export default function IntegrationsPage() {
 
       {/* Connections Tab */}
       {tab === 'connections' && (
-        <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+        <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.name')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.provider')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.category')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.status')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.lastSync')}</th>
-                <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.actions')}</th>
+              <tr className="border-b bg-[var(--surface-secondary)]">
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.name')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.provider')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.category')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.status')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.lastSync')}</th>
+                <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -206,7 +207,7 @@ export default function IntegrationsPage() {
                 </tr>
               ) : (
                 filteredConnections.map((c) => (
-                  <tr key={c.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={c.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                     <td className="p-3 text-sm font-medium">{escapeHtml(c.name)}</td>
                     <td className="p-3 text-sm">{escapeHtml(c.provider)}</td>
                     <td className="p-3"><Badge>{escapeHtml(c.category)}</Badge></td>
@@ -215,7 +216,7 @@ export default function IntegrationsPage() {
                         {escapeHtml(c.status)}
                       </Badge>
                     </td>
-                    <td className="p-3 text-xs text-gray-500">
+                    <td className="p-3 text-xs text-[var(--text-muted)]">
                       {formatDateTime(c.lastSyncAt) || 'Never'}
                     </td>
                     <td className="p-3">
@@ -238,16 +239,16 @@ export default function IntegrationsPage() {
       {/* Webhooks Tab */}
       {tab === 'webhooks' && (
         <div>
-          <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800 mb-6">
+          <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800 mb-6">
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.name')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.url')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.events')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.status')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.lastTrigger')}</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.actions')}</th>
+                <tr className="border-b bg-[var(--surface-secondary)]">
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.name')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.url')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.events')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.status')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.lastTrigger')}</th>
+                  <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -263,9 +264,9 @@ export default function IntegrationsPage() {
                   </tr>
                 ) : (
                   filteredWebhooks.map((w) => (
-                    <tr key={w.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <tr key={w.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                       <td className="p-3 text-sm font-medium">{escapeHtml(w.name)}</td>
-                      <td className="p-3 text-xs max-w-xs truncate text-gray-500">
+                      <td className="p-3 text-xs max-w-xs truncate text-[var(--text-muted)]">
                         {escapeHtml(w.url)}
                       </td>
                       <td className="p-3 text-xs">{(w.events ?? []).join(', ')}</td>
@@ -274,7 +275,7 @@ export default function IntegrationsPage() {
                           {escapeHtml(w.status)}
                         </Badge>
                       </td>
-                      <td className="p-3 text-xs text-gray-500">
+                      <td className="p-3 text-xs text-[var(--text-muted)]">
                         {formatDateTime(w.lastTriggeredAt) || '-'}
                       </td>
                       <td className="p-3">
@@ -298,7 +299,7 @@ export default function IntegrationsPage() {
 
           {/* Webhook Logs */}
           {selectedWebhook && (
-            <div className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+            <div className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold">
                   {t('intg.logs')}: {escapeHtml(selectedWebhook.name)}
@@ -311,16 +312,16 @@ export default function IntegrationsPage() {
                   {t('common.close')}
                 </Button>
               </div>
-              <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+              <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.events')}</th>
-                      <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.status')}</th>
-                      <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.response')}</th>
-                      <th className="text-left p-3 text-sm font-medium text-gray-600">{t('intg.attempt')}</th>
-                      <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.error')}</th>
-                      <th className="text-left p-3 text-sm font-medium text-gray-600">{t('common.date')}</th>
+                    <tr className="border-b bg-[var(--surface-secondary)]">
+                      <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.events')}</th>
+                      <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.status')}</th>
+                      <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.response')}</th>
+                      <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('intg.attempt')}</th>
+                      <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.error')}</th>
+                      <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('common.date')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -336,7 +337,7 @@ export default function IntegrationsPage() {
                       </tr>
                     ) : (
                       webhookLogs.map((l) => (
-                        <tr key={l.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                        <tr key={l.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                           <td className="p-3"><Badge>{escapeHtml(l.event)}</Badge></td>
                           <td className="p-3">
                             <Badge variant={STATUS_VARIANT[l.status] ?? 'gray'}>
@@ -348,7 +349,7 @@ export default function IntegrationsPage() {
                           <td className="p-3 text-xs text-red-600 max-w-xs truncate">
                             {l.error ? escapeHtml(l.error) : '-'}
                           </td>
-                          <td className="p-3 text-xs text-gray-500">
+                          <td className="p-3 text-xs text-[var(--text-muted)]">
                             {formatDateTime(l.createdAt) || '-'}
                           </td>
                         </tr>
@@ -373,13 +374,13 @@ export default function IntegrationsPage() {
             />
           ) : (
             catalog.map((c) => (
-              <div key={c.id} className="bg-white rounded-lg border p-4 dark:bg-gray-900 dark:border-gray-800">
+              <div key={c.id} className="bg-[var(--surface)] rounded-lg border p-4 dark:bg-[var(--background)] dark:border-gray-800">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-sm">{escapeHtml(c.name)}</h3>
                   <Badge>{escapeHtml(c.category)}</Badge>
                 </div>
-                <p className="text-xs text-gray-500 mb-2">{escapeHtml(c.provider)}</p>
-                <p className="text-sm text-gray-600">
+                <p className="text-xs text-[var(--text-muted)] mb-2">{escapeHtml(c.provider)}</p>
+                <p className="text-sm text-[var(--text-secondary)]">
                   {c.description ? escapeHtml(c.description) : t('intg.noDescription')}
                 </p>
                 {(c.availableActions ?? []).length > 0 && (

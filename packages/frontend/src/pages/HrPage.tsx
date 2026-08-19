@@ -5,6 +5,7 @@ import { Modal, Input, Select, Button, Badge, EmptyState, PageLoader } from '../
 import { Plus, UsersRound, CalendarCheck, Banknote } from 'lucide-react';
 import { sanitizeString } from '../lib/sanitize';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 type TabType = 'employees' | 'leave' | 'payroll';
 
@@ -224,12 +225,14 @@ export default function HrPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('hr.title')}</h1>
-          <p className="text-gray-500 mt-1">{t('hr.employeeCountLabel', { count: employees.length })}</p>
+          <p className="text-[var(--text-muted)] mt-1">{t('hr.employeeCountLabel', { count: employees.length })}</p>
         </div>
         {tab !== 'payroll' && (
+          <Can permission="hr.create">
           <Button icon={<Plus className="w-4 h-4" />} onClick={openNewModal}>
             {tab === 'employees' ? t('hr.addEmployee') : t('hr.newLeaveRequest')}
           </Button>
+        </Can>
         )}
       </div>
 
@@ -265,26 +268,26 @@ export default function HrPage() {
         filteredEmployees.length === 0 ? (
           <EmptyState title={t('hr.noEmployees')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.employeeCode')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.firstName')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.department')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.position')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.employmentType')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('common.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.employeeCode')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.firstName')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.department')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.position')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.employmentType')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('common.status')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {filteredEmployees.map((emp) => (
-                    <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{emp.employeeCode}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{empName(emp)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{emp.department}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{emp.position}</td>
+                    <tr key={emp.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-[var(--text-primary)]">{emp.employeeCode}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{empName(emp)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{emp.department}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{emp.position}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{t(`hr.${emp.employmentType}`)}</Badge></td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={emp.status === 'active' ? 'success' : 'warning'}>{emp.status}</Badge>
@@ -303,27 +306,27 @@ export default function HrPage() {
         leaves.length === 0 ? (
           <EmptyState title={t('hr.noLeaveRequests')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.employees')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.leaveType')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.startDate')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.endDate')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.totalDays')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('common.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.employees')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.leaveType')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.startDate')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.endDate')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.totalDays')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('common.status')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {leaves.map((lr) => (
-                    <tr key={lr.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{lr.employeeName}</td>
+                    <tr key={lr.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{lr.employeeName}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{t(`hr.${lr.leaveType}`)}</Badge></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lr.startDate}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lr.endDate}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{lr.totalDays}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{lr.startDate}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{lr.endDate}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{lr.totalDays}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={lr.status === 'approved' ? 'success' : lr.status === 'pending' ? 'warning' : 'danger'}>{lr.status}</Badge>
                       </td>
@@ -341,29 +344,29 @@ export default function HrPage() {
         payrolls.length === 0 ? (
           <EmptyState title={t('hr.noPayrollRuns')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.periodName')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.periodStart')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.periodEnd')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.gross')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.net')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('hr.employeeCount')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('common.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.periodName')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.periodStart')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.periodEnd')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.gross')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.net')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('hr.employeeCount')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('common.status')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {payrolls.map((pr) => (
-                    <tr key={pr.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{pr.periodName}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{pr.periodStart}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{pr.periodEnd}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatEgp(pr.totalGross)}</td>
+                    <tr key={pr.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{pr.periodName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{pr.periodStart}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{pr.periodEnd}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{formatEgp(pr.totalGross)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">{formatEgp(pr.totalNet)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{pr.employeeCount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{pr.employeeCount}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{pr.status}</Badge></td>
                     </tr>
                   ))}

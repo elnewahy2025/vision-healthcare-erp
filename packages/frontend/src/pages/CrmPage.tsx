@@ -6,6 +6,7 @@ import { Plus, BarChart3, MessageSquare } from 'lucide-react';
 import { sanitizeNumber, sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 type TabType = 'campaigns' | 'feedback';
 
@@ -137,13 +138,15 @@ export default function CrmPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('crm.title')}</h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[var(--text-muted)] mt-1">
             {t('crm.campaignCount', { count: campaigns.length })} · {t('crm.avgRating', { rating: avgRating })}
           </p>
         </div>
-        <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCampaignModal(true)}>
+        <Can permission="crm.create">
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCampaignModal(true)}>
           {t('crm.newCampaign')}
         </Button>
+        </Can>
       </div>
 
       {/* Tab Buttons */}
@@ -170,29 +173,29 @@ export default function CrmPage() {
         filteredCampaigns.length === 0 ? (
           <EmptyState title={t('crm.noCampaigns')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('crm.campaignName')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('crm.campaignType')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('crm.budget')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('crm.targetCount')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('crm.reachedCount')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('crm.conversionCount')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('common.status')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('crm.campaignName')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('crm.campaignType')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('crm.budget')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('crm.targetCount')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('crm.reachedCount')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('crm.conversionCount')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('common.status')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {filteredCampaigns.map((camp) => (
-                    <tr key={camp.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{camp.name}</td>
+                    <tr key={camp.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{camp.name}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{t(`crm.${camp.type}`)}</Badge></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatEgp(camp.budget)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{camp.targetCount}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{camp.reachedCount}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{camp.conversionCount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{formatEgp(camp.budget)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{camp.targetCount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{camp.reachedCount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)]">{camp.conversionCount}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={camp.status === 'active' ? 'success' : camp.status === 'draft' ? 'warning' : 'gray'}>{camp.status}</Badge>
                       </td>
@@ -210,26 +213,26 @@ export default function CrmPage() {
         feedback.length === 0 ? (
           <EmptyState title={t('crm.noFeedback')} message={t('common.noData')} />
         ) : (
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[var(--surface-secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('crm.patient')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('crm.rating')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('crm.category')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('crm.comment')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('crm.date')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('crm.patient')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('crm.rating')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('crm.category')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('crm.comment')}</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('crm.date')}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-[var(--surface)]">
                   {feedback.map((fb) => (
-                    <tr key={fb.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{fb.patientName}</td>
+                    <tr key={fb.id} className="hover:bg-[var(--surface-secondary)] transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{fb.patientName}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-500">{renderStars(fb.rating)}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><Badge>{fb.category}</Badge></td>
-                      <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate">{fb.comment || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(fb.createdAt)}</td>
+                      <td className="px-6 py-4 text-sm text-[var(--text-primary)] max-w-xs truncate">{fb.comment || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-muted)]">{formatDateTime(fb.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>

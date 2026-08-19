@@ -12,20 +12,26 @@ import {
   expandGrantKey,
   normalizeLegacyPermission,
   PERMISSION_CATALOG,
+  SEED_ROLES,
+  expandRoleGrants,
 } from '@healthcare/shared/authz';
 
 function principal(grants: Principal['grants'], roles: string[] = []): Principal {
   return {
     kind: 'user',
     id: 'u1',
+    userId: 'u1',
+    membershipId: 'm1',
     tenantId: 't1',
+    branchId: 'b1',
     roles,
     grants,
     branches: ['b1'],
     departmentId: 'd1',
     locale: 'en',
-    permVersion: 0,
+    authzVersion: 0,
     status: 'active',
+    membershipStatus: 'active',
   };
 }
 
@@ -140,5 +146,79 @@ describe('shared permission catalog', () => {
     expect(PERMISSION_CATALOG.users).toEqual(expect.arrayContaining(['view', 'create', 'edit', 'delete', 'assign', 'manage']));
     expect(PERMISSION_CATALOG.roles).toEqual(expect.arrayContaining(['view', 'create', 'edit', 'delete', 'assign', 'manage']));
     expect(allPermissionKeys().length).toBeGreaterThan(200);
+  });
+});
+
+describe('Phase 5: 39 system role templates', () => {
+  it('has exactly 39 role templates', () => {
+    expect(Object.keys(SEED_ROLES).length).toBe(39);
+  });
+
+  it('every role has a valid level', () => {
+    const validLevels = ['system', 'tenant', 'branch', 'custom'];
+    for (const [slug, template] of Object.entries(SEED_ROLES)) {
+      expect(validLevels).toContain(template.level);
+    }
+  });
+
+  it('every role has a valid scopeDefault', () => {
+    const validScopes = ['self', 'assigned_patients', 'department', 'branch', 'branches', 'tenant', 'system'];
+    for (const [slug, template] of Object.entries(SEED_ROLES)) {
+      expect(validScopes).toContain(template.scopeDefault);
+    }
+  });
+
+  it('every role grant references valid permissions from the catalog', () => {
+    const allCatalogKeys = allPermissionKeys();
+    for (const [slug, template] of Object.entries(SEED_ROLES)) {
+      const grants = expandRoleGrants(template);
+      for (const grant of grants) {
+        // Wildcard '*' is always valid
+        if (grant.permission === '*') continue;
+        expect(allCatalogKeys).toContain(grant.permission);
+      }
+    }
+  });
+
+  it('every role expands to at least one grant (except guest)', () => {
+    for (const [slug, template] of Object.entries(SEED_ROLES)) {
+      const grants = expandRoleGrants(template);
+      if (slug === 'guest') {
+        // Guest has no grants by design
+        expect(grants.length).toBe(0);
+      } else {
+        expect(grants.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('roles include all expected categories', () => {
+    const slugs = Object.keys(SEED_ROLES);
+    // Platform
+    expect(slugs).toContain('super_admin');
+    // Tenant admin
+    expect(slugs).toContain('admin');
+    expect(slugs).toContain('it_administrator');
+    expect(slugs).toContain('compliance_officer');
+    // Clinical
+    expect(slugs).toContain('doctor');
+    expect(slugs).toContain('resident_doctor');
+    expect(slugs).toContain('nurse');
+    expect(slugs).toContain('nurse_manager');
+    // Front desk
+    expect(slugs).toContain('receptionist');
+    expect(slugs).toContain('appointment_coordinator');
+    // Financial
+    expect(slugs).toContain('billing_staff');
+    expect(slugs).toContain('accountant');
+    expect(slugs).toContain('insurance_officer');
+    // Operations
+    expect(slugs).toContain('inventory_manager');
+    expect(slugs).toContain('hr_manager');
+    // Portal
+    expect(slugs).toContain('patient');
+    expect(slugs).toContain('guardian_parent');
+    expect(slugs).toContain('vendor_supplier');
+    expect(slugs).toContain('guest');
   });
 });

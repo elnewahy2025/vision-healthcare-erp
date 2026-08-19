@@ -13,6 +13,7 @@ import { apiClient as api } from '../lib/api';
 import { sanitizeString, escapeHtml } from '../lib/sanitize';
 import { isValidEgyptianPhone } from '../lib/validators';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -167,12 +168,13 @@ export default function VoiceCallsPage() {
 
     setCallLoading(true);
     try {
-      const res = await api.post('/voice/call', {
+      await api.post('/voice/call', {
         toNumber: callForm.toNumber.trim(),
         notes: sanitizeString(callForm.notes) || undefined,
       });
-      const telLink = res.data?.data?.telLink;
-      if (telLink) window.location.href = telLink;
+      // Open tel: link directly to trigger device phone dialer
+      const cleanTo = callForm.toNumber.trim().replace(/[^0-9+]/g, '');
+      window.location.href = 'tel:' + cleanTo;
       toast.success(t('voice.callInitiated'));
       setCallForm({ toNumber: '', notes: '' });
       setTab('calls');
@@ -196,10 +198,7 @@ export default function VoiceCallsPage() {
     setCallLoading(true);
     try {
       await api.post('/voice/conference', {
-        participants: valid.map((p) => ({
-          phone: p.phone.trim(),
-          role: p.role,
-        })),
+        toNumbers: valid.map((p) => p.phone.trim()),
       });
       toast.success(t('voice.conferenceStarted'));
       setShowConference(false);
@@ -235,7 +234,7 @@ export default function VoiceCallsPage() {
       header: t('voice.duration'),
       render: (item) => (
         <span className="flex items-center gap-1">
-          <Clock className="w-3 h-3 text-gray-400" />
+          <Clock className="w-3 h-3 text-[var(--text-disabled)]" />
           {formatDuration(item.duration_seconds)}
         </span>
       ),
@@ -273,8 +272,8 @@ export default function VoiceCallsPage() {
             <PhoneCall className="w-6 h-6 text-purple-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('voice.title')}</h1>
-            <p className="text-sm text-gray-500">{t('voice.subtitle')}</p>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('voice.title')}</h1>
+            <p className="text-sm text-[var(--text-muted)]">{t('voice.subtitle')}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -282,15 +281,17 @@ export default function VoiceCallsPage() {
             <Video className="w-4 h-4 mr-1" />
             {t('voice.conferenceCall')}
           </Button>
+          <Can permission="communications.view">
           <Button onClick={() => setTab('make')}>
             <Phone className="w-4 h-4 mr-1" />
             {t('voice.makeCall')}
           </Button>
+        </Can>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-gray-200 pb-2">
+      <div className="flex gap-2 border-b border-[var(--border)] pb-2">
         {tabs.map((tabItem) => (
           <button
             key={tabItem.key}
@@ -298,7 +299,7 @@ export default function VoiceCallsPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === tabItem.key
                 ? 'bg-primary-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {tabItem.icon}
@@ -348,7 +349,7 @@ export default function VoiceCallsPage() {
                   >
                     {t('voice.prev')}
                   </Button>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-[var(--text-muted)]">
                     {t('voice.pageOf', { current: String(page), total: String(totalPages) } as Record<string, unknown>)}
                   </span>
                   <Button
@@ -367,7 +368,7 @@ export default function VoiceCallsPage() {
           {tab === 'make' && (
             <Card>
               <CardBody className="p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">{t('voice.makeCall')}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('voice.makeCall')}</h3>
                 <div className="space-y-4 max-w-lg">
                   <Input
                     label={t('voice.toNumber')}
@@ -396,20 +397,20 @@ export default function VoiceCallsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card>
                 <CardBody className="p-5 text-center">
-                  <p className="text-3xl font-bold text-gray-900">{stats?.total ?? 0}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t('voice.totalCalls')}</p>
+                  <p className="text-3xl font-bold text-[var(--text-primary)]">{stats?.total ?? 0}</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">{t('voice.totalCalls')}</p>
                 </CardBody>
               </Card>
               <Card>
                 <CardBody className="p-5 text-center">
                   <p className="text-3xl font-bold text-green-600">{stats?.today ?? 0}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t('voice.callsToday')}</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">{t('voice.callsToday')}</p>
                 </CardBody>
               </Card>
               <Card>
                 <CardBody className="p-5 text-center">
                   <p className="text-3xl font-bold text-blue-600">{stats?.totalMinutes ?? 0}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t('voice.totalMinutes')}</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">{t('voice.totalMinutes')}</p>
                 </CardBody>
               </Card>
             </div>
@@ -426,35 +427,35 @@ export default function VoiceCallsPage() {
         {selectedCall && (
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('voice.type')}</span>
+              <span className="text-[var(--text-muted)]">{t('voice.type')}</span>
               <span className="capitalize">{escapeHtml(selectedCall.call_type)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('voice.fromNumber')}</span>
+              <span className="text-[var(--text-muted)]">{t('voice.fromNumber')}</span>
               <span className="font-mono">{escapeHtml(selectedCall.from_number)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('voice.toNumberLabel')}</span>
+              <span className="text-[var(--text-muted)]">{t('voice.toNumberLabel')}</span>
               <span className="font-mono">{escapeHtml(selectedCall.to_number)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('voice.duration')}</span>
+              <span className="text-[var(--text-muted)]">{t('voice.duration')}</span>
               <span>{formatDuration(selectedCall.duration_seconds)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('voice.status')}</span>
+              <span className="text-[var(--text-muted)]">{t('voice.status')}</span>
               <Badge variant={STATUS_VARIANTS[selectedCall.status] ?? 'gray'}>
                 {selectedCall.status}
               </Badge>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('voice.date')}</span>
+              <span className="text-[var(--text-muted)]">{t('voice.date')}</span>
               <span>{escapeHtml(new Date(selectedCall.created_at).toLocaleString())}</span>
             </div>
             {selectedCall.notes && (
               <div>
-                <p className="text-gray-500 mb-1">{t('voice.notesLabel')}</p>
-                <p className="bg-gray-50 p-3 rounded-lg">{escapeHtml(selectedCall.notes)}</p>
+                <p className="text-[var(--text-muted)] mb-1">{t('voice.notesLabel')}</p>
+                <p className="bg-[var(--surface-secondary)] p-3 rounded-lg">{escapeHtml(selectedCall.notes)}</p>
               </div>
             )}
           </div>
@@ -483,7 +484,7 @@ export default function VoiceCallsPage() {
         }
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-500">{t('voice.minParticipants')}</p>
+          <p className="text-sm text-[var(--text-muted)]">{t('voice.minParticipants')}</p>
           {participants.map((p, idx) => (
             <div key={idx} className="grid grid-cols-2 gap-3">
               <Input

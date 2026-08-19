@@ -23,6 +23,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Status' },
@@ -182,27 +183,27 @@ export default function InsuranceClaimsPage() {
       {/* Summary Cards */}
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-          <div className="bg-white rounded-lg border p-3 text-center">
+          <div className="bg-[var(--surface)] rounded-lg border p-3 text-center">
             <p className="text-lg font-bold">{summary.total}</p>
-            <p className="text-xs text-gray-500">{t('insClaims.total')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('insClaims.total')}</p>
           </div>
-          <div className="bg-white rounded-lg border p-3 text-center">
+          <div className="bg-[var(--surface)] rounded-lg border p-3 text-center">
             <p className="text-lg font-bold text-yellow-600">{summary.draft}</p>
-            <p className="text-xs text-gray-500">{t('insClaims.draft')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('insClaims.draft')}</p>
           </div>
-          <div className="bg-white rounded-lg border p-3 text-center">
+          <div className="bg-[var(--surface)] rounded-lg border p-3 text-center">
             <p className="text-lg font-bold text-blue-600">{summary.submitted}</p>
-            <p className="text-xs text-gray-500">{t('insClaims.submitted')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('insClaims.submitted')}</p>
           </div>
-          <div className="bg-white rounded-lg border p-3 text-center">
+          <div className="bg-[var(--surface)] rounded-lg border p-3 text-center">
             <p className="text-lg font-bold text-green-600">{summary.approved}</p>
-            <p className="text-xs text-gray-500">{t('insClaims.approved')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('insClaims.approved')}</p>
           </div>
-          <div className="bg-white rounded-lg border p-3 text-center">
+          <div className="bg-[var(--surface)] rounded-lg border p-3 text-center">
             <p className="text-lg font-bold text-red-600">{summary.denied}</p>
-            <p className="text-xs text-gray-500">{t('insClaims.denied')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('insClaims.denied')}</p>
           </div>
-          <div className="bg-white rounded-lg border p-3 col-span-2 sm:col-span-3 lg:col-span-5">
+          <div className="bg-[var(--surface)] rounded-lg border p-3 col-span-2 sm:col-span-3 lg:col-span-5">
             <p className="text-sm">
               {t('insClaims.claimed')}: <strong>{Number(summary.totalClaimed).toLocaleString()} EGP</strong>
               {' | '}
@@ -230,18 +231,18 @@ export default function InsuranceClaimsPage() {
       </div>
 
       {/* Claims Table */}
-      <div className="bg-white rounded-lg border overflow-hidden dark:bg-gray-900 dark:border-gray-800">
+      <div className="bg-[var(--surface)] rounded-lg border overflow-hidden dark:bg-[var(--background)] dark:border-gray-800">
         <table className="w-full">
           <thead>
-            <tr className="border-b bg-gray-50">
-              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.claimNumber')}</th>
-              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.patient')}</th>
-              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.company')}</th>
-              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.invoice')}</th>
-              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.claimedAmount')}</th>
-              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.approvedAmount')}</th>
-              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.status')}</th>
-              <th className="text-left p-3 text-sm font-medium text-gray-600">{t('insClaims.actions')}</th>
+            <tr className="border-b bg-[var(--surface-secondary)]">
+              <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('insClaims.claimNumber')}</th>
+              <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('insClaims.patient')}</th>
+              <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('insClaims.company')}</th>
+              <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('insClaims.invoice')}</th>
+              <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('insClaims.claimedAmount')}</th>
+              <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('insClaims.approvedAmount')}</th>
+              <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('insClaims.status')}</th>
+              <th className="text-left p-3 text-sm font-medium text-[var(--text-secondary)]">{t('insClaims.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -257,7 +258,7 @@ export default function InsuranceClaimsPage() {
               </tr>
             ) : (
               claims.map((c) => (
-                <tr key={c.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                <tr key={c.id} className="border-b last:border-b-0 hover:bg-[var(--surface-secondary)]">
                   <td className="p-3 font-mono text-xs font-medium">{escapeHtml(c.claimNumber)}</td>
                   <td className="p-3 text-sm">
                     {c.patientName ? escapeHtml(c.patientName) : '-'}
@@ -265,7 +266,7 @@ export default function InsuranceClaimsPage() {
                       <br />
                     )}
                     {c.patientMrn && (
-                      <span className="text-xs text-gray-400">{escapeHtml(c.patientMrn)}</span>
+                      <span className="text-xs text-[var(--text-disabled)]">{escapeHtml(c.patientMrn)}</span>
                     )}
                   </td>
                   <td className="p-3 text-sm">{c.companyName ? escapeHtml(c.companyName) : '-'}</td>
@@ -307,7 +308,7 @@ export default function InsuranceClaimsPage() {
       {/* Pagination */}
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[var(--text-muted)]">
             Page {page} of {pagination.totalPages}
           </p>
           <div className="flex gap-2">
@@ -344,9 +345,11 @@ export default function InsuranceClaimsPage() {
             >
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleStatusChange} loading={submitting}>
+            <Can permission="insurance_claims.create">
+          <Button onClick={handleStatusChange} loading={submitting}>
               {t('common.save')}
             </Button>
+        </Can>
           </div>
         }
       >

@@ -155,22 +155,22 @@ export default function PublicPortalPage() {
 
   if (portalToken) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="min-h-screen bg-[var(--surface-secondary)]">
+        <header className="bg-[var(--surface)] border-b border-[var(--border)] sticky top-0 z-10">
           <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
                 <Stethoscope className="w-4 h-4 text-white" />
               </div>
-              <span className="font-semibold text-gray-900">{t('portal.title')}</span>
+              <span className="font-semibold text-[var(--text-primary)]">{t('portal.title')}</span>
             </div>
             {patient && (
               <div className="flex items-center gap-3">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-[var(--text-secondary)]">
                   <span className="font-medium">{patient.firstName} {patient.lastName}</span>
-                  <span className="text-gray-400 ml-2">MRN {patient.medicalRecordNumber}</span>
+                  <span className="text-[var(--text-disabled)] ml-2">MRN {patient.medicalRecordNumber}</span>
                 </div>
-                <button onClick={handleLogout} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800">
+                <button onClick={handleLogout} className="flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                   <LogOut className="w-4 h-4" /> {t('portal.logout')}
                 </button>
               </div>
@@ -191,7 +191,7 @@ export default function PublicPortalPage() {
                 key={key}
                 onClick={() => setDashTab(key)}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg whitespace-nowrap ${
-                  dashTab === key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                  dashTab === key ? 'bg-primary-600 text-white' : 'bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface-hover)]'
                 }`}
               >
                 <Icon className="w-4 h-4" /> {t(labelKey)}
@@ -203,34 +203,34 @@ export default function PublicPortalPage() {
           {!loading && dashTab === 'dashboard' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="card p-5">
-                <h3 className="font-semibold text-gray-800 mb-2">{t('portal.upcoming')} {t('portal.appointments')}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">{t('portal.upcoming')} {t('portal.appointments')}</h3>
                 {appointments.filter((a) => ['scheduled', 'confirmed'].includes(String(a.status))).slice(0, 5).map((a) => (
-                  <div key={String(a.id)} className="text-sm py-1.5 border-b border-gray-100 last:border-0">
-                    <div className="text-gray-800">{String(a.date)} · {String(a.time || '')}</div>
-                    <div className="text-gray-400 capitalize">{String(a.type || a.status)}</div>
+                  <div key={String(a.id)} className="text-sm py-1.5 border-b border-[var(--border)] last:border-0">
+                    <div className="text-[var(--text-primary)]">{String(a.date)} · {String(a.time || '')}</div>
+                    <div className="text-[var(--text-disabled)] capitalize">{String(a.type || a.status)}</div>
                   </div>
                 ))}
-                {appointments.length === 0 && <p className="text-sm text-gray-400">{t('portal.noAppointments')}</p>}
+                {appointments.length === 0 && <p className="text-sm text-[var(--text-disabled)]">{t('portal.noAppointments')}</p>}
               </div>
               <div className="card p-5">
-                <h3 className="font-semibold text-gray-800 mb-2">{t('portal.recentRecords')}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">{t('portal.recentRecords')}</h3>
                 {records.slice(0, 5).map((r) => (
-                  <div key={String(r.id)} className="text-sm py-1.5 border-b border-gray-100 last:border-0">
-                    <div className="text-gray-800 line-clamp-2">{String(r.diagnosis || r.symptoms || '—')}</div>
-                    <div className="text-gray-400">{String(r.encounterDate || r.createdAt || '')}</div>
+                  <div key={String(r.id)} className="text-sm py-1.5 border-b border-[var(--border)] last:border-0">
+                    <div className="text-[var(--text-primary)] line-clamp-2">{String(r.diagnosis || r.symptoms || '—')}</div>
+                    <div className="text-[var(--text-disabled)]">{String(r.encounterDate || r.createdAt || '')}</div>
                   </div>
                 ))}
-                {records.length === 0 && <p className="text-sm text-gray-400">{t('portal.noRecords')}</p>}
+                {records.length === 0 && <p className="text-sm text-[var(--text-disabled)]">{t('portal.noRecords')}</p>}
               </div>
               <div className="card p-5">
-                <h3 className="font-semibold text-gray-800 mb-2">{t('portal.pendingBills')}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">{t('portal.pendingBills')}</h3>
                 {bills.filter((b) => ['pending', 'partial'].includes(String(b.status))).slice(0, 5).map((b) => (
-                  <div key={String(b.id)} className="text-sm py-1.5 border-b border-gray-100 last:border-0 flex justify-between">
-                    <span className="text-gray-800">{String(b.invoiceNumber)}</span>
+                  <div key={String(b.id)} className="text-sm py-1.5 border-b border-[var(--border)] last:border-0 flex justify-between">
+                    <span className="text-[var(--text-primary)]">{String(b.invoiceNumber)}</span>
                     <span className="font-medium">{Number(b.dueAmount).toFixed(2)}</span>
                   </div>
                 ))}
-                {bills.length === 0 && <p className="text-sm text-gray-400">{t('portal.noBills')}</p>}
+                {bills.length === 0 && <p className="text-sm text-[var(--text-disabled)]">{t('portal.noBills')}</p>}
               </div>
             </div>
           )}
@@ -239,26 +239,26 @@ export default function PublicPortalPage() {
               {appointments.map((a) => (
                 <div key={String(a.id)} className="p-4 flex justify-between items-start">
                   <div>
-                    <div className="font-medium text-gray-800">{String(a.date)} {a.time ? `· ${String(a.time)}` : ''}</div>
-                    <div className="text-sm text-gray-500 capitalize">{String(a.type || '')} · {String(a.status || '')}</div>
-                    {a.reason ? <div className="text-sm text-gray-500 mt-1">{String(a.reason)}</div> : null}
+                    <div className="font-medium text-[var(--text-primary)]">{String(a.date)} {a.time ? `· ${String(a.time)}` : ''}</div>
+                    <div className="text-sm text-[var(--text-muted)] capitalize">{String(a.type || '')} · {String(a.status || '')}</div>
+                    {a.reason ? <div className="text-sm text-[var(--text-muted)] mt-1">{String(a.reason)}</div> : null}
                   </div>
                 </div>
               ))}
-              {appointments.length === 0 && <div className="p-6 text-center text-gray-400">{t('portal.noAppointments')}</div>}
+              {appointments.length === 0 && <div className="p-6 text-center text-[var(--text-disabled)]">{t('portal.noAppointments')}</div>}
             </div>
           )}
           {!loading && dashTab === 'records' && (
             <div className="card divide-y divide-gray-100">
               {records.map((r) => (
                 <div key={String(r.id)} className="p-4">
-                  <div className="font-medium text-gray-800">{String(r.diagnosis || t('portal.record'))}</div>
-                  <div className="text-sm text-gray-500 mt-1">{String(r.symptoms || '')}</div>
-                  {r.treatment ? <div className="text-sm text-gray-600 mt-2">Plan: {String(r.treatment)}</div> : null}
-                  <div className="text-xs text-gray-400 mt-2">{String(r.encounterDate || r.createdAt || '')}</div>
+                  <div className="font-medium text-[var(--text-primary)]">{String(r.diagnosis || t('portal.record'))}</div>
+                  <div className="text-sm text-[var(--text-muted)] mt-1">{String(r.symptoms || '')}</div>
+                  {r.treatment ? <div className="text-sm text-[var(--text-secondary)] mt-2">Plan: {String(r.treatment)}</div> : null}
+                  <div className="text-xs text-[var(--text-disabled)] mt-2">{String(r.encounterDate || r.createdAt || '')}</div>
                 </div>
               ))}
-              {records.length === 0 && <div className="p-6 text-center text-gray-400">{t('portal.noRecords')}</div>}
+              {records.length === 0 && <div className="p-6 text-center text-[var(--text-disabled)]">{t('portal.noRecords')}</div>}
             </div>
           )}
           {!loading && dashTab === 'bills' && (
@@ -266,8 +266,8 @@ export default function PublicPortalPage() {
               {bills.map((b) => (
                 <div key={String(b.id)} className="p-4 flex justify-between items-center">
                   <div>
-                    <div className="font-medium text-gray-800">{String(b.invoiceNumber)}</div>
-                    <div className="text-sm text-gray-500 capitalize">{String(b.status)} · {String(b.dueDate || '')}</div>
+                    <div className="font-medium text-[var(--text-primary)]">{String(b.invoiceNumber)}</div>
+                    <div className="text-sm text-[var(--text-muted)] capitalize">{String(b.status)} · {String(b.dueDate || '')}</div>
                   </div>
                   <div className="text-right">
                     <div className="font-semibold">{Number(b.total).toFixed(2)}</div>
@@ -275,7 +275,7 @@ export default function PublicPortalPage() {
                   </div>
                 </div>
               ))}
-              {bills.length === 0 && <div className="p-6 text-center text-gray-400">{t('portal.noBills')}</div>}
+              {bills.length === 0 && <div className="p-6 text-center text-[var(--text-disabled)]">{t('portal.noBills')}</div>}
             </div>
           )}
           {!loading && dashTab === 'messages' && (
@@ -283,13 +283,13 @@ export default function PublicPortalPage() {
               {messages.map((m) => (
                 <div key={String(m.id)} className="p-4">
                   <div className="flex justify-between">
-                    <div className="font-medium text-gray-800">{String(m.subject || '')}</div>
-                    <div className="text-xs text-gray-400">{String(m.createdAt || '')}</div>
+                    <div className="font-medium text-[var(--text-primary)]">{String(m.subject || '')}</div>
+                    <div className="text-xs text-[var(--text-disabled)]">{String(m.createdAt || '')}</div>
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">{String(m.body || '')}</div>
+                  <div className="text-sm text-[var(--text-secondary)] mt-1">{String(m.body || '')}</div>
                 </div>
               ))}
-              {messages.length === 0 && <div className="p-6 text-center text-gray-400">{t('portal.noMessages')}</div>}
+              {messages.length === 0 && <div className="p-6 text-center text-[var(--text-disabled)]">{t('portal.noMessages')}</div>}
             </div>
           )}
         </main>
@@ -298,21 +298,21 @@ export default function PublicPortalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[var(--surface-secondary)] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <div className="w-14 h-14 bg-primary-600 rounded-xl flex items-center justify-center mx-auto mb-3">
             <Stethoscope className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('portal.title')}</h1>
-          <p className="text-sm text-gray-500 mt-1">{t('portal.subtitle')}</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('portal.title')}</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">{t('portal.subtitle')}</p>
         </div>
 
         {submitted && mode === 'request' ? (
           <div className="card p-6 text-center">
             <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
-            <h2 className="text-lg font-semibold text-gray-900">{t('portal.requestSubmitted')}</h2>
-            <p className="text-sm text-gray-500 mt-2">{t('portal.requestSubmittedHint')}</p>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">{t('portal.requestSubmitted')}</h2>
+            <p className="text-sm text-[var(--text-muted)] mt-2">{t('portal.requestSubmittedHint')}</p>
             <button
               onClick={() => { setSubmitted(false); setMode('signin'); }}
               className="btn-secondary w-full mt-5"
@@ -324,9 +324,9 @@ export default function PublicPortalPage() {
           <form onSubmit={handleVerify} className="card p-6">
             <div className="flex items-center gap-2 mb-2">
               <Smartphone className="w-5 h-5 text-primary-600" />
-              <h2 className="font-semibold text-gray-900">{t('portal.enterOtp')}</h2>
+              <h2 className="font-semibold text-[var(--text-primary)]">{t('portal.enterOtp')}</h2>
             </div>
-            <p className="text-sm text-gray-500 mb-4">{t('portal.otpWhatsAppHint')}</p>
+            <p className="text-sm text-[var(--text-muted)] mb-4">{t('portal.otpWhatsAppHint')}</p>
             <label className="label">{t('portal.otpCode')}</label>
             <input
               className="input text-center text-2xl tracking-[0.5em] font-mono"
@@ -343,7 +343,7 @@ export default function PublicPortalPage() {
             <button
               type="button"
               onClick={() => { setMode('signin'); setOtp(''); setToken(''); }}
-              className="text-sm text-gray-400 hover:text-gray-600 mt-3 w-full text-center"
+              className="text-sm text-[var(--text-disabled)] hover:text-[var(--text-secondary)] mt-3 w-full text-center"
             >
               {t('portal.backToSignIn')}
             </button>
@@ -354,7 +354,7 @@ export default function PublicPortalPage() {
               <button
                 onClick={() => setMode('signin')}
                 className={`flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg ${
-                  mode === 'signin' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'
+                  mode === 'signin' ? 'bg-primary-600 text-white' : 'bg-[var(--surface-hover)] text-[var(--text-secondary)]'
                 }`}
               >
                 <LogIn className="w-4 h-4" /> {t('portal.tabSignIn')}
@@ -362,7 +362,7 @@ export default function PublicPortalPage() {
               <button
                 onClick={() => setMode('request')}
                 className={`flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg ${
-                  mode === 'request' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'
+                  mode === 'request' ? 'bg-primary-600 text-white' : 'bg-[var(--surface-hover)] text-[var(--text-secondary)]'
                 }`}
               >
                 <UserPlus className="w-4 h-4" /> {t('portal.tabRequestAccess')}
@@ -387,12 +387,12 @@ export default function PublicPortalPage() {
                   <select className="input" value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
                     {COUNTRY_CODES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                   </select>
-                  <p className="text-xs text-gray-400 mt-1">{t('portal.countryCodeHint')}</p>
+                  <p className="text-xs text-[var(--text-disabled)] mt-1">{t('portal.countryCodeHint')}</p>
                 </div>
                 <div>
                   <label className="label">{t('portal.phone')}</label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-disabled)]" />
                     <input
                       className="input pl-9"
                       value={phone}
@@ -401,7 +401,7 @@ export default function PublicPortalPage() {
                       inputMode="numeric"
                     />
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">{t('portal.phoneHint')}</p>
+                  <p className="text-xs text-[var(--text-disabled)] mt-1">{t('portal.phoneHint')}</p>
                 </div>
               </div>
 
@@ -427,7 +427,7 @@ export default function PublicPortalPage() {
                       inputMode="numeric"
                       placeholder="14 digits"
                     />
-                    <p className="text-xs text-gray-400 mt-1">{t('portal.nationalIdHint')}</p>
+                    <p className="text-xs text-[var(--text-disabled)] mt-1">{t('portal.nationalIdHint')}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>

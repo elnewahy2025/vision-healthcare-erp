@@ -16,6 +16,7 @@ import { authenticate } from '../auth-guard.js';
 import { authorize } from '../../services/authorization.js';
 import { loadUserPrincipal, uniquePermissionKeys, hasPermission } from '../../services/authorization.js';
 import { logAudit } from '../../services/audit.js';
+import { invalidateUserAuthz, invalidateBulkUserAuthz } from '../../services/authz-cache.js';
 import { revokeAllUserTokens } from '../../services/refresh-token.js';
 
 export async function registerRbacModule(app: FastifyInstance) {
@@ -153,6 +154,11 @@ export async function registerRbacModule(app: FastifyInstance) {
       if (body.roles) updateData.roles = JSON.stringify(body.roles);
       if (body.permissions) updateData.permissions = JSON.stringify(body.permissions);
       await trx('users').where({ id: userId, tenant_id: tenantId }).update(updateData);
+
+      // Also bump authz_version on all memberships for this user
+      await trx('memberships')
+        .where({ user_id: userId, tenant_id: tenantId })
+        .increment('authz_version', 1);
     });
 
     await logAudit({
@@ -169,6 +175,7 @@ export async function registerRbacModule(app: FastifyInstance) {
     // Permission changes take effect immediately (principal is loaded per
     // request); revoke the target's sessions/tokens for defense in depth.
     await revokeAllUserTokens(userId, tenantId);
+    await invalidateUserAuthz(String(userId));
     await db('user_sessions').where({ user_id: userId, tenant_id: tenantId, is_active: true }).update({ is_active: false });
     return sendSuccess(reply, { userId, ...body }, 'Permissions updated');
   });
@@ -279,6 +286,10 @@ export async function registerRbacModule(app: FastifyInstance) {
       const userIds = await trx('user_roles').where({ role_id: roleId, tenant_id: tenantId }).select('user_id');
       for (const row of userIds) {
         await trx('users').where({ id: row.user_id, tenant_id: tenantId }).update({ perm_version: trx.raw('perm_version + 1') });
+        // Also bump authz_version on memberships
+        await trx('memberships')
+          .where({ user_id: row.user_id, tenant_id: tenantId })
+          .increment('authz_version', 1);
       }
       return userIds;
     });
@@ -297,6 +308,8 @@ export async function registerRbacModule(app: FastifyInstance) {
       await revokeAllUserTokens(String(row.user_id), tenantId);
       await db('user_sessions').where({ user_id: row.user_id, tenant_id: tenantId, is_active: true }).update({ is_active: false });
     }
+    // Invalidate cached principals for all affected users
+    await invalidateBulkUserAuthz(affected.map((r: { user_id: string }) => String(r.user_id)));
     return sendSuccess(reply, { roleId }, 'Role updated');
   });
 
@@ -309,11 +322,19 @@ export async function registerRbacModule(app: FastifyInstance) {
     if (!role) return sendError(reply, 'Role not found', 404);
     if (role.is_system) throw new ForbiddenError('System roles cannot be deleted');
 
+    // Collect affected users before deleting
+    const affectedUserIds = await db('user_roles').where({ role_id: roleId, tenant_id: tenantId }).select('user_id');
+
     await db.transaction(async (trx) => {
       await trx('role_permissions').where({ role_id: roleId }).delete();
       await trx('user_roles').where({ role_id: roleId, tenant_id: tenantId }).delete();
       await trx('roles').where({ id: roleId, tenant_id: tenantId }).delete();
     });
+
+    // Invalidate cached principals for affected users
+    if (affectedUserIds.length > 0) {
+      await invalidateBulkUserAuthz(affectedUserIds.map((r: { user_id: string }) => String(r.user_id)));
+    }
 
     await logAudit({
       tenantId,

@@ -3,7 +3,7 @@ import { db } from '../../core/database.js';
 import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { authenticate } from '../auth-guard.js';
-import { authorize } from '../../services/authorization.js';
+import { authorize, hasPermission, type Principal } from '../../services/authorization.js';
 import { logAudit } from '../../services/audit.js';
 
 interface InsuranceCompanyRow {
@@ -16,14 +16,35 @@ interface InsuranceCompanyRow {
   coverage_plans: unknown;
 }
 
+/**
+ * Scope resolution for insurance module.
+ * Insurance companies are tenant-wide; claims could be branch-scoped.
+ */
+function resolveInsuranceScope(principal: Principal): { denied: boolean } {
+  if (hasPermission(principal, 'insurance.view', 'system') || hasPermission(principal, 'insurance.view', 'tenant')) {
+    return { denied: false };
+  }
+  if (hasPermission(principal, 'insurance.view', 'branch') || hasPermission(principal, 'insurance.view', 'branches')) {
+    return { denied: false };
+  }
+  if (hasPermission(principal, 'insurance.view', 'department') || hasPermission(principal, 'insurance.view', 'assigned_patients')) {
+    return { denied: false };
+  }
+  return { denied: true };
+}
+
 export async function registerInsuranceModule(app: FastifyInstance) {
   app.get('/api/v1/insurance/companies', { preHandler: [authenticate, authorize('insurance.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
+    const scope = resolveInsuranceScope(principal);
+    if (scope.denied) return sendSuccess(reply, []);
+
     const companies = await db('insurance_companies').where({ tenant_id: tenantId, is_active: true }).orderBy('name');
     return sendSuccess(reply, companies.map((c: InsuranceCompanyRow) => ({ id: c.id, name: c.name, code: c.code, contractType: c.contract_type, discountRate: Number(c.discount_rate), coveragePlans: c.coverage_plans })));
   });
 
-  app.post('/api/v1/insurance/companies', { preHandler: [authenticate, authorize('insurance.view')] }, async (request, reply) => {
+  app.post('/api/v1/insurance/companies', { preHandler: [authenticate, authorize('insurance.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
@@ -36,14 +57,18 @@ export async function registerInsuranceModule(app: FastifyInstance) {
 
   app.get('/api/v1/insurance/claims', { preHandler: [authenticate, authorize('insurance.view')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
     const { status } = request.query as { status?: string };
+    const scope = resolveInsuranceScope(principal);
+
     let q = db('insurance_claims').where('insurance_claims.tenant_id', tenantId).whereNull('insurance_claims.deleted_at');
+    if (scope.denied) q = q.where(db.raw('false'));
     if (status) q = q.andWhere('insurance_claims.status', status);
     const claims = await q.orderBy('created_at', 'desc').limit(50);
     return sendSuccess(reply, claims);
   });
 
-  app.post('/api/v1/insurance/claims', { preHandler: [authenticate, authorize('insurance.view')] }, async (request, reply) => {
+  app.post('/api/v1/insurance/claims', { preHandler: [authenticate, authorize('insurance.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const body = request.body as Record<string, unknown>;
@@ -55,7 +80,7 @@ export async function registerInsuranceModule(app: FastifyInstance) {
     return sendSuccess(reply, claim, 'Claim submitted', 201);
   });
 
-  app.put('/api/v1/insurance/claims/:id', { preHandler: [authenticate, authorize('insurance.view')] }, async (request, reply) => {
+  app.put('/api/v1/insurance/claims/:id', { preHandler: [authenticate, authorize('insurance.edit')] }, async (request, reply) => {
     const tenantId = getTenantId(request);
     const ctx = getCtx(request);
     const { id } = request.params as { id: string };

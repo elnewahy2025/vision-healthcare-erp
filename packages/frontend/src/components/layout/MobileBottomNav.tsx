@@ -20,7 +20,7 @@ export default function MobileBottomNav({ onMenuClick }: MobileBottomNavProps) {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 lg:hidden safe-area-bottom dark:bg-gray-900 dark:border-gray-800" role="navigation" aria-label="Mobile navigation">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--surface)] border-t border-[var(--border)] lg:hidden safe-area-bottom dark:bg-[var(--background)] dark:border-gray-800" role="navigation" aria-label="Mobile navigation">
       <div className="flex items-center justify-around h-16">
         {mobileNavItems.map((item) => {
           const isActive = location.pathname === item.path ||
@@ -35,7 +35,7 @@ export default function MobileBottomNav({ onMenuClick }: MobileBottomNavProps) {
                 'flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-0 rounded-lg transition-colors',
                 isActive
                   ? 'text-primary-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               )}
               aria-label={item.label}
               aria-current={isActive ? 'page' : undefined}
@@ -47,7 +47,7 @@ export default function MobileBottomNav({ onMenuClick }: MobileBottomNavProps) {
         })}
         <button
           onClick={onMenuClick}
-          className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-0 rounded-lg text-gray-500 hover:text-gray-700"
+          className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-0 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
           aria-label="Open navigation menu"
         >
           <Menu className="w-5 h-5" />

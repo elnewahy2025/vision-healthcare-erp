@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ListOrdered, Bell, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { Spinner } from '../components/ui';
 import { sanitizeString } from '../lib/sanitize';
+import { Can } from '../components/Can';
 
 interface QueueEntry {
   id: string;
@@ -167,14 +168,14 @@ export default function QueueDisplayPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <Spinner size="lg" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8 flex flex-col">
+    <div className="min-h-screen bg-[var(--background)] text-white p-8 flex flex-col">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <ListOrdered className="w-10 h-10 text-blue-500" />
@@ -261,7 +262,7 @@ export default function QueueDisplayPage() {
                   >
                     <span
                       className={`text-3xl font-black ${
-                        i === 0 ? 'text-blue-600' : 'text-gray-400'
+                        i === 0 ? 'text-blue-600' : 'text-[var(--text-disabled)]'
                       }`}
                     >
                       #{entry.queue_number}

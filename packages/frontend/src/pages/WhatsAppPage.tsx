@@ -11,6 +11,7 @@ import { apiClient as api } from '../lib/api';
 import { sanitizeString, escapeHtml } from '../lib/sanitize';
 import { isValidEgyptianPhone } from '../lib/validators';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -182,9 +183,18 @@ export default function WhatsAppPage() {
       } else {
         payload.message = sanitizeString(sendForm.message);
       }
-      const res = await api.post('/whatsapp/send', payload);
-      const waLink = res.data?.data?.waLink;
-      if (waLink) window.open(waLink, '_blank');
+      await api.post('/whatsapp/send', payload);
+      // Build wa.me link client-side and open via hidden link to avoid popup blocker
+      const cleanTo = sendForm.to.trim().replace(/[^0-9]/g, '');
+      const e164 = cleanTo.startsWith('0') ? '20' + cleanTo : cleanTo;
+      const waLink = 'https://wa.me/' + e164 + '?text=' + encodeURIComponent(sanitizeString(sendForm.message));
+      const a = document.createElement('a');
+      a.href = waLink;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       toast.success(t('whatsapp.messageSent'));
       setShowSendModal(false);
       setSendForm({ to: '', message: '', templateName: '', templateParams: '', messageType: 'text' });
@@ -213,7 +223,7 @@ export default function WhatsAppPage() {
       key: 'message',
       header: t('whatsapp.message'),
       render: (item) => (
-        <span className="truncate max-w-[200px] block text-sm text-gray-600">
+        <span className="truncate max-w-[200px] block text-sm text-[var(--text-secondary)]">
           {escapeHtml(item.message || item.template_name || '-')}
         </span>
       ),
@@ -252,18 +262,20 @@ export default function WhatsAppPage() {
             <MessageCircle className="w-6 h-6 text-green-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('whatsapp.title')}</h1>
-            <p className="text-sm text-gray-500">{t('whatsapp.subtitle')}</p>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('whatsapp.title')}</h1>
+            <p className="text-sm text-[var(--text-muted)]">{t('whatsapp.subtitle')}</p>
           </div>
         </div>
-        <Button onClick={() => setShowSendModal(true)}>
+        <Can permission="communications.view">
+          <Button onClick={() => setShowSendModal(true)}>
           <Send className="w-4 h-4 mr-1" />
           {t('whatsapp.newMessage')}
         </Button>
+        </Can>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-gray-200 pb-2">
+      <div className="flex gap-2 border-b border-[var(--border)] pb-2">
         {tabs.map((tabItem) => (
           <button
             key={tabItem.key}
@@ -271,7 +283,7 @@ export default function WhatsAppPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === tabItem.key
                 ? 'bg-primary-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {tabItem.icon}
@@ -322,7 +334,7 @@ export default function WhatsAppPage() {
                   >
                     {t('whatsapp.prev')}
                   </Button>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-[var(--text-muted)]">
                     {t('whatsapp.pageOf', { current: String(page), total: String(totalPages) } as Record<string, unknown>)}
                   </span>
                   <Button
@@ -341,7 +353,7 @@ export default function WhatsAppPage() {
           {tab === 'send' && (
             <Card>
               <CardBody className="p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">{t('whatsapp.sendMessage')}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('whatsapp.sendMessage')}</h3>
                 <div className="space-y-4 max-w-lg">
                   <Input
                     label={t('whatsapp.to')}
@@ -361,11 +373,11 @@ export default function WhatsAppPage() {
                   />
                   {sendForm.messageType === 'text' ? (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                         {t('whatsapp.message')}
                       </label>
                       <textarea
-                        className="w-full rounded-lg border border-gray-300 p-3 h-32 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full rounded-lg border border-[var(--border-strong)] p-3 h-32 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                         placeholder={t('whatsapp.messagePlaceholder')}
                         value={sendForm.message}
                         onChange={(e) => setSendForm((p) => ({ ...p, message: e.target.value }))}
@@ -402,21 +414,21 @@ export default function WhatsAppPage() {
           {tab === 'templates' && (
             <Card>
               <CardBody className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-4">{t('whatsapp.templatesTab')}</h3>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('whatsapp.templatesTab')}</h3>
                 {templates.length === 0 ? (
                   <EmptyState
-                    icon={<MessageCircle className="w-8 h-8 text-gray-400" />}
+                    icon={<MessageCircle className="w-8 h-8 text-[var(--text-disabled)]" />}
                     title={t('whatsapp.noTemplates')}
                     message={t('whatsapp.createTemplates')}
                   />
                 ) : (
                   <div className="space-y-3">
                     {templates.map((tmpl) => (
-                      <div key={tmpl.id} className="p-4 border border-gray-200 rounded-lg">
+                      <div key={tmpl.id} className="p-4 border border-[var(--border)] rounded-lg">
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="font-medium">{escapeHtml(tmpl.name)}</p>
-                            <p className="text-sm text-gray-500">{escapeHtml(tmpl.body_text)}</p>
+                            <p className="text-sm text-[var(--text-muted)]">{escapeHtml(tmpl.body_text)}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <Badge>{tmpl.category}</Badge>
@@ -439,21 +451,21 @@ export default function WhatsAppPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card>
                 <CardBody className="p-5 text-center">
-                  <p className="text-3xl font-bold text-gray-900">{stats?.total ?? 0}</p>
-                  <p className="text-sm text-gray-500 mt-1">Total Messages</p>
+                  <p className="text-3xl font-bold text-[var(--text-primary)]">{stats?.total ?? 0}</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Total Messages</p>
                 </CardBody>
               </Card>
               <Card>
                 <CardBody className="p-5 text-center">
                   <p className="text-3xl font-bold text-green-600">{stats?.today ?? 0}</p>
-                  <p className="text-sm text-gray-500 mt-1">Today</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Today</p>
                 </CardBody>
               </Card>
               {stats?.byStatus?.map((s) => (
                 <Card key={s.status}>
                   <CardBody className="p-5 text-center">
                     <Badge variant={STATUS_VARIANTS[s.status] ?? 'gray'}>{s.status}</Badge>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">{s.count}</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)] mt-2">{s.count}</p>
                   </CardBody>
                 </Card>
               ))}
@@ -498,11 +510,11 @@ export default function WhatsAppPage() {
           />
           {sendForm.messageType === 'text' ? (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
                 {t('whatsapp.message')}
               </label>
               <textarea
-                className="w-full rounded-lg border border-gray-300 p-3 h-32 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full rounded-lg border border-[var(--border-strong)] p-3 h-32 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 placeholder={t('whatsapp.messagePlaceholder')}
                 value={sendForm.message}
                 onChange={(e) => setSendForm((p) => ({ ...p, message: e.target.value }))}
@@ -538,31 +550,31 @@ export default function WhatsAppPage() {
         {selectedMessage && (
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('whatsapp.direction')}</span>
+              <span className="text-[var(--text-muted)]">{t('whatsapp.direction')}</span>
               <span>{escapeHtml(selectedMessage.direction)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('whatsapp.toLabel')}</span>
+              <span className="text-[var(--text-muted)]">{t('whatsapp.toLabel')}</span>
               <span className="font-mono">{escapeHtml(selectedMessage.to_number)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('whatsapp.type')}</span>
+              <span className="text-[var(--text-muted)]">{t('whatsapp.type')}</span>
               <Badge>{selectedMessage.message_type}</Badge>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('whatsapp.status')}</span>
+              <span className="text-[var(--text-muted)]">{t('whatsapp.status')}</span>
               <Badge variant={STATUS_VARIANTS[selectedMessage.status] ?? 'gray'}>
                 {selectedMessage.status}
               </Badge>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">{t('whatsapp.date')}</span>
+              <span className="text-[var(--text-muted)]">{t('whatsapp.date')}</span>
               <span>{escapeHtml(new Date(selectedMessage.created_at).toLocaleString())}</span>
             </div>
             {selectedMessage.message && (
               <div>
-                <p className="text-gray-500 mb-1">{t('whatsapp.message')}</p>
-                <p className="bg-gray-50 p-3 rounded-lg">{escapeHtml(selectedMessage.message)}</p>
+                <p className="text-[var(--text-muted)] mb-1">{t('whatsapp.message')}</p>
+                <p className="bg-[var(--surface-secondary)] p-3 rounded-lg">{escapeHtml(selectedMessage.message)}</p>
               </div>
             )}
           </div>

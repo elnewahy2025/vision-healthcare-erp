@@ -18,7 +18,7 @@ export function ImageViewer({ src, title, mimeType, onClose }: ImageViewerProps)
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-3 bg-black/50" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-3 min-w-0">
-          <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg">
+          <button onClick={onClose} className="p-1.5 hover:bg-[var(--surface)]/10 rounded-lg">
             <X className="w-5 h-5 text-white" />
           </button>
           <h3 className="text-sm font-medium text-white truncate">{title}</h3>
@@ -26,19 +26,19 @@ export function ImageViewer({ src, title, mimeType, onClose }: ImageViewerProps)
         <div className="flex items-center gap-2">
           {isImage && (
             <>
-              <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-1.5 hover:bg-white/10 rounded-lg">
+              <button onClick={() => setZoom(z => Math.max(0.25, z - 0.25))} className="p-1.5 hover:bg-[var(--surface)]/10 rounded-lg">
                 <ZoomOut className="w-4 h-4 text-white" />
               </button>
               <span className="text-xs text-white/70 min-w-[40px] text-center">{Math.round(zoom * 100)}%</span>
-              <button onClick={() => setZoom(z => Math.min(4, z + 0.25))} className="p-1.5 hover:bg-white/10 rounded-lg">
+              <button onClick={() => setZoom(z => Math.min(4, z + 0.25))} className="p-1.5 hover:bg-[var(--surface)]/10 rounded-lg">
                 <ZoomIn className="w-4 h-4 text-white" />
               </button>
-              <button onClick={() => setRotation(r => r + 90)} className="p-1.5 hover:bg-white/10 rounded-lg">
+              <button onClick={() => setRotation(r => r + 90)} className="p-1.5 hover:bg-[var(--surface)]/10 rounded-lg">
                 <RotateCw className="w-4 h-4 text-white" />
               </button>
             </>
           )}
-          <a href={src} download className="p-1.5 hover:bg-white/10 rounded-lg">
+          <a href={src} download className="p-1.5 hover:bg-[var(--surface)]/10 rounded-lg">
             <Download className="w-4 h-4 text-white" />
           </a>
         </div>

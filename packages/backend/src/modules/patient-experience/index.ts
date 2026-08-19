@@ -1,11 +1,11 @@
 import crypto from "crypto";
-import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
+import type { FastifyInstance } from "fastify";
 import { z } from 'zod';
 import { db } from '../../core/database.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated, sendError } from '../../utils/response.js';
 import { authenticate } from '../auth-guard.js';
-import { authorize } from '../../services/authorization.js';
+import { authorize, hasPermission, type Principal } from '../../services/authorization.js';
 import { logAudit } from '../../services/audit.js';
 
 let queueWsClients = new Set<{ send(data: string): void; on(event: string, handler: (...args: unknown[]) => void): void }>();
@@ -15,6 +15,15 @@ function broadcastQueueUpdate(data: Record<string, unknown>): void {
   for (const client of queueWsClients) {
     try { (client as { send(data: string): void }).send(msg); } catch { queueWsClients.delete(client); }
   }
+}
+
+/**
+ * Scope resolution for kiosk/surveys.
+ */
+function resolveExperienceScope(principal: Principal): { denied: boolean; branchIds?: string[] } {
+  if (hasPermission(principal, 'queue.view', 'system') || hasPermission(principal, 'queue.view', 'tenant')) return { denied: false };
+  if (hasPermission(principal, 'queue.view', 'branch') || hasPermission(principal, 'queue.view', 'branches')) return { denied: false, branchIds: principal.branches };
+  return { denied: true };
 }
 
 export async function registerPatientExperienceModule(app: FastifyInstance) {
@@ -59,11 +68,15 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
   });
 
   app.get('/api/v1/kiosk/checkins', { preHandler: [authenticate, authorize('queue.view')] }, async (request, reply) => {
-    const { tenantId } = getCtx(request);
+    const { tenantId, principal } = getCtx(request);
+    const expScope = resolveExperienceScope(principal);
     const query = z.object({ status: z.string().optional(), date: z.string().optional() }).parse(request.query);
     const today = query.date || new Date().toISOString().split('T')[0];
     let qb = db('kiosk_checkins').join('patients', 'kiosk_checkins.patient_id', 'patients.id')
       .where('kiosk_checkins.tenant_id', tenantId).whereRaw("DATE(kiosk_checkins.created_at) = ?", [today]);
+    if (expScope.denied) { qb = qb.where(db.raw('false')); }
+    else if (expScope.branchIds !== undefined && expScope.branchIds.length > 0) { qb = qb.whereIn('patients.branch_id', expScope.branchIds); }
+    else if (expScope.branchIds !== undefined && expScope.branchIds.length === 0) { qb = qb.where(db.raw('false')); }
     if (query.status) qb = qb.andWhere('kiosk_checkins.status', query.status);
     const data = await qb.select('kiosk_checkins.*', 'patients.first_name', 'patients.last_name')
       .orderBy('kiosk_checkins.queue_number', 'asc');
@@ -162,9 +175,13 @@ export async function registerPatientExperienceModule(app: FastifyInstance) {
   });
 
   app.get('/api/v1/surveys/responses', { preHandler: [authenticate, authorize('crm.view')] }, async (request, reply) => {
-    const { tenantId } = getCtx(request);
+    const { tenantId, principal } = getCtx(request);
+    const scope = resolveExperienceScope(principal);
     const query = z.object({ page: z.coerce.number().optional().default(1), limit: z.coerce.number().optional().default(20), surveyId: z.string().optional() }).parse(request.query);
     let qb = db('survey_responses').join('surveys', 'survey_responses.survey_id', 'surveys.id').leftJoin('patients', 'survey_responses.patient_id', 'patients.id').where('survey_responses.tenant_id', tenantId);
+    if (scope.denied) { qb = qb.where(db.raw('false')); }
+    else if (scope.branchIds !== undefined && scope.branchIds.length > 0) { qb = qb.whereIn('patients.branch_id', scope.branchIds); }
+    else if (scope.branchIds !== undefined && scope.branchIds.length === 0) { qb = qb.where(db.raw('false')); }
     if (query.surveyId) qb = qb.andWhere('survey_responses.survey_id', query.surveyId);
     const total = await qb.clone().count('survey_responses.id as count').first();
     const data = await qb.clone().select('survey_responses.*', 'surveys.name as survey_name', 'surveys.type as survey_type', 'patients.first_name', 'patients.last_name')

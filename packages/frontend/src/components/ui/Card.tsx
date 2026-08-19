@@ -16,7 +16,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ padding = 'md', className, children, ...props }, ref) => (
     <div
       ref={ref}
-      className={clsx('bg-white rounded-xl border border-gray-200 shadow-sm dark:bg-gray-900 dark:border-gray-800', paddingStyles[padding], className)}
+      className={clsx('bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-sm dark:bg-[var(--background)] dark:border-gray-800', paddingStyles[padding], className)}
       {...props}
     >
       {children}
@@ -26,8 +26,8 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
 Card.displayName = 'Card';
 
 export const CardHeader = ({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) => (
-  <div className={clsx('px-6 py-4 border-b border-gray-200 dark:border-gray-800', className)} {...props}>
-    {typeof children === 'string' ? <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{children}</h2> : children}
+  <div className={clsx('px-6 py-4 border-b border-[var(--border)] dark:border-gray-800', className)} {...props}>
+    {typeof children === 'string' ? <h2 className="text-lg font-semibold text-[var(--text-primary)] dark:text-gray-100">{children}</h2> : children}
   </div>
 );
 

@@ -5,6 +5,7 @@ import { formatDate } from '../lib/format';
 import { Modal, Input, Select, PatientSearchField } from '../components/ui';
 import { Plus, FileText, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Can } from '../components/Can';
 
 interface VitalsData {
   bloodPressureSystolic: number;
@@ -168,7 +169,7 @@ export default function EmrPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">{t('emr.title')}</h1>
-          <p className="text-gray-500 mt-1">{pagination.total} records</p>
+          <p className="text-[var(--text-muted)] mt-1">{pagination.total} records</p>
         </div>
         <button onClick={() => setShowNewModal(true)} className="btn-primary">
           <Plus className="w-4 h-4" />{t('emr.new')}
@@ -185,10 +186,10 @@ export default function EmrPage() {
           </thead>
           <tbody>
             {records.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-12 text-gray-500">{t('common.noData')}</td></tr>
+              <tr><td colSpan={7} className="text-center py-12 text-[var(--text-muted)]">{t('common.noData')}</td></tr>
             ) : records.map(r => (
-              <tr key={r.id} className="hover:bg-gray-50">
-                <td><p className="font-medium">{r.patientName}</p><p className="text-xs text-gray-500 font-mono">{r.patientMrn}</p></td>
+              <tr key={r.id} className="hover:bg-[var(--surface-secondary)]">
+                <td><p className="font-medium">{r.patientName}</p><p className="text-xs text-[var(--text-muted)] font-mono">{r.patientMrn}</p></td>
                 <td>{formatDate(r.encounterDate) || '-'}</td>
                 <td><span className="badge-info">{r.encounterType}</span></td>
                 <td className="max-w-xs truncate">{r.chiefComplaint || '-'}</td>
@@ -196,9 +197,11 @@ export default function EmrPage() {
                 <td><span className={statusBadge(r.status)}>{r.status}</span></td>
                 <td>
                   {r.status !== 'signed' && (
-                    <button onClick={() => handleSign(r.id)} className="btn-ghost btn-sm text-green-600">
-                      <FileText className="w-3.5 h-3.5" />Sign
-                    </button>
+                    <Can permission="emr.sign">
+                      <button onClick={() => handleSign(r.id)} className="btn-ghost btn-sm text-green-600">
+                        <FileText className="w-3.5 h-3.5" />Sign
+                      </button>
+                    </Can>
                   )}
                 </td>
               </tr>
@@ -210,7 +213,7 @@ export default function EmrPage() {
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary btn-sm">←</button>
-          <span className="text-sm text-gray-600">Page {page} / {pagination.totalPages}</span>
+          <span className="text-sm text-[var(--text-secondary)]">Page {page} / {pagination.totalPages}</span>
           <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page === pagination.totalPages} className="btn-secondary btn-sm">→</button>
         </div>
       )}
@@ -241,12 +244,12 @@ export default function EmrPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">{t('emr.chiefComplaint')}</label>
+              <label className="block text-sm font-medium text-[var(--text-primary)]">{t('emr.chiefComplaint')}</label>
               <textarea className="input" rows={2} value={newEmr.chiefComplaint}
                 onChange={e => setNewEmr(prev => ({ ...prev, chiefComplaint: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">{t('emr.subjective')}</label>
+              <label className="block text-sm font-medium text-[var(--text-primary)]">{t('emr.subjective')}</label>
               <textarea className="input" rows={2} value={newEmr.subjective}
                 onChange={e => setNewEmr(prev => ({ ...prev, subjective: e.target.value }))} />
             </div>
@@ -254,19 +257,19 @@ export default function EmrPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">{t('emr.objective')}</label>
+              <label className="block text-sm font-medium text-[var(--text-primary)]">{t('emr.objective')}</label>
               <textarea className="input" rows={3} value={newEmr.objective}
                 onChange={e => setNewEmr(prev => ({ ...prev, objective: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">{t('emr.assessment')}</label>
+              <label className="block text-sm font-medium text-[var(--text-primary)]">{t('emr.assessment')}</label>
               <textarea className="input" rows={3} value={newEmr.assessment}
                 onChange={e => setNewEmr(prev => ({ ...prev, assessment: e.target.value }))} />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('emr.plan')}</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('emr.plan')}</label>
             <textarea className="input" rows={3} value={newEmr.plan}
               onChange={e => setNewEmr(prev => ({ ...prev, plan: e.target.value }))} />
           </div>
@@ -274,12 +277,12 @@ export default function EmrPage() {
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={newEmr.addVitals}
               onChange={e => setNewEmr(prev => ({ ...prev, addVitals: e.target.checked }))}
-              className="rounded border-gray-300 text-primary-600" />
+              className="rounded border-[var(--border-strong)] text-primary-600" />
             <span className="text-sm font-medium">{t('emr.addVitals')}</span>
           </label>
 
           {newEmr.addVitals && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-[var(--surface-secondary)] rounded-lg">
               {VITALS_FIELDS.map(field => (
                 <Input
                   key={field.key}
@@ -295,7 +298,7 @@ export default function EmrPage() {
           )}
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">{t('emr.notes')}</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)]">{t('emr.notes')}</label>
             <textarea className="input" rows={2} value={newEmr.notes}
               onChange={e => setNewEmr(prev => ({ ...prev, notes: e.target.value }))} />
           </div>

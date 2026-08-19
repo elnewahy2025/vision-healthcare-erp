@@ -18,6 +18,7 @@ vi.mock('../lib/api', () => ({
 }));
 
 vi.mock('react-i18next', () => ({
+  initReactI18next: { type: 'plugin', init: vi.fn() },
   useTranslation: () => ({
     t: (key: string) => {
       const translations: Record<string, string> = {

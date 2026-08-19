@@ -13,6 +13,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { sanitizeString, escapeHtml } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -296,7 +297,7 @@ export default function PharmacyAdvancedPage() {
       render: (item) => (
         <div>
           <p className="font-medium">{escapeHtml(item.drugName)}</p>
-          <p className="text-xs text-gray-500">{escapeHtml(item.dosageForm)} {escapeHtml(item.strength)}</p>
+          <p className="text-xs text-[var(--text-muted)]">{escapeHtml(item.dosageForm)} {escapeHtml(item.strength)}</p>
         </div>
       ),
     },
@@ -360,22 +361,24 @@ export default function PharmacyAdvancedPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
             <PillBottle className="w-6 h-6 text-primary-600" />
             {t('pharmAdv.title')}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">{t('pharmAdv.subtitle')}</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">{t('pharmAdv.subtitle')}</p>
         </div>
         {tab === 'inventory' && (
+          <Can permission="pharmacy.create">
           <Button onClick={() => setShowAddModal(true)}>
             <Plus className="w-4 h-4 mr-1" />
             {t('pharmAdv.addDrug')}
           </Button>
+        </Can>
         )}
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-2">
+      <div className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-2">
         {tabs.map((tabItem) => (
           <button
             key={tabItem.key}
@@ -383,7 +386,7 @@ export default function PharmacyAdvancedPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === tabItem.key
                 ? 'bg-primary-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {tabItem.icon}
@@ -407,13 +410,13 @@ export default function PharmacyAdvancedPage() {
                 <Card>
                   <CardBody className="p-4">
                     <div className="relative mb-4">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-disabled)]" />
                       <input
                         type="text"
                         placeholder={t('pharmAdv.searchDrug')}
                         value={searchDrug}
                         onChange={(e) => setSearchDrug(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-[var(--border-strong)] text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                       />
                     </div>
                     <div className="space-y-1 max-h-[400px] overflow-y-auto">
@@ -424,7 +427,7 @@ export default function PharmacyAdvancedPage() {
                           className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors ${
                             selectedDrugs.includes(drug.name)
                               ? 'bg-primary-50 border border-primary-300'
-                              : 'hover:bg-gray-50 border border-transparent'
+                              : 'hover:bg-[var(--surface-secondary)] border border-transparent'
                           }`}
                         >
                           <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center shrink-0">
@@ -432,7 +435,7 @@ export default function PharmacyAdvancedPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm">{escapeHtml(drug.name)}</p>
-                            <p className="text-xs text-gray-500">{escapeHtml(drug.category)} — {escapeHtml(drug.form)}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{escapeHtml(drug.category)} — {escapeHtml(drug.form)}</p>
                           </div>
                           {selectedDrugs.includes(drug.name) && (
                             <CheckCircle className="w-4 h-4 text-primary-600 shrink-0" />
@@ -441,8 +444,8 @@ export default function PharmacyAdvancedPage() {
                       ))}
                     </div>
                     {selectedDrugs.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <p className="text-sm text-gray-500 mb-2">
+                      <div className="mt-3 pt-3 border-t border-[var(--border)]">
+                        <p className="text-sm text-[var(--text-muted)] mb-2">
                           {t('pharmAdv.selected', { count: String(selectedDrugs.length) } as Record<string, unknown>)}
                         </p>
                         <Button onClick={checkInteractions} className="w-full">
@@ -457,7 +460,7 @@ export default function PharmacyAdvancedPage() {
               <div className="lg:col-span-2">
                 <Card>
                   <CardBody className="p-4">
-                    <h3 className="font-semibold text-gray-900 mb-4">{t('pharmAdv.interactionResults')}</h3>
+                    <h3 className="font-semibold text-[var(--text-primary)] mb-4">{t('pharmAdv.interactionResults')}</h3>
                     {interactions.length === 0 ? (
                       <EmptyState
                         icon={<CheckCircle className="w-8 h-8 text-green-400" />}
@@ -487,13 +490,13 @@ export default function PharmacyAdvancedPage() {
                                 }`}
                               />
                               <div>
-                                <p className="font-medium text-gray-900">
+                                <p className="font-medium text-[var(--text-primary)]">
                                   {escapeHtml(inter.drug1)} ↔ {escapeHtml(inter.drug2)}
                                 </p>
                                 <Badge variant={getSeverityVariant(inter.severity)} className="mt-1">
                                   {t(`pharmAdv.${inter.severity}`)}
                                 </Badge>
-                                <p className="text-sm text-gray-600 mt-1">{escapeHtml(inter.description)}</p>
+                                <p className="text-sm text-[var(--text-secondary)] mt-1">{escapeHtml(inter.description)}</p>
                               </div>
                             </div>
                           </div>
@@ -549,7 +552,7 @@ export default function PharmacyAdvancedPage() {
                       <div key={item.id} className="flex items-center gap-4 p-4 bg-red-50 rounded-lg border border-red-200">
                         <TrendingDown className="w-5 h-5 text-red-500 shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900">{escapeHtml(item.drugName)}</p>
+                          <p className="font-medium text-[var(--text-primary)]">{escapeHtml(item.drugName)}</p>
                           <p className="text-sm text-red-600">
                             {t('pharmAdv.unitsRemaining', {
                               count: String(item.stockQuantity),

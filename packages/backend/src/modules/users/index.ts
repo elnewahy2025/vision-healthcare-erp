@@ -8,6 +8,7 @@ import { sendSuccess, sendError, sendPaginated } from '../../utils/response.js';
 import { authenticate } from '../auth-guard.js';
 import { authorize, hasPermission, type Principal } from '../../services/authorization.js';
 import { logAudit } from '../../services/audit.js';
+import { invalidateUserAuthz } from '../../services/authz-cache.js';
 import { revokeAllUserTokens } from '../../services/refresh-token.js';
 import { getEnv } from '@healthcare/shared/config';
 import { ForbiddenError, ConflictError } from '@healthcare/shared/errors';
@@ -241,6 +242,9 @@ export async function registerUsersModule(app: FastifyInstance) {
       userAgent: request.headers['user-agent'] as string,
     });
 
+    // Invalidate cache for newly created user (in case of immediate login)
+    await invalidateUserAuthz(String(inserted.id));
+
     return sendSuccess(reply, {
       id: inserted.id,
       email: inserted.email,
@@ -320,6 +324,8 @@ export async function registerUsersModule(app: FastifyInstance) {
       ipAddress: request.ip,
       userAgent: request.headers['user-agent'] as string,
     });
+    // Invalidate cached principal when user profile/roles change
+    await invalidateUserAuthz(String(userId));
     return sendSuccess(reply, { userId }, 'User updated');
   });
 

@@ -11,6 +11,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { sanitizeString } from '../lib/sanitize';
 import { formatDateTime } from '../lib/format';
+import { Can } from '../components/Can';
 
 type MonitorTab = 'health' | 'alerts' | 'storage' | 'audit';
 
@@ -144,7 +145,9 @@ export default function SystemMonitorPage() {
     <div>
       <div className="page-header">
         <div><h1 className="page-title">{t('monitor.title')}</h1></div>
-        <Button onClick={load}><RefreshCw className="w-4 h-4" /> {t('monitor.refresh')}</Button>
+        <Can permission="system_monitor.view">
+          <Button onClick={load}><RefreshCw className="w-4 h-4" /> {t('monitor.refresh')}</Button>
+        </Can>
       </div>
 
       <div className="flex gap-2 mb-6 flex-wrap">
@@ -166,7 +169,7 @@ export default function SystemMonitorPage() {
             <span className="text-xl font-bold capitalize">
               {health.status === 'healthy' ? t('monitor.healthy') : health.status === 'degraded' ? t('monitor.degraded') : t('monitor.unhealthy')}
             </span>
-            <span className="text-sm text-gray-500">{t('monitor.uptime')}: {sanitizeString(health.uptime)}</span>
+            <span className="text-sm text-[var(--text-muted)]">{t('monitor.uptime')}: {sanitizeString(health.uptime)}</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -179,7 +182,7 @@ export default function SystemMonitorPage() {
                 <Badge variant={health.database?.status === 'healthy' ? 'success' : 'danger'}>
                   {health.database?.status}
                 </Badge>
-                <p className="text-xs text-gray-500 mt-1">{t('monitor.latency')}: {sanitizeString(health.database?.latency)}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">{t('monitor.latency')}: {sanitizeString(health.database?.latency)}</p>
               </CardBody>
             </Card>
             <Card>
@@ -200,7 +203,7 @@ export default function SystemMonitorPage() {
                   <span className="font-medium">{t('monitor.memory')}</span>
                 </div>
                 <p className="text-xl font-bold">{sanitizeString(health.memory?.heapUsed)}</p>
-                <p className="text-xs text-gray-500">RSS: {sanitizeString(health.memory?.rss)}</p>
+                <p className="text-xs text-[var(--text-muted)]">RSS: {sanitizeString(health.memory?.rss)}</p>
               </CardBody>
             </Card>
             <Card>
@@ -210,7 +213,7 @@ export default function SystemMonitorPage() {
                   <span className="font-medium">{t('monitor.platform')}</span>
                 </div>
                 <p className="text-sm">Node {sanitizeString(health.platform?.node)}</p>
-                <p className="text-xs text-gray-500">{health.platform?.cpus} {t('monitor.cpus')} · {sanitizeString(health.platform?.arch)}</p>
+                <p className="text-xs text-[var(--text-muted)]">{health.platform?.cpus} {t('monitor.cpus')} · {sanitizeString(health.platform?.arch)}</p>
               </CardBody>
             </Card>
           </div>
@@ -219,14 +222,14 @@ export default function SystemMonitorPage() {
             <CardBody>
               <h3 className="font-semibold mb-3">{t('monitor.environment')}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div><p className="text-gray-500">{t('monitor.nodejs')}</p><p className="font-medium">{sanitizeString(health.platform?.node)}</p></div>
-                <div><p className="text-gray-500">{t('monitor.platform')}</p><p className="font-medium">{sanitizeString(health.platform?.platform)}</p></div>
-                <div><p className="text-gray-500">{t('monitor.architecture')}</p><p className="font-medium">{sanitizeString(health.platform?.arch)}</p></div>
-                <div><p className="text-gray-500">{t('monitor.cpus')}</p><p className="font-medium">{health.platform?.cpus}</p></div>
-                <div><p className="text-gray-500">{t('monitor.heapTotal')}</p><p className="font-medium">{sanitizeString(health.memory?.heapTotal)}</p></div>
-                <div><p className="text-gray-500">{t('monitor.heapUsed')}</p><p className="font-medium">{sanitizeString(health.memory?.heapUsed)}</p></div>
-                <div><p className="text-gray-500">{t('monitor.rss')}</p><p className="font-medium">{sanitizeString(health.memory?.rss)}</p></div>
-                <div><p className="text-gray-500">{t('monitor.uptime')}</p><p className="font-medium">{sanitizeString(health.uptime)}</p></div>
+                <div><p className="text-[var(--text-muted)]">{t('monitor.nodejs')}</p><p className="font-medium">{sanitizeString(health.platform?.node)}</p></div>
+                <div><p className="text-[var(--text-muted)]">{t('monitor.platform')}</p><p className="font-medium">{sanitizeString(health.platform?.platform)}</p></div>
+                <div><p className="text-[var(--text-muted)]">{t('monitor.architecture')}</p><p className="font-medium">{sanitizeString(health.platform?.arch)}</p></div>
+                <div><p className="text-[var(--text-muted)]">{t('monitor.cpus')}</p><p className="font-medium">{health.platform?.cpus}</p></div>
+                <div><p className="text-[var(--text-muted)]">{t('monitor.heapTotal')}</p><p className="font-medium">{sanitizeString(health.memory?.heapTotal)}</p></div>
+                <div><p className="text-[var(--text-muted)]">{t('monitor.heapUsed')}</p><p className="font-medium">{sanitizeString(health.memory?.heapUsed)}</p></div>
+                <div><p className="text-[var(--text-muted)]">{t('monitor.rss')}</p><p className="font-medium">{sanitizeString(health.memory?.rss)}</p></div>
+                <div><p className="text-[var(--text-muted)]">{t('monitor.uptime')}</p><p className="font-medium">{sanitizeString(health.uptime)}</p></div>
               </div>
             </CardBody>
           </Card>
@@ -239,7 +242,7 @@ export default function SystemMonitorPage() {
             <Card>
               <CardBody className="text-center py-12">
                 <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-                <p className="text-gray-500">{t('monitor.noAlerts')}</p>
+                <p className="text-[var(--text-muted)]">{t('monitor.noAlerts')}</p>
               </CardBody>
             </Card>
           ) : (
@@ -265,7 +268,7 @@ export default function SystemMonitorPage() {
                         <span className="font-medium">{sanitizeString(a.source)}</span>
                       </div>
                       <p className="text-sm">{sanitizeString(a.message)}</p>
-                      <p className="text-xs text-gray-400 mt-1">{formatTimestamp(a.createdAt)}</p>
+                      <p className="text-xs text-[var(--text-disabled)] mt-1">{formatTimestamp(a.createdAt)}</p>
                     </div>
                     {!a.isAcknowledged && (
                       <Button
@@ -293,9 +296,9 @@ export default function SystemMonitorPage() {
             storage.map((s) => (
               <Card key={s.table}>
                 <CardBody>
-                  <p className="text-sm text-gray-500 capitalize">{sanitizeString(s.table.replace(/_/g, ' '))}</p>
+                  <p className="text-sm text-[var(--text-muted)] capitalize">{sanitizeString(s.table.replace(/_/g, ' '))}</p>
                   <p className="text-xl font-bold">{s.recordCount?.toLocaleString()}</p>
-                  <p className="text-xs text-gray-400">{t('monitor.records')}</p>
+                  <p className="text-xs text-[var(--text-disabled)]">{t('monitor.records')}</p>
                 </CardBody>
               </Card>
             ))
@@ -337,7 +340,7 @@ export default function SystemMonitorPage() {
                   </tr>
                 ) : (
                   filteredAudit.map((l) => (
-                    <tr key={l.id} className="hover:bg-gray-50">
+                    <tr key={l.id} className="hover:bg-[var(--surface-secondary)]">
                       <td><Badge>{sanitizeString(l.action)}</Badge></td>
                       <td className="text-xs">{sanitizeString(l.entity)}</td>
                       <td className="font-mono text-xs">{sanitizeString(l.entityId?.slice(0, 12) ?? '')}</td>

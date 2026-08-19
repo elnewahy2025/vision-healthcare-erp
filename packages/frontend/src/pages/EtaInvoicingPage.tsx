@@ -10,6 +10,7 @@ import {
 import { apiClient as api } from '../lib/api';
 import { escapeHtml } from '../lib/sanitize';
 import { formatDate } from '../lib/format';
+import { Can } from '../components/Can';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -153,7 +154,7 @@ export default function EtaInvoicingPage() {
       key: 'created_at',
       header: t('eta.created'),
       render: (item) => (
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-[var(--text-muted)]">
           {formatDate(item.created_at)}
         </span>
       ),
@@ -165,10 +166,10 @@ export default function EtaInvoicingPage() {
         <div className="flex gap-2">
           <button
             onClick={() => setSelected(item)}
-            className="p-1 rounded hover:bg-gray-100"
+            className="p-1 rounded hover:bg-[var(--surface-hover)]"
             aria-label={t('eta.details')}
           >
-            <Eye className="w-4 h-4 text-gray-500" />
+            <Eye className="w-4 h-4 text-[var(--text-muted)]" />
           </button>
           {item.status === 'draft' && (
             <button
@@ -203,15 +204,15 @@ export default function EtaInvoicingPage() {
           <FileText className="w-6 h-6 text-blue-600" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('eta.title')}</h1>
-          <p className="text-sm text-gray-500">{t('eta.subtitle')}</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('eta.title')}</h1>
+          <p className="text-sm text-[var(--text-muted)]">{t('eta.subtitle')}</p>
         </div>
       </div>
 
       {/* Generate Card */}
       <Card>
         <CardBody className="p-4">
-          <h3 className="font-semibold text-gray-900 mb-3">{t('eta.generateInvoice')}</h3>
+          <h3 className="font-semibold text-[var(--text-primary)] mb-3">{t('eta.generateInvoice')}</h3>
           <div className="flex gap-3 items-end">
             <div className="flex-1">
               <Input
@@ -221,13 +222,15 @@ export default function EtaInvoicingPage() {
                 onChange={(e) => setInvoiceIdInput(e.target.value)}
               />
             </div>
-            <Button
+            <Can permission="eta_invoicing.create">
+          <Button
               onClick={() => void handleGenerate()}
               disabled={generating || !invoiceIdInput.trim()}
             >
               <QrCode className="w-4 h-4 mr-1" />
               {generating ? t('eta.generating') : t('eta.generate')}
             </Button>
+        </Can>
           </div>
         </CardBody>
       </Card>
@@ -237,8 +240,8 @@ export default function EtaInvoicingPage() {
         {stats.map((s) => (
           <Card key={s.label}>
             <CardBody className="p-4 text-center">
-              <p className="text-xs text-gray-500 capitalize mb-1">{t(`eta.${s.label}`) || s.label}</p>
-              <p className="text-2xl font-bold text-gray-900">{s.count}</p>
+              <p className="text-xs text-[var(--text-muted)] capitalize mb-1">{t(`eta.${s.label}`) || s.label}</p>
+              <p className="text-2xl font-bold text-[var(--text-primary)]">{s.count}</p>
             </CardBody>
           </Card>
         ))}
@@ -279,7 +282,7 @@ export default function EtaInvoicingPage() {
           >
             {t('eta.prev')}
           </Button>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-[var(--text-muted)]">
             {t('eta.pageOf', { current: String(page), total: String(totalPages) } as Record<string, unknown>)}
           </span>
           <Button
@@ -303,28 +306,28 @@ export default function EtaInvoicingPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-sm text-gray-500">{t('eta.etaUuid')}</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('eta.etaUuid')}</p>
                 <p className="font-mono text-sm">{escapeHtml(selected.eta_uuid || t('eta.notSubmitted'))}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">{t('eta.etaNumber')}</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('eta.etaNumber')}</p>
                 <p className="font-medium">{escapeHtml(selected.eta_invoice_number || '—')}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">{t('eta.status')}</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('eta.status')}</p>
                 <Badge variant={STATUS_VARIANTS[selected.status] ?? 'gray'}>
                   {t(`eta.${selected.status}`) || selected.status}
                 </Badge>
               </div>
               <div>
-                <p className="text-sm text-gray-500">{t('eta.type')}</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('eta.type')}</p>
                 <p className="capitalize">{t(DOC_TYPE_MAP[selected.document_type] ?? 'eta.invoice')}</p>
               </div>
             </div>
             {selected.qr_code_data && (
               <div>
-                <p className="text-sm text-gray-500 mb-2">{t('eta.qrCodeData')}</p>
-                <div className="bg-gray-50 p-3 rounded-lg text-xs font-mono break-all">
+                <p className="text-sm text-[var(--text-muted)] mb-2">{t('eta.qrCodeData')}</p>
+                <div className="bg-[var(--surface-secondary)] p-3 rounded-lg text-xs font-mono break-all">
                   {escapeHtml(selected.qr_code_data)}
                 </div>
               </div>

@@ -5,11 +5,16 @@ import { getCtx } from '../../utils/route-helper.js';
 import { sendSuccess, sendPaginated } from '../../utils/response.js';
 import { sendNotification } from '../../services/notification.js';
 import { authenticate } from '../auth-guard.js';
-import { authorize } from '../../services/authorization.js';
+import { authorize, hasPermission, type Principal } from '../../services/authorization.js';
+
+function resolveCommScope(principal: Principal): { denied: boolean; branchIds?: string[] } {
+  if (hasPermission(principal, 'communications.view', 'system') || hasPermission(principal, 'communications.view', 'tenant')) return { denied: false };
+  if (hasPermission(principal, 'communications.view', 'branch') || hasPermission(principal, 'communications.view', 'branches')) return { denied: false, branchIds: principal.branches };
+  return { denied: true };
+}
 
 export async function registerCommunicationsModule(app: FastifyInstance) {
 
-  // List notification templates
   app.get('/api/v1/notification-templates', { preHandler: [authenticate, authorize('communications.view')] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const templates = await db('notification_templates')
@@ -22,7 +27,6 @@ export async function registerCommunicationsModule(app: FastifyInstance) {
     })));
   });
 
-  // Update a notification template (tenant-specific override)
   app.put('/api/v1/notification-templates/:id', { preHandler: [authenticate, authorize('communications.edit')] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
@@ -42,8 +46,7 @@ export async function registerCommunicationsModule(app: FastifyInstance) {
     return sendSuccess(reply, { message: 'Template updated' });
   });
 
-  // Create a custom template (tenant-specific)
-  app.post('/api/v1/notification-templates', { preHandler: [authenticate, authorize('communications.view')] }, async (request, reply) => {
+  app.post('/api/v1/notification-templates', { preHandler: [authenticate, authorize('communications.create')] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const body = z.object({
       code: z.string().min(2).max(100), name: z.string().min(1).max(200),
@@ -63,7 +66,6 @@ export async function registerCommunicationsModule(app: FastifyInstance) {
     }, 'Template created', 201);
   });
 
-  // Send test notification
   app.post('/api/v1/notification-templates/:id/test', { preHandler: [authenticate, authorize('communications.manage')] }, async (request, reply) => {
     const { tenantId } = getCtx(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
@@ -82,14 +84,22 @@ export async function registerCommunicationsModule(app: FastifyInstance) {
     return sendSuccess(reply, { sent, message: sent ? 'Test sent successfully' : 'Failed to send test' });
   });
 
-  // List notification logs
   app.get('/api/v1/notification-logs', { preHandler: [authenticate, authorize('notifications.view')] }, async (request, reply) => {
-    const { tenantId } = getCtx(request);
+    const { tenantId, principal } = getCtx(request);
+    const scope = resolveCommScope(principal);
+
     const query = z.object({ page: z.coerce.number().optional().default(1), limit: z.coerce.number().optional().default(20) }).parse(request.query);
 
-    const total = await db('notification_logs').where({ tenant_id: tenantId }).count('id as count').first();
-    const logs = await db('notification_logs').where({ tenant_id: tenantId })
-      .orderBy('created_at', 'desc').limit(query.limit).offset((query.page - 1) * query.limit);
+    let totalQ = db('notification_logs').where({ tenant_id: tenantId });
+    let logsQ = db('notification_logs').where({ tenant_id: tenantId });
+
+    if (scope.denied) {
+      totalQ = totalQ.where(db.raw('false'));
+      logsQ = logsQ.where(db.raw('false'));
+    }
+
+    const total = await totalQ.count('id as count').first();
+    const logs = await logsQ.orderBy('created_at', 'desc').limit(query.limit).offset((query.page - 1) * query.limit);
 
     return sendPaginated(reply, logs, Number((total as Record<string, unknown>)?.count || 0), query.page, query.limit);
   });

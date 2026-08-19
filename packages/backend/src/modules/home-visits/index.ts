@@ -4,18 +4,44 @@ import { sendSuccess } from '../../utils/response.js';
 import { getCtx, getTenantId } from '../../utils/route-helper.js';
 import { authenticate } from '../auth-guard.js';
 import { authorize } from '../../services/authorization.js';
+import { resolveModuleScope } from '../../services/module-scope-helpers.js';
 import type { HomeVisitRow } from "../types.js";
 
 export async function registerHomeVisitsModule(app: FastifyInstance) {
   app.get('/api/v1/home-visits', { preHandler: [authenticate, authorize('home_visits.view')] }, async (request, reply) => {
-    const tenantId = getTenantId(request); const { status, assignedTo } = request.query as { assignedTo?: string; status?: string };
+    const tenantId = getTenantId(request);
+    const { principal } = getCtx(request);
+    const { status, assignedTo } = request.query as { assignedTo?: string; status?: string };
+    const scope = await resolveModuleScope(principal, 'home_visits');
+
     let q = db('home_visits').where('home_visits.tenant_id', tenantId).whereNull('home_visits.deleted_at');
+
+    if (scope.denied) {
+      q = q.where(db.raw('false'));
+    } else if (scope.branchIds !== undefined) {
+      if (scope.branchIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('home_visits.patient_id', function () {
+          this.select('id').from('patients').whereIn('branch_id', scope.branchIds!);
+        });
+      }
+    } else if (scope.patientIds !== undefined) {
+      if (scope.patientIds.length === 0) {
+        q = q.where(db.raw('false'));
+      } else {
+        q = q.whereIn('home_visits.patient_id', scope.patientIds);
+      }
+    }
+
     if (status) q = q.andWhere('home_visits.status', status);
     if (assignedTo) q = q.andWhere('home_visits.assigned_to', assignedTo);
+
     const visits = await q.join('patients', 'home_visits.patient_id', 'patients.id')
       .leftJoin('users', 'home_visits.assigned_to', 'users.id')
       .select('home_visits.*', 'patients.first_name as p_first', 'patients.last_name as p_last', 'users.first_name as n_first', 'users.last_name as n_last')
       .orderBy('scheduled_date', 'asc').limit(50);
+
     return sendSuccess(reply, visits.map((v: Record<string, unknown>) => ({
       id: v.id, visitNumber: v.visit_number, patientId: v.patient_id,
       patientName: String(v.p_first) + ' ' + String(v.p_last), status: v.status,
@@ -26,7 +52,7 @@ export async function registerHomeVisitsModule(app: FastifyInstance) {
     })));
   });
 
-  app.post('/api/v1/home-visits', { preHandler: [authenticate, authorize('home_visits.view')] }, async (request, reply) => {
+  app.post('/api/v1/home-visits', { preHandler: [authenticate, authorize('home_visits.create')] }, async (request, reply) => {
     const tenantId = getTenantId(request); const ctx = getCtx(request); const body = request.body as Record<string, unknown>;
     const visitNum = "HV-" + Date.now().toString(36).toUpperCase();
     const [visit] = await db('home_visits').insert({
