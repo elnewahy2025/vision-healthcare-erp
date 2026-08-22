@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const API_BASE = process.env.E2E_API_URL || 'http://localhost:3000';
+const API_BASE = process.env.E2E_API_URL || 'http://127.0.0.1:4000';
 
 test.describe('API Health', () => {
   test('health endpoint returns 200', async ({ request }) => {

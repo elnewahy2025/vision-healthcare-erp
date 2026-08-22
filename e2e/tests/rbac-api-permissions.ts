@@ -8,10 +8,10 @@
  *   npx tsx e2e/tests/rbac-api-permissions.ts
  *
  * Prerequisites:
- *   - Backend running on localhost:3000
+ *   - Backend running on 127.0.0.1:4000
  *   - Seed data applied
  */
-const API = process.env.API_URL || 'http://localhost:3000';
+const API = process.env.API_URL || 'http://127.0.0.1:4000';
 
 // ─── Types ──────────────────────────────────────────────────────────
 

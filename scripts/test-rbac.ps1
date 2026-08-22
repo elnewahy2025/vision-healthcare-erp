@@ -31,10 +31,10 @@ Write-Host ""
 # Check if backend is running
 Write-Host -NoNewline "Checking backend... "
 try {
-    $health = Invoke-RestMethod -Uri "http://localhost:3000/api/v1/health" -Method GET -TimeoutSec 3
+    $health = Invoke-RestMethod -Uri "http://127.0.0.1:4000/api/v1/health" -Method GET -TimeoutSec 3
     Write-Host "running" -ForegroundColor Green
 } catch {
-    Write-Host "not running on :3000" -ForegroundColor Red
+    Write-Host "not running on :4000" -ForegroundColor Red
     Write-Host "Start the Docker stack first: docker compose up -d"
     exit 1
 }

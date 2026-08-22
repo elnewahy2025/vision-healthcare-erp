@@ -8,7 +8,7 @@
  *   npx playwright test e2e/tests/rbac-role-matrix.spec.ts
  *
  * Prerequisites:
- *   - Docker stack running (backend on :3000, frontend on :5173 or :81)
+ *   - Docker stack running (backend on :4000, frontend on :5173 or :81)
  *   - Seed data applied (npm run seed)
  *   - Environment: E2E_BASE_URL=http://localhost:81 (or 5173)
  */
@@ -16,7 +16,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 // ─── Configuration ──────────────────────────────────────────────────
 
-const API_BASE = process.env.E2E_API_URL || 'http://localhost:3000';
+const API_BASE = process.env.E2E_API_URL || 'http://127.0.0.1:4000';
 const FRONTEND = process.env.E2E_BASE_URL || 'http://localhost:81';
 
 /**

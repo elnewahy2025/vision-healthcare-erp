@@ -5,7 +5,7 @@
 # Runs all RBAC integration tests and generates a report.
 #
 # Prerequisites:
-#   - Docker stack running (backend :3000, frontend :81)
+#   - Docker stack running (backend :4000, frontend :81)
 #   - Seed data applied
 #
 # Usage:
@@ -29,10 +29,10 @@ echo ""
 
 # Check if backend is running
 echo -n "Checking backend... "
-if curl -s http://localhost:3000/api/v1/health > /dev/null 2>&1; then
+if curl -s http://127.0.0.1:4000/api/v1/health > /dev/null 2>&1; then
   echo -e "${GREEN}running${NC}"
 else
-  echo -e "${RED}not running on :3000${NC}"
+  echo -e "${RED}not running on :4000${NC}"
   echo "Start the Docker stack first: docker compose up -d"
   exit 1
 fi
